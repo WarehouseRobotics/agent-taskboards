@@ -10,5 +10,6 @@
     "sourceMap": true,
     "types": ["node"]
   },
-  "include": ["api/**/*.ts"]
+  "include": ["api/**/*.ts"],
+  "exclude": ["api/**/*.test.ts", "api/**/*.spec.ts"]
 }

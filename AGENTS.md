@@ -16,6 +16,22 @@ The project has two runtime components:
 Use `docker compose ...` for normal project operations. Do not run `npm install`
 on the host machine; dependency installation should happen inside Docker.
 
+## Runtime Directories
+
+Docker Compose bind-mounts a few repo-root directories so local runtime state is
+visible to developers on the host machine:
+
+- `data/` -> `/data`: durable local application data. The default SQLite
+  database lives at `/data/taskboards.sqlite`, controlled by
+  `TASKBOARDS_DB_PATH`.
+- `uploads/` -> `/uploads`: durable uploaded or imported files that should be
+  available to the API across container restarts.
+- `tmp/` -> `/tmp/taskboards`: scratch space for temporary files, staging, and
+  generated intermediates. Do not rely on files here as durable data.
+
+The contents of these directories are ignored by git. Keep the `.keep` files so
+the directories exist in fresh checkouts.
+
 ## Docker Workflow
 
 The app is exposed on `http://localhost:8142`.

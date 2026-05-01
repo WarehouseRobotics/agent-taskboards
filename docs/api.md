@@ -128,6 +128,20 @@ Maintenance APIs should be available to both the UI and trusted local agents.
 Potentially destructive operations should require explicit confirmation fields
 or similarly deliberate request shapes.
 
+## Files and Runtime Paths
+
+The API should treat runtime files according to their Docker-mounted purpose:
+
+- `/data`: durable application data. The SQLite database defaults to
+  `/data/taskboards.sqlite`.
+- `/uploads`: durable uploaded or imported files. Future file attachment APIs
+  should store persistent files here or in subdirectories below it.
+- `/tmp/taskboards`: temporary scratch space for upload staging, extraction,
+  generated intermediates, or other disposable work.
+
+API code should not store durable user or agent data in `/tmp/taskboards`.
+Temporary files should be safe for maintenance tooling to remove.
+
 ## Error Shape
 
 Errors should use a consistent JSON shape:

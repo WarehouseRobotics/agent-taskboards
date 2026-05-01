@@ -14,11 +14,13 @@
     "build": "npm run build:api && npm run build:ui",
     "build:api": "tsc -p tsconfig.api.json",
     "build:ui": "vite build",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx api/db/migrate.ts",
     "start": "node dist/api/index.js",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@toon-format/toon": "^2.1.0",

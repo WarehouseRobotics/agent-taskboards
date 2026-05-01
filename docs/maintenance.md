@@ -17,6 +17,21 @@ Maintenance features should help humans and trusted local agents:
 SQLite records are the source of truth. Embedding vectors and search indexes are
 derived data that can be rebuilt.
 
+## Runtime Directories
+
+The app uses repo-root bind mounts for local runtime state:
+
+- `data/`: durable database storage, mapped to `/data` in Docker. The default
+  SQLite file is `data/taskboards.sqlite` on the host and
+  `/data/taskboards.sqlite` in the container.
+- `uploads/`: durable uploaded or imported files, mapped to `/uploads`.
+- `tmp/`: temporary scratch space, mapped to `/tmp/taskboards`.
+
+`data/` and `uploads/` should survive normal container restarts. `tmp/` is for
+files that can be regenerated or safely cleaned up. Maintenance tooling may
+purge stale files from `tmp/`, but should not delete durable uploads or database
+files without an explicit destructive action.
+
 ## Archival
 
 Archive should be the default cleanup path. Archived projects, boards, and tasks

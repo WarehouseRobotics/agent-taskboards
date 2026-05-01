@@ -4,10 +4,14 @@ services:
       context: .
     environment:
       TASKBOARDS_DEBUG: "${TASKBOARDS_DEBUG-1}"
+      TASKBOARDS_DB_PATH: "/data/taskboards.sqlite"
     ports:
       - "8142:8142"
     volumes:
       - .:/app
+      - ./data:/data
+      - ./uploads:/uploads
+      - ./tmp:/tmp/taskboards
       - taskboards_node_modules:/app/node_modules
 
 volumes:

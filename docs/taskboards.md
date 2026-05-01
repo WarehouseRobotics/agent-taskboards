@@ -113,6 +113,21 @@ The project has two runtime components:
 Normal project operations should run through Docker. Dependency installation is
 intended to happen inside the container, not on the host machine.
 
+## Runtime Directories
+
+Docker Compose maps host-visible runtime folders from the repository root into
+the container:
+
+- `data/` maps to `/data` and stores durable local application data. The default
+  SQLite database path is `/data/taskboards.sqlite`.
+- `uploads/` maps to `/uploads` and stores durable uploaded, imported, or
+  agent-provided files associated with taskboard workflows.
+- `tmp/` maps to `/tmp/taskboards` and stores temporary scratch files, staging
+  output, and generated intermediates that can be discarded.
+
+Only the directory placeholders are meant to be tracked in git. Runtime contents
+should stay local and ignored.
+
 ## Supporting Docs
 
 - `docs/tasks-and-boards.md`: domain model and ownership rules

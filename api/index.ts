@@ -1,13 +1,35 @@
 import express from "express";
 import { join, resolve } from "node:path";
+import { getDatabaseClient } from "./db/client.js";
+import { runMigrations } from "./db/migrate.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
+const migrationResult = runMigrations();
+const databaseClient = getDatabaseClient();
 
 app.use(express.json());
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true });
+  try {
+    databaseClient.sqlite.prepare("SELECT 1").get();
+    res.json({
+      ok: true,
+      database: {
+        ok: true,
+        path: databaseClient.databasePath,
+        migrations: migrationResult,
+      },
+    });
+  } catch (error) {
+    res.status(503).json({
+      ok: false,
+      database: {
+        ok: false,
+        error: error instanceof Error ? error.message : "Unknown database error",
+      },
+    });
+  }
 });
 
 if (process.env.NODE_ENV === "production") {

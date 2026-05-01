@@ -1,6 +1,14 @@
 node_modules/
 dist/
 coverage/
+data/
+uploads/*
+!uploads/.keep
+tmp/*
+!tmp/.keep
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 .env
 .env.*
 !.env.example
