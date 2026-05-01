@@ -1,0 +1,1 @@
+TODO: Explain how text embeddings and node ollama models work

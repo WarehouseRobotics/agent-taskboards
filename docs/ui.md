@@ -1,0 +1,1 @@
+# TODO: Explain how UI works (considering that design is explained in design.md)

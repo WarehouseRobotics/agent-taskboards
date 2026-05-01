@@ -1,0 +1,6 @@
+.git/
+coverage/
+dist/
+models-gguf/
+node_modules/
+npm-debug.log*
