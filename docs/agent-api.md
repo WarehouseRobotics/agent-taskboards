@@ -256,7 +256,7 @@ for expansion.
 
 ### `GET /api/agents/tasks`
 
-Discovers tasks across projects and boards. This is the primary endpoint for
+Main endpoint for getting tasks. Discovers tasks across projects and boards. This is the primary endpoint for
 agents that know what work they want but may not know the board.
 
 Supported query parameters:
