@@ -1,94 +1,192 @@
-# Tasks, Boards, Projects, and Other Objects
+# Tasks, Boards, Projects, Comments, And Activity
 
-This document defines the domain model for Agent Taskboards. The main product
-spec is `docs/taskboards.md`; this file expands the object relationships and
-state semantics.
+This document defines the core project-management domain model for Agent
+Taskboards. Lower-level storage details, JSON data conventions, timestamps, and
+database-oriented types live in `docs/data.md`.
 
 ## Ownership Model
 
 The app is single-user and local. There are no accounts, teams, tenants, or
-permission boundaries in the v1 model. The ownership hierarchy is:
+permission boundaries in the v1 model.
+
+The ownership hierarchy is:
 
 ```text
 project -> board -> task -> comments/activity
 ```
 
-A project owns boards. A board owns tasks. A task owns its comments and activity
-entries.
+A project owns boards. A board owns workflow columns and tasks. A task owns its
+comments and activity entries. Child records carry parent IDs so agents can cite
+and validate context without relying on UI state.
 
 ## Projects
 
 A project represents a repository, product, customer workstream, or other
-developer-owned scope. Projects are the top-level unit that agents use to avoid
+developer-owned scope. Projects are the top-level unit agents use to avoid
 mixing context across unrelated work.
 
-Projects should have:
+Project concepts:
 
-- a durable ID
-- a human-readable name
-- an optional description
-- optional local metadata such as repository path or default branch
-- timestamps for creation and last update
-- an archived state instead of hard deletion by default
+- durable ID
+- human-readable name
+- optional description
+- optional repository path
+- optional default branch
+- open-ended metadata for local conventions
+- active or archived state
+- creation and update timestamps
+
+Projects are archived instead of hard-deleted by normal user and API flows.
 
 ## Boards
 
-A board organizes tasks for one project. A project may have several boards when
-the user wants separate views for different efforts, such as a backlog, release
-plan, bug queue, or active agent work session.
+A board organizes tasks for one project. A project may have several boards for
+different efforts, such as backlog management, release work, bug triage, or an
+active agent work session.
 
-Boards should have:
+Board concepts:
 
-- a durable ID
-- a parent project ID
-- a name and optional description
-- an ordered set of workflow columns
-- timestamps for creation and last update
-- an archived state
+- durable ID
+- parent project ID
+- name and optional description
+- ordered workflow columns
+- open-ended metadata
+- active or archived state
+- creation and update timestamps
 
-Columns represent workflow state. The app should support common Kanban states
-such as backlog, ready, in progress, blocked, review, and done, while allowing
-future customization.
+Boards are archived instead of hard-deleted by normal user and API flows.
+
+## Workflow Columns
+
+Columns represent workflow state on a board. They are owned by a single board
+and are ordered by numeric `position`.
+
+Column concepts:
+
+- durable ID
+- parent board ID
+- stable `key` for API and agent use
+- human-readable name
+- numeric position
+- `isDone` marker
+
+New boards receive these default columns unless callers provide their own:
+
+```text
+backlog, ready, in_progress, blocked, review, done
+```
+
+Only `done` is marked `isDone` in the default workflow. Moving a task into any
+done column completes it; moving it to a non-done column clears completion.
+
+The current starter API supports defining columns at board creation time. Editing
+columns after board creation is planned but not implemented.
 
 ## Tasks
 
 Tasks are the primary unit of work. They should be small enough for a human or
-coding agent to reason about and update, but flexible enough to carry the
-context needed for implementation.
+coding agent to reason about and update, while carrying enough context for
+implementation and handoff.
 
-Tasks should have:
+Task concepts:
 
-- a durable ID
+- durable ID
 - parent project and board IDs
-- a title and optional description
-- a column or status
-- an order within the column
-- optional priority, labels, and external references
-- timestamps for creation, last update, and completion when applicable
-- an archived state
+- current column ID
+- title and optional description
+- numeric position within the column
+- priority
+- labels
+- external references
+- open-ended metadata
+- optional completion timestamp
+- active or archived state
+- creation and update timestamps
 
-Moving a task is an explicit state transition. API clients should not need to
-infer movement by rewriting a whole board.
+Supported priorities are:
 
-## Comments and Activity
+```text
+low, normal, high, urgent
+```
 
-Comments and activity provide task history. They are especially important for
-agent workflows because they preserve decisions, partial progress, blockers,
-handoffs, and useful memory.
+Task movement is an explicit state transition. Clients move a task by
+destination column and optional position; they do not rewrite the whole board.
+The system reorders affected tasks in the source and destination columns.
 
-Comments are user- or agent-authored notes. Activity entries are structured
-events produced by the system when tasks are created, moved, updated, archived,
-or completed.
+Completing a task and moving a task to a done column are related but distinct:
 
-The v1 docs should treat comments and activity as append-oriented. Existing
-entries should remain stable so agents can cite and search historical context.
+- `complete` sets `completedAt` without changing columns.
+- `move` into an `isDone` column sets `completedAt`.
+- `move` to a non-done column clears `completedAt`.
 
-## Archival and Deletion
+Tasks are archived instead of hard-deleted by normal user and API flows.
 
-Archive should be the default way to remove projects, boards, and tasks from
-active views. Hard deletion can exist as a maintenance operation, but it should
-be deliberate because old task context may still be useful for semantic search
-and agent memory.
+## Comments
 
-Archived objects should be excluded from normal active views unless explicitly
-requested.
+Comments are durable notes authored by humans or agents. They preserve context
+such as progress, blockers, decisions, handoffs, and implementation notes.
+
+Comment concepts:
+
+- durable ID
+- parent project, board, and task IDs
+- author type
+- optional author name
+- optional author reference
+- body
+- open-ended metadata
+- creation timestamp
+
+Supported author types are:
+
+```text
+human, agent, system
+```
+
+Comments are append-oriented. The current API creates and lists comments; it
+does not edit or delete them.
+
+## Activity
+
+Activity entries are structured history generated by the system for important
+task changes. Activity gives agents and humans a stable audit trail without
+having to infer changes from current task state.
+
+Activity concepts:
+
+- durable ID
+- parent project, board, and task IDs
+- actor type
+- optional actor name
+- optional actor reference
+- event type
+- human-readable summary
+- structured data payload
+- creation timestamp
+
+Current generated event types:
+
+- `task.created`
+- `task.updated`
+- `task.moved`
+- `task.completed`
+- `task.archived`
+- `comment.created`
+
+Supported actor types are:
+
+```text
+human, agent, system
+```
+
+Activity is append-oriented and system-generated in the starter API.
+
+## Archival And Deletion
+
+Archive is the default removal path for projects, boards, and tasks. Archived
+objects are excluded from normal active views unless a caller explicitly asks to
+include archived content.
+
+Hard deletion can exist later as a maintenance operation, but it should remain
+deliberate because archived task context may still be useful for search,
+semantic memory, handoffs, and audit history.

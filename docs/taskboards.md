@@ -6,9 +6,10 @@ to make agentic AI coding workflows easier to coordinate: projects have boards,
 boards have tasks, and both humans and coding agents can use the same task data
 through a UI and a deterministic API.
 
-The current codebase is a scaffold for this product direction. The docs in this
-directory describe the intended v1 behavior unless they explicitly mention
-current implementation status.
+The current codebase includes a starter implementation for the project, board,
+task, comment, and activity API. The docs in this directory describe the
+implemented starter surface and intended v1 behavior for areas that are still
+planned.
 
 ## Core Idea
 
@@ -131,7 +132,8 @@ should stay local and ignored.
 ## Supporting Docs
 
 - `docs/tasks-and-boards.md`: domain model and ownership rules
-- `docs/api.md`: planned v1 API contract and conventions
+- `docs/api.md`: implemented starter API contract and planned API areas
+- `docs/data.md`: storage, timestamps, JSON fields, and low-level data details
 - `docs/text-embedding.md`: local embedding and semantic search design
 - `docs/ui.md`: UI architecture and user experience principles
 - `docs/design.md`: visual and interaction design rules
