@@ -7,7 +7,9 @@ import type {
   BoardCreateInput,
   BoardUpdateInput,
 } from "../models/request-schemas.js";
+import { runBestEffortIndex } from "./best-effort-index.js";
 import type { ProjectService } from "./project-service.js";
+import type { SearchService } from "./search-service.js";
 
 export class BoardService {
   private readonly db: DatabaseClient["db"];
@@ -15,6 +17,7 @@ export class BoardService {
   constructor(
     databaseClient: DatabaseClient,
     private readonly projectService: ProjectService,
+    private readonly searchService: SearchService,
   ) {
     this.db = databaseClient.db;
   }
@@ -31,16 +34,18 @@ export class BoardService {
       : this.db
           .select()
           .from(boards)
-          .where(and(eq(boards.projectId, projectId), isNull(boards.archivedAt)))
+          .where(
+            and(eq(boards.projectId, projectId), isNull(boards.archivedAt)),
+          )
           .orderBy(asc(boards.name))
           .all();
   }
 
-  createBoard(projectId: string, input: BoardCreateInput) {
+  async createBoard(projectId: string, input: BoardCreateInput) {
     const project = this.projectService.getProject(projectId, false);
     const inputColumns = input.columns ?? defaultBoardColumns;
 
-    return this.db.transaction((tx) => {
+    const created = this.db.transaction((tx) => {
       const board = tx
         .insert(boards)
         .values({
@@ -68,6 +73,12 @@ export class BoardService {
 
       return { board, columns };
     });
+
+    await runBestEffortIndex(
+      { sourceType: "board", sourceId: created.board.id },
+      () => this.searchService.indexBoard(created.board),
+    );
+    return created;
   }
 
   getBoard(projectId: string, boardId: string, includeArchived: boolean) {
@@ -96,15 +107,24 @@ export class BoardService {
     return board;
   }
 
-  updateBoard(projectId: string, boardId: string, input: BoardUpdateInput) {
+  async updateBoard(
+    projectId: string,
+    boardId: string,
+    input: BoardUpdateInput,
+  ) {
     this.projectService.getProject(projectId, false);
     this.getBoard(projectId, boardId, false);
-    return this.db
+    const board = this.db
       .update(boards)
       .set(input)
       .where(eq(boards.id, boardId))
       .returning()
       .get();
+
+    await runBestEffortIndex({ sourceType: "board", sourceId: board.id }, () =>
+      this.searchService.indexBoard(board),
+    );
+    return board;
   }
 
   archiveBoard(projectId: string, boardId: string) {

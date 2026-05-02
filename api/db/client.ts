@@ -1,7 +1,11 @@
 import Database from "better-sqlite3";
-import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import {
+  drizzle,
+  type BetterSQLite3Database,
+} from "drizzle-orm/better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { load as loadSqliteVec } from "sqlite-vec";
 import * as schema from "./schema.js";
 
 export const DEFAULT_DATABASE_PATH = "/data/taskboards.sqlite";
@@ -25,6 +29,7 @@ export function createDatabaseClient(
   ensureDatabaseDirectory(databasePath);
 
   const sqlite = new Database(databasePath);
+  loadSqliteVec(sqlite);
   sqlite.pragma("foreign_keys = ON");
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("busy_timeout = 5000");

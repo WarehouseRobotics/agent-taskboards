@@ -1,5 +1,10 @@
 import type { Express } from "express";
-import { parseBody, parseNonEmptyBody, parseQuery } from "../http/validation.js";
+import { asyncHandler } from "../http/async-handler.js";
+import {
+  parseBody,
+  parseNonEmptyBody,
+  parseQuery,
+} from "../http/validation.js";
 import {
   commentCreateSchema,
   includeArchivedQuerySchema,
@@ -28,19 +33,22 @@ export function registerTaskRoutes(app: Express, services: ApiServices) {
     res.json({ tasks: tasks.map(serializeTask) });
   });
 
-  app.post("/api/projects/:projectId/boards/:boardId/tasks", (req, res) => {
-    const body = parseBody(req, taskCreateSchema);
-    const created = services.tasks.createTask(
-      req.params.projectId,
-      req.params.boardId,
-      body,
-    );
+  app.post(
+    "/api/projects/:projectId/boards/:boardId/tasks",
+    asyncHandler(async (req, res) => {
+      const body = parseBody(req, taskCreateSchema);
+      const created = await services.tasks.createTask(
+        req.params.projectId,
+        req.params.boardId,
+        body,
+      );
 
-    res.status(201).json({
-      task: serializeTask(created.task),
-      activity: serializeActivity(created.activity),
-    });
-  });
+      res.status(201).json({
+        task: serializeTask(created.task),
+        activity: serializeActivity(created.activity),
+      });
+    }),
+  );
 
   app.get("/api/tasks/:taskId", (req, res) => {
     const { includeArchived } = parseQuery(req, includeArchivedQuerySchema);
@@ -48,15 +56,18 @@ export function registerTaskRoutes(app: Express, services: ApiServices) {
     res.json({ task: serializeTask(task) });
   });
 
-  app.patch("/api/tasks/:taskId", (req, res) => {
-    const body = parseNonEmptyBody(req, taskUpdateSchema);
-    const updated = services.tasks.updateTask(req.params.taskId, body);
+  app.patch(
+    "/api/tasks/:taskId",
+    asyncHandler(async (req, res) => {
+      const body = parseNonEmptyBody(req, taskUpdateSchema);
+      const updated = await services.tasks.updateTask(req.params.taskId, body);
 
-    res.json({
-      task: serializeTask(updated.task),
-      activity: serializeActivity(updated.activity),
-    });
-  });
+      res.json({
+        task: serializeTask(updated.task),
+        activity: serializeActivity(updated.activity),
+      });
+    }),
+  );
 
   app.post("/api/tasks/:taskId/move", (req, res) => {
     const body = parseBody(req, taskMoveSchema);
@@ -91,15 +102,21 @@ export function registerTaskRoutes(app: Express, services: ApiServices) {
     res.json({ comments: comments.map(serializeComment) });
   });
 
-  app.post("/api/tasks/:taskId/comments", (req, res) => {
-    const body = parseBody(req, commentCreateSchema);
-    const created = services.comments.createComment(req.params.taskId, body);
+  app.post(
+    "/api/tasks/:taskId/comments",
+    asyncHandler(async (req, res) => {
+      const body = parseBody(req, commentCreateSchema);
+      const created = await services.comments.createComment(
+        req.params.taskId,
+        body,
+      );
 
-    res.status(201).json({
-      comment: serializeComment(created.comment),
-      activity: serializeActivity(created.activity),
-    });
-  });
+      res.status(201).json({
+        comment: serializeComment(created.comment),
+        activity: serializeActivity(created.activity),
+      });
+    }),
+  );
 
   app.get("/api/tasks/:taskId/activity", (req, res) => {
     const activity = services.comments.listTaskActivity(req.params.taskId);

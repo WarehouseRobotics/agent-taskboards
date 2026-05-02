@@ -16,6 +16,7 @@
     "build:ui": "vite build",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx api/db/migrate.ts",
+    "embeddings:reindex": "tsx api/embeddings/reindex.ts",
     "start": "node dist/api/index.js",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",

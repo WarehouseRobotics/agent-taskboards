@@ -5,9 +5,9 @@ and comments searchable as long-term memory for coding agents. The goal is to
 let agents retrieve useful local context without sending task data to a hosted
 embedding service.
 
-## Planned Stack
+## Stack
 
-The planned v1 embedding stack is:
+The v1 embedding stack is:
 
 - `node-llama-cpp` for loading and running a local GGUF embedding model
 - `models-gguf/bge-small-en-v1.5-f32.gguf` as the bundled embedding model
@@ -52,13 +52,13 @@ test runs do not require committing model weights.
 The embedding index should cover content that helps humans and agents recover
 project context:
 
-- project names and descriptions
 - board names and descriptions
 - task titles and descriptions
 - task comments
-- important activity summaries when they contain useful semantic context
 
-Each indexed chunk should store enough metadata to trace a search result back to
+Projects and activity are intentionally not indexed in the first implementation.
+
+Each indexed chunk stores enough metadata to trace a search result back to
 the canonical object: object type, object ID, project ID, board ID when
 applicable, task ID when applicable, and timestamps.
 
@@ -68,7 +68,7 @@ Semantic search should be exposed through the API as a retrieval primitive for
 agents. A typical agent should be able to ask for related tasks or comments
 before starting work, after encountering a blocker, or during handoff.
 
-Search should support:
+Search supports:
 
 - global queries across active content
 - scoped queries within a project or board
@@ -81,12 +81,17 @@ should also include stable IDs so agents can fetch full canonical records.
 
 ## Index Lifecycle
 
-Embeddings should be created or refreshed when indexed text changes. The API and
-UI should also expose maintenance operations for reindexing when needed.
+Embeddings are created or refreshed inline after indexed text changes. A
+developer maintenance script can force-rebuild all board, task, and comment
+embeddings:
+
+```sh
+docker compose exec taskboards npm run embeddings:reindex
+```
 
 Expected lifecycle events:
 
-- create embeddings when projects, boards, tasks, or comments are created
+- create embeddings when boards, tasks, or comments are created
 - update embeddings when indexed text changes
 - preserve or mark embeddings for archived content depending on search filters
 - support full reindexing as a maintenance action

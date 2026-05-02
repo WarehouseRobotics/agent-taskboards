@@ -2,8 +2,10 @@ import { asc, eq } from "drizzle-orm";
 import type { DatabaseClient } from "../db/client.js";
 import { taskActivity, taskComments } from "../db/schema.js";
 import type { CommentCreateInput } from "../models/request-schemas.js";
+import { runBestEffortIndex } from "./best-effort-index.js";
 import type { BoardService } from "./board-service.js";
 import type { ProjectService } from "./project-service.js";
+import type { SearchService } from "./search-service.js";
 import type { TaskService } from "./task-service.js";
 
 export class CommentService {
@@ -14,6 +16,7 @@ export class CommentService {
     private readonly projectService: ProjectService,
     private readonly boardService: BoardService,
     private readonly taskService: TaskService,
+    private readonly searchService: SearchService,
   ) {
     this.db = databaseClient.db;
   }
@@ -28,10 +31,10 @@ export class CommentService {
       .all();
   }
 
-  createComment(taskId: string, input: CommentCreateInput) {
+  async createComment(taskId: string, input: CommentCreateInput) {
     const task = this.taskService.getTask(taskId, false);
 
-    return this.db.transaction((tx) => {
+    const created = this.db.transaction((tx) => {
       const comment = tx
         .insert(taskComments)
         .values({
@@ -65,6 +68,12 @@ export class CommentService {
 
       return { comment, activity };
     });
+
+    await runBestEffortIndex(
+      { sourceType: "comment", sourceId: created.comment.id },
+      () => this.searchService.indexComment(created.comment),
+    );
+    return created;
   }
 
   listTaskActivity(taskId: string) {
@@ -80,7 +89,11 @@ export class CommentService {
   getTaskContext(taskId: string) {
     const task = this.taskService.getTask(taskId, true);
     const project = this.projectService.getProject(task.projectId, true);
-    const board = this.boardService.getBoard(task.projectId, task.boardId, true);
+    const board = this.boardService.getBoard(
+      task.projectId,
+      task.boardId,
+      true,
+    );
     const columns = this.boardService.listBoardColumns(board.id);
     const comments = this.listTaskComments(task.id);
     const activity = this.listTaskActivity(task.id);

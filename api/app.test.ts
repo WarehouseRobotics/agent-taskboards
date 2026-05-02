@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./app.js";
 import { createDatabaseClient, type DatabaseClient } from "./db/client.js";
 import { runMigrations } from "./db/migrate.js";
+import { searchDocuments } from "./db/schema.js";
+import { createFakeEmbeddingModel } from "./testing/fake-embedding-model.js";
 
 describe("starter API", () => {
   let tmpDir: string | undefined;
@@ -23,7 +25,11 @@ describe("starter API", () => {
     });
 
     client = createDatabaseClient(databasePath);
-    const app = createApp({ databaseClient: client, migrationResult });
+    const app = createApp({
+      databaseClient: client,
+      migrationResult,
+      embeddingModel: createFakeEmbeddingModel(),
+    });
 
     await new Promise<void>((resolveServer) => {
       server = app.listen(0, "127.0.0.1", resolveServer);
@@ -76,9 +82,13 @@ describe("starter API", () => {
     const projectId = stringProp(project, "id");
     expect(stringProp(project, "name")).toBe("Agent Taskboards");
 
-    const boardResponse = await api("POST", `/api/projects/${projectId}/boards`, {
-      name: "Implementation",
-    });
+    const boardResponse = await api(
+      "POST",
+      `/api/projects/${projectId}/boards`,
+      {
+        name: "Implementation",
+      },
+    );
 
     expect(boardResponse.status).toBe(201);
     const board = objectProp(boardResponse.body, "board");
@@ -119,9 +129,9 @@ describe("starter API", () => {
     });
 
     expect(commentResponse.status).toBe(201);
-    expect(stringProp(objectProp(commentResponse.body, "comment"), "body")).toBe(
-      "First implementation pass is underway.",
-    );
+    expect(
+      stringProp(objectProp(commentResponse.body, "comment"), "body"),
+    ).toBe("First implementation pass is underway.");
 
     const activityResponse = await api("GET", `/api/tasks/${taskId}/activity`);
     expect(activityResponse.status).toBe(200);
@@ -144,6 +154,20 @@ describe("starter API", () => {
     );
     expect(arrayProp(contextResponse.body, "comments")).toHaveLength(1);
     expect(arrayProp(contextResponse.body, "activity")).toHaveLength(2);
+
+    if (!client) {
+      throw new Error("Expected test database client");
+    }
+
+    const indexedDocuments = client.db.select().from(searchDocuments).all();
+    expect(
+      indexedDocuments.map((document) => document.sourceType).sort(),
+    ).toEqual(["board", "comment", "task"]);
+    expect(
+      indexedDocuments.every(
+        (document) => document.embeddingStatus === "indexed",
+      ),
+    ).toBe(true);
   });
 
   it("moves tasks by column key, reorders positions, and updates completion state", async () => {
@@ -151,19 +175,27 @@ describe("starter API", () => {
 
     const first = objectProp(
       (
-        await api("POST", `/api/projects/${projectId}/boards/${boardId}/tasks`, {
-          title: "First task",
-          columnKey: "ready",
-        })
+        await api(
+          "POST",
+          `/api/projects/${projectId}/boards/${boardId}/tasks`,
+          {
+            title: "First task",
+            columnKey: "ready",
+          },
+        )
       ).body,
       "task",
     );
     const second = objectProp(
       (
-        await api("POST", `/api/projects/${projectId}/boards/${boardId}/tasks`, {
-          title: "Second task",
-          columnKey: "ready",
-        })
+        await api(
+          "POST",
+          `/api/projects/${projectId}/boards/${boardId}/tasks`,
+          {
+            title: "Second task",
+            columnKey: "ready",
+          },
+        )
       ).body,
       "task",
     );
@@ -176,7 +208,9 @@ describe("starter API", () => {
     });
 
     expect(moveResponse.status).toBe(200);
-    expect(numberProp(objectProp(moveResponse.body, "task"), "position")).toBe(0);
+    expect(numberProp(objectProp(moveResponse.body, "task"), "position")).toBe(
+      0,
+    );
 
     const tasksResponse = await api(
       "GET",
@@ -187,20 +221,26 @@ describe("starter API", () => {
       secondTaskId,
       firstTaskId,
     ]);
-    expect(taskRows.map((task) => numberProp(task, "position"))).toEqual([0, 1]);
+    expect(taskRows.map((task) => numberProp(task, "position"))).toEqual([
+      0, 1,
+    ]);
 
     const doneResponse = await api("POST", `/api/tasks/${secondTaskId}/move`, {
       columnKey: "done",
     });
 
     expect(doneResponse.status).toBe(200);
-    expect(
-      typeof objectProp(doneResponse.body, "task").completedAt,
-    ).toBe("string");
+    expect(typeof objectProp(doneResponse.body, "task").completedAt).toBe(
+      "string",
+    );
 
-    const blockedResponse = await api("POST", `/api/tasks/${secondTaskId}/move`, {
-      columnKey: "blocked",
-    });
+    const blockedResponse = await api(
+      "POST",
+      `/api/tasks/${secondTaskId}/move`,
+      {
+        columnKey: "blocked",
+      },
+    );
 
     expect(blockedResponse.status).toBe(200);
     expect(objectProp(blockedResponse.body, "task").completedAt).toBeNull();
@@ -210,10 +250,14 @@ describe("starter API", () => {
     const { projectId, boardId } = await createProjectAndBoard();
     const task = objectProp(
       (
-        await api("POST", `/api/projects/${projectId}/boards/${boardId}/tasks`, {
-          title: "Original title",
-          description: "Original description",
-        })
+        await api(
+          "POST",
+          `/api/projects/${projectId}/boards/${boardId}/tasks`,
+          {
+            title: "Original title",
+            description: "Original description",
+          },
+        )
       ).body,
       "task",
     );
@@ -249,9 +293,13 @@ describe("starter API", () => {
     const { projectId, boardId } = await createProjectAndBoard();
     const task = objectProp(
       (
-        await api("POST", `/api/projects/${projectId}/boards/${boardId}/tasks`, {
-          title: "Archive me",
-        })
+        await api(
+          "POST",
+          `/api/projects/${projectId}/boards/${boardId}/tasks`,
+          {
+            title: "Archive me",
+          },
+        )
       ).body,
       "task",
     );
@@ -285,6 +333,81 @@ describe("starter API", () => {
     expect(archivedRead.status).toBe(200);
   });
 
+  it("searches indexed boards, tasks, and comments and respects archived filters", async () => {
+    const projectResponse = await api("POST", "/api/projects", {
+      name: "Search project",
+    });
+    const projectId = stringProp(
+      objectProp(projectResponse.body, "project"),
+      "id",
+    );
+    const boardResponse = await api(
+      "POST",
+      `/api/projects/${projectId}/boards`,
+      {
+        name: "Vector search board",
+        description: "SQLite migration planning",
+      },
+    );
+    const board = objectProp(boardResponse.body, "board");
+    const boardId = stringProp(board, "id");
+    const taskResponse = await api(
+      "POST",
+      `/api/projects/${projectId}/boards/${boardId}/tasks`,
+      {
+        title: "SQLite migration blocker",
+        description: "Debug sqlite-vec virtual table setup",
+        priority: "urgent",
+        labels: ["sqlite", "vector"],
+      },
+    );
+    const task = objectProp(taskResponse.body, "task");
+    const taskId = stringProp(task, "id");
+    await api("POST", `/api/tasks/${taskId}/comments`, {
+      authorType: "agent",
+      body: "Blocked on vector search result filtering.",
+    });
+
+    const taskSearch = await api("POST", "/api/search", {
+      query: "sqlite migration",
+      sourceTypes: ["task"],
+      limit: 1,
+    });
+
+    expect(taskSearch.status).toBe(200);
+    const taskResults = arrayProp(taskSearch.body, "results").map(asObject);
+    expect(taskResults).toHaveLength(1);
+    expect(stringProp(taskResults[0], "sourceId")).toBe(taskId);
+
+    const commentSearch = await api("POST", "/api/search", {
+      query: "blocked vector filtering",
+      sourceTypes: ["comment"],
+      boardId,
+    });
+    expect(commentSearch.status).toBe(200);
+    expect(
+      stringProp(
+        asObject(arrayProp(commentSearch.body, "results")[0]),
+        "sourceType",
+      ),
+    ).toBe("comment");
+
+    await api("POST", `/api/tasks/${taskId}/archive`);
+
+    const activeSearch = await api("POST", "/api/search", {
+      query: "sqlite migration",
+      sourceTypes: ["task"],
+    });
+    expect(arrayProp(activeSearch.body, "results")).toHaveLength(0);
+
+    const archivedSearch = await api("POST", "/api/search", {
+      query: "sqlite migration",
+      sourceTypes: ["task"],
+      includeArchived: true,
+    });
+    expect(arrayProp(archivedSearch.body, "results")).toHaveLength(1);
+  });
+
   it("rejects invalid bodies and columns from the wrong board", async () => {
     const { projectId, boardId } = await createProjectAndBoard();
     const secondBoard = objectProp(
@@ -307,9 +430,9 @@ describe("starter API", () => {
       },
     );
     expect(invalidPriority.status).toBe(400);
-    expect(
-      stringProp(objectProp(invalidPriority.body, "error"), "code"),
-    ).toBe("invalid_request");
+    expect(stringProp(objectProp(invalidPriority.body, "error"), "code")).toBe(
+      "invalid_request",
+    );
 
     const wrongColumn = await api(
       "POST",
@@ -326,6 +449,14 @@ describe("starter API", () => {
 
     const emptyPatch = await api("PATCH", `/api/projects/${projectId}`, {});
     expect(emptyPatch.status).toBe(400);
+
+    const oversizedSearch = await api("POST", "/api/search", {
+      query: "x".repeat(1001),
+    });
+    expect(oversizedSearch.status).toBe(400);
+    expect(
+      stringProp(objectProp(oversizedSearch.body, "error"), "code"),
+    ).toBe("invalid_request");
   });
 
   async function createProjectAndBoard() {
@@ -349,7 +480,140 @@ describe("starter API", () => {
     };
   }
 
-  async function api(method: string, path: string, body?: Record<string, unknown>) {
+  async function api(
+    method: string,
+    path: string,
+    body?: Record<string, unknown>,
+  ) {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    return {
+      status: response.status,
+      body: (await response.json()) as unknown,
+    };
+  }
+});
+
+describe("starter API with indexing errors", () => {
+  let tmpDir: string | undefined;
+  let client: DatabaseClient | undefined;
+  let server: Server | undefined;
+  let baseUrl: string;
+
+  beforeEach(async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), "taskboards-api-index-error-"));
+    const databasePath = join(tmpDir, "test.sqlite");
+    const migrationResult = runMigrations({
+      databasePath,
+      migrationsDir: resolve(process.cwd(), "drizzle"),
+    });
+
+    client = createDatabaseClient(databasePath);
+    const app = createApp({
+      databaseClient: client,
+      migrationResult,
+      embeddingModel: {
+        async embed() {
+          throw new Error("embedding unavailable");
+        },
+      },
+    });
+
+    await new Promise<void>((resolveServer) => {
+      server = app.listen(0, "127.0.0.1", resolveServer);
+    });
+
+    const runningServer = server;
+    if (!runningServer) {
+      throw new Error("API test server did not start");
+    }
+
+    const address = runningServer.address() as AddressInfo;
+    baseUrl = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterEach(async () => {
+    if (server) {
+      await new Promise<void>((resolveClose, rejectClose) => {
+        server?.close((error) => {
+          if (error) {
+            rejectClose(error);
+            return;
+          }
+
+          resolveClose();
+        });
+      });
+      server = undefined;
+    }
+
+    client?.close();
+    client = undefined;
+
+    if (tmpDir) {
+      rmSync(tmpDir, { recursive: true, force: true });
+      tmpDir = undefined;
+    }
+  });
+
+  it("keeps write endpoints successful when embedding indexing fails", async () => {
+    const project = objectProp(
+      (await api("POST", "/api/projects", { name: "Project" })).body,
+      "project",
+    );
+    const projectId = stringProp(project, "id");
+
+    const boardResponse = await api(
+      "POST",
+      `/api/projects/${projectId}/boards`,
+      {
+        name: "Indexing can fail",
+      },
+    );
+    expect(boardResponse.status).toBe(201);
+    const boardId = stringProp(objectProp(boardResponse.body, "board"), "id");
+
+    const taskResponse = await api(
+      "POST",
+      `/api/projects/${projectId}/boards/${boardId}/tasks`,
+      {
+        title: "Still create the task",
+      },
+    );
+    expect(taskResponse.status).toBe(201);
+    const taskId = stringProp(objectProp(taskResponse.body, "task"), "id");
+
+    const updateResponse = await api("PATCH", `/api/tasks/${taskId}`, {
+      title: "Still update the task",
+    });
+    expect(updateResponse.status).toBe(200);
+
+    const commentResponse = await api("POST", `/api/tasks/${taskId}/comments`, {
+      authorType: "agent",
+      body: "The comment write should still succeed.",
+    });
+    expect(commentResponse.status).toBe(201);
+
+    if (!client) {
+      throw new Error("Expected test database client");
+    }
+
+    const documents = client.db.select().from(searchDocuments).all();
+    expect(documents).toHaveLength(3);
+    expect(
+      documents.every((document) => document.embeddingStatus === "error"),
+    ).toBe(true);
+  });
+
+  async function api(
+    method: string,
+    path: string,
+    body?: Record<string, unknown>,
+  ) {
     const response = await fetch(`${baseUrl}${path}`, {
       method,
       headers: body ? { "Content-Type": "application/json" } : undefined,

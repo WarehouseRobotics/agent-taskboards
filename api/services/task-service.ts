@@ -12,8 +12,10 @@ import type {
   TaskMoveInput,
   TaskUpdateInput,
 } from "../models/request-schemas.js";
+import { runBestEffortIndex } from "./best-effort-index.js";
 import type { BoardService } from "./board-service.js";
 import type { ProjectService } from "./project-service.js";
+import type { SearchService } from "./search-service.js";
 
 export class TaskService {
   private readonly db: DatabaseClient["db"];
@@ -22,32 +24,45 @@ export class TaskService {
     databaseClient: DatabaseClient,
     private readonly projectService: ProjectService,
     private readonly boardService: BoardService,
+    private readonly searchService: SearchService,
   ) {
     this.db = databaseClient.db;
   }
 
   listBoardTasks(projectId: string, boardId: string, includeArchived: boolean) {
     this.projectService.getProject(projectId, includeArchived);
-    const board = this.boardService.getBoard(projectId, boardId, includeArchived);
+    const board = this.boardService.getBoard(
+      projectId,
+      boardId,
+      includeArchived,
+    );
 
     const taskRows = includeArchived
       ? this.db
           .select()
           .from(tasks)
           .where(eq(tasks.boardId, board.id))
-          .orderBy(asc(tasks.columnId), asc(tasks.position), asc(tasks.createdAt))
+          .orderBy(
+            asc(tasks.columnId),
+            asc(tasks.position),
+            asc(tasks.createdAt),
+          )
           .all()
       : this.db
           .select()
           .from(tasks)
           .where(and(eq(tasks.boardId, board.id), isNull(tasks.archivedAt)))
-          .orderBy(asc(tasks.columnId), asc(tasks.position), asc(tasks.createdAt))
+          .orderBy(
+            asc(tasks.columnId),
+            asc(tasks.position),
+            asc(tasks.createdAt),
+          )
           .all();
 
     return { board, tasks: taskRows };
   }
 
-  createTask(projectId: string, boardId: string, input: TaskCreateInput) {
+  async createTask(projectId: string, boardId: string, input: TaskCreateInput) {
     const project = this.projectService.getProject(projectId, false);
     const board = this.boardService.getBoard(project.id, boardId, false);
     const column = this.resolveTaskColumn(board.id, {
@@ -57,7 +72,7 @@ export class TaskService {
     const position = this.nextTaskPosition(board.id, column.id);
     const now = new Date();
 
-    return this.db.transaction((tx) => {
+    const created = this.db.transaction((tx) => {
       const task = tx
         .insert(tasks)
         .values({
@@ -95,6 +110,12 @@ export class TaskService {
 
       return { task, activity };
     });
+
+    await runBestEffortIndex(
+      { sourceType: "task", sourceId: created.task.id },
+      () => this.searchService.indexTask(created.task),
+    );
+    return created;
   }
 
   getTask(taskId: string, includeArchived: boolean) {
@@ -113,10 +134,10 @@ export class TaskService {
     return task;
   }
 
-  updateTask(taskId: string, input: TaskUpdateInput) {
+  async updateTask(taskId: string, input: TaskUpdateInput) {
     const task = this.getTask(taskId, false);
 
-    return this.db.transaction((tx) => {
+    const updated = this.db.transaction((tx) => {
       const nextTask = tx
         .update(tasks)
         .set(input)
@@ -139,6 +160,12 @@ export class TaskService {
 
       return { task: nextTask, activity };
     });
+
+    await runBestEffortIndex(
+      { sourceType: "task", sourceId: updated.task.id },
+      () => this.searchService.indexTask(updated.task),
+    );
+    return updated;
   }
 
   moveTask(taskId: string, input: TaskMoveInput) {
@@ -230,7 +257,11 @@ export class TaskService {
           .run();
       }
 
-      const nextTask = tx.select().from(tasks).where(eq(tasks.id, task.id)).get();
+      const nextTask = tx
+        .select()
+        .from(tasks)
+        .where(eq(tasks.id, task.id))
+        .get();
 
       if (!nextTask) {
         throw new ApiError(404, "not_found", "Task not found");

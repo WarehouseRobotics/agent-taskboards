@@ -109,6 +109,18 @@ export const commentCreateSchema = z.object({
   metadata: jsonObjectSchema.optional(),
 });
 
+const indexedSearchSourceTypes = ["board", "task", "comment"] as const;
+
+export const searchSchema = z.object({
+  query: requiredString.max(1000),
+  projectId: requiredString.optional(),
+  boardId: requiredString.optional(),
+  taskId: requiredString.optional(),
+  sourceTypes: z.array(z.enum(indexedSearchSourceTypes)).min(1).optional(),
+  includeArchived: z.boolean().optional().default(false),
+  limit: z.number().int().min(1).max(50).optional().default(10),
+});
+
 export type ProjectCreateInput = z.infer<typeof projectCreateSchema>;
 export type ProjectUpdateInput = z.infer<typeof projectUpdateSchema>;
 export type BoardCreateInput = z.infer<typeof boardCreateSchema>;
@@ -117,3 +129,4 @@ export type TaskCreateInput = z.infer<typeof taskCreateSchema>;
 export type TaskUpdateInput = z.infer<typeof taskUpdateSchema>;
 export type TaskMoveInput = z.infer<typeof taskMoveSchema>;
 export type CommentCreateInput = z.infer<typeof commentCreateSchema>;
+export type SearchInput = z.infer<typeof searchSchema>;

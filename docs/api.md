@@ -5,8 +5,8 @@ JSON operations for managing local task state without driving the UI. The
 implemented starter API covers projects, boards, board columns, tasks, task
 movement, task completion, archival, comments, activity, and task context.
 
-Search, embeddings, maintenance, and file attachment APIs are still planned
-areas and are not part of the current starter surface.
+Text embedding search is implemented for boards, tasks, and comments. Broader
+maintenance APIs and file attachment APIs are still planned areas.
 
 ## API Principles
 
@@ -473,13 +473,68 @@ Response:
 
 The `board` object includes ordered columns.
 
+## Search
+
+`POST /api/search`
+
+Runs local semantic search over indexed board, task, and comment documents.
+Search uses local embeddings and `sqlite-vec`; it does not call hosted services.
+
+Request:
+
+```json
+{
+  "query": "blocked tasks about sqlite migrations",
+  "projectId": "optional",
+  "boardId": "optional",
+  "taskId": "optional",
+  "sourceTypes": ["board", "task", "comment"],
+  "includeArchived": false,
+  "limit": 10
+}
+```
+
+Required fields:
+
+- `query`
+
+Defaults:
+
+- `sourceTypes`: all indexed source types
+- `includeArchived`: `false`
+- `limit`: `10`
+
+Response:
+
+```json
+{
+  "query": "blocked tasks about sqlite migrations",
+  "results": [
+    {
+      "searchDocumentId": "doc-id",
+      "sourceType": "task",
+      "sourceId": "task-id",
+      "projectId": "project-id",
+      "boardId": "board-id",
+      "taskId": "task-id",
+      "title": "SQLite migration blocker",
+      "snippet": "Task: SQLite migration blocker ...",
+      "distance": 0.123,
+      "metadata": {}
+    }
+  ]
+}
+```
+
+Archived projects, boards, and tasks are excluded unless
+`includeArchived: true` is provided. Comments inherit archive visibility from
+their parent task, board, and project.
+
 ## Planned API Areas
 
 The following areas are documented as product direction but are not implemented
 in the starter API yet:
 
-- text and semantic search
-- embedding reindexing and maintenance
 - workflow column editing after board creation
 - hard deletion and purge operations
 - file attachments and upload workflows

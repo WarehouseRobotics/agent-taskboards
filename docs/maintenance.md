@@ -62,6 +62,13 @@ created with a changed model. Reindexing may target:
 Reindexing should rebuild derived vector data from canonical SQLite records. It
 should not mutate task content.
 
+The current developer script force-rebuilds all board, task, and comment
+embeddings:
+
+```sh
+docker compose exec taskboards npm run embeddings:reindex
+```
+
 ## Health Checks
 
 Maintenance status should include simple health information:

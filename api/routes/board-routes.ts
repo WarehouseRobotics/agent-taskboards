@@ -1,5 +1,10 @@
 import type { Express } from "express";
-import { parseBody, parseNonEmptyBody, parseQuery } from "../http/validation.js";
+import { asyncHandler } from "../http/async-handler.js";
+import {
+  parseBody,
+  parseNonEmptyBody,
+  parseQuery,
+} from "../http/validation.js";
 import {
   boardCreateSchema,
   boardUpdateSchema,
@@ -18,14 +23,20 @@ export function registerBoardRoutes(app: Express, services: ApiServices) {
     res.json({ boards: boards.map((board) => serializeBoard(board)) });
   });
 
-  app.post("/api/projects/:projectId/boards", (req, res) => {
-    const body = parseBody(req, boardCreateSchema);
-    const created = services.boards.createBoard(req.params.projectId, body);
+  app.post(
+    "/api/projects/:projectId/boards",
+    asyncHandler(async (req, res) => {
+      const body = parseBody(req, boardCreateSchema);
+      const created = await services.boards.createBoard(
+        req.params.projectId,
+        body,
+      );
 
-    res.status(201).json({
-      board: serializeBoard(created.board, { columns: created.columns }),
-    });
-  });
+      res.status(201).json({
+        board: serializeBoard(created.board, { columns: created.columns }),
+      });
+    }),
+  );
 
   app.get("/api/projects/:projectId/boards/:boardId", (req, res) => {
     const { includeArchived } = parseQuery(req, includeArchivedQuerySchema);
@@ -53,20 +64,23 @@ export function registerBoardRoutes(app: Express, services: ApiServices) {
     });
   });
 
-  app.patch("/api/projects/:projectId/boards/:boardId", (req, res) => {
-    const body = parseNonEmptyBody(req, boardUpdateSchema);
-    const board = services.boards.updateBoard(
-      req.params.projectId,
-      req.params.boardId,
-      body,
-    );
+  app.patch(
+    "/api/projects/:projectId/boards/:boardId",
+    asyncHandler(async (req, res) => {
+      const body = parseNonEmptyBody(req, boardUpdateSchema);
+      const board = await services.boards.updateBoard(
+        req.params.projectId,
+        req.params.boardId,
+        body,
+      );
 
-    res.json({
-      board: serializeBoard(board, {
-        columns: services.boards.listBoardColumns(board.id),
-      }),
-    });
-  });
+      res.json({
+        board: serializeBoard(board, {
+          columns: services.boards.listBoardColumns(board.id),
+        }),
+      });
+    }),
+  );
 
   app.post("/api/projects/:projectId/boards/:boardId/archive", (req, res) => {
     const board = services.boards.archiveBoard(

@@ -23,6 +23,8 @@ export const searchSourceTypes = [
 ] as const;
 export type SearchSourceType = (typeof searchSourceTypes)[number];
 
+// `stale` is reserved for future background reindex flows where canonical
+// text has changed but derived vectors have not been rebuilt yet.
 export const embeddingStatuses = ["pending", "indexed", "stale", "error"] as const;
 export type EmbeddingStatus = (typeof embeddingStatuses)[number];
 

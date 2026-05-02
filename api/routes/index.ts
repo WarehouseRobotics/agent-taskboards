@@ -5,6 +5,7 @@ import type { ApiServices } from "../services/index.js";
 import { registerBoardRoutes } from "./board-routes.js";
 import { registerHealthRoutes } from "./health-routes.js";
 import { registerProjectRoutes } from "./project-routes.js";
+import { registerSearchRoutes } from "./search-routes.js";
 import { registerTaskRoutes } from "./task-routes.js";
 
 export interface RegisterRoutesOptions {
@@ -18,4 +19,5 @@ export function registerRoutes(app: Express, options: RegisterRoutesOptions) {
   registerProjectRoutes(app, options.services);
   registerBoardRoutes(app, options.services);
   registerTaskRoutes(app, options.services);
+  registerSearchRoutes(app, options.services);
 }

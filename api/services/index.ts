@@ -2,6 +2,7 @@ import type { DatabaseClient } from "../db/client.js";
 import { BoardService } from "./board-service.js";
 import { CommentService } from "./comment-service.js";
 import { ProjectService } from "./project-service.js";
+import { SearchService, type EmbeddingModel } from "./search-service.js";
 import { TaskService } from "./task-service.js";
 
 export interface ApiServices {
@@ -9,13 +10,28 @@ export interface ApiServices {
   boards: BoardService;
   tasks: TaskService;
   comments: CommentService;
+  search: SearchService;
 }
 
-export function createServices(databaseClient: DatabaseClient): ApiServices {
-  const projects = new ProjectService(databaseClient);
-  const boards = new BoardService(databaseClient, projects);
-  const tasks = new TaskService(databaseClient, projects, boards);
-  const comments = new CommentService(databaseClient, projects, boards, tasks);
+export type CreateServicesOptions = {
+  embeddingModel?: EmbeddingModel;
+};
 
-  return { projects, boards, tasks, comments };
+export function createServices(
+  databaseClient: DatabaseClient,
+  options: CreateServicesOptions = {},
+): ApiServices {
+  const search = new SearchService(databaseClient, options.embeddingModel);
+  const projects = new ProjectService(databaseClient);
+  const boards = new BoardService(databaseClient, projects, search);
+  const tasks = new TaskService(databaseClient, projects, boards, search);
+  const comments = new CommentService(
+    databaseClient,
+    projects,
+    boards,
+    tasks,
+    search,
+  );
+
+  return { projects, boards, tasks, comments, search };
 }
