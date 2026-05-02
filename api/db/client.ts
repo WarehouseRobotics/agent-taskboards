@@ -26,6 +26,8 @@ export function createDatabaseClient(
 
   const sqlite = new Database(databasePath);
   sqlite.pragma("foreign_keys = ON");
+  sqlite.pragma("journal_mode = WAL");
+  sqlite.pragma("busy_timeout = 5000");
 
   return {
     databasePath,
@@ -46,8 +48,14 @@ export function closeDatabaseClient() {
 }
 
 function ensureDatabaseDirectory(databasePath: string) {
-  if (databasePath === ":memory:" || databasePath.startsWith("file:")) {
+  if (databasePath === ":memory:") {
     return;
+  }
+
+  if (databasePath.startsWith("file:")) {
+    throw new Error(
+      "TASKBOARDS_DB_PATH must be a filesystem path; SQLite file: URIs are not supported by better-sqlite3",
+    );
   }
 
   mkdirSync(dirname(databasePath), { recursive: true });

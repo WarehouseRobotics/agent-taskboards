@@ -41,6 +41,7 @@ export class LocalEmbeddingModel {
 
   #model: LlamaModel | undefined;
   #context: LlamaEmbeddingContext | undefined;
+  #contextPromise: Promise<LlamaEmbeddingContext> | undefined;
 
   constructor(options: LocalEmbeddingModelOptions = {}) {
     this.modelPath = resolve(options.modelPath ?? getDefaultEmbeddingModelPath());
@@ -72,6 +73,17 @@ export class LocalEmbeddingModel {
   }
 
   async dispose(): Promise<void> {
+    const pendingContext = this.#contextPromise;
+    this.#contextPromise = undefined;
+
+    if (pendingContext) {
+      try {
+        await pendingContext;
+      } catch {
+        // Failed loads clean up their own partially initialized model.
+      }
+    }
+
     await this.#context?.dispose();
     await this.#model?.dispose();
     this.#context = undefined;
@@ -83,6 +95,16 @@ export class LocalEmbeddingModel {
       return this.#context;
     }
 
+    this.#contextPromise ??= this.#loadContext();
+
+    try {
+      return await this.#contextPromise;
+    } finally {
+      this.#contextPromise = undefined;
+    }
+  }
+
+  async #loadContext(): Promise<LlamaEmbeddingContext> {
     if (!hasLocalEmbeddingModel(this.modelPath)) {
       throw new Error(`Embedding model file was not found at ${this.modelPath}`);
     }

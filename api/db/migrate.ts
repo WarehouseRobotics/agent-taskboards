@@ -28,6 +28,9 @@ export function runMigrations({
   const skipped: string[] = [];
 
   try {
+    // drizzle-kit owns drizzle/meta for schema generation history. At runtime we
+    // apply the generated *.sql files directly and track checksums here so the
+    // app does not depend on drizzle-kit metadata in production containers.
     client.sqlite.exec(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         id TEXT PRIMARY KEY NOT NULL,

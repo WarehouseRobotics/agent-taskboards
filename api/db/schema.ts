@@ -39,6 +39,9 @@ const timestamp = (name: string) =>
     .notNull()
     .$defaultFn(() => new Date());
 
+const updatedTimestamp = (name = "updated_at") =>
+  timestamp(name).$onUpdateFn(() => new Date());
+
 const nullableTimestamp = (name: string) =>
   integer(name, { mode: "timestamp_ms" });
 
@@ -67,7 +70,7 @@ export const projects = sqliteTable(
     metadata: jsonObject("metadata"),
     archivedAt: nullableTimestamp("archived_at"),
     createdAt: timestamp("created_at"),
-    updatedAt: timestamp("updated_at"),
+    updatedAt: updatedTimestamp(),
   },
   (table) => ({
     activeIdx: index("projects_active_idx").on(table.archivedAt),
@@ -87,7 +90,7 @@ export const boards = sqliteTable(
     metadata: jsonObject("metadata"),
     archivedAt: nullableTimestamp("archived_at"),
     createdAt: timestamp("created_at"),
-    updatedAt: timestamp("updated_at"),
+    updatedAt: updatedTimestamp(),
   },
   (table) => ({
     projectIdx: index("boards_project_idx").on(table.projectId),
@@ -110,7 +113,7 @@ export const boardColumns = sqliteTable(
     position: integer("position").notNull(),
     isDone: integer("is_done", { mode: "boolean" }).notNull().default(false),
     createdAt: timestamp("created_at"),
-    updatedAt: timestamp("updated_at"),
+    updatedAt: updatedTimestamp(),
   },
   (table) => ({
     boardPositionIdx: index("board_columns_board_position_idx").on(
@@ -147,7 +150,7 @@ export const tasks = sqliteTable(
     completedAt: nullableTimestamp("completed_at"),
     archivedAt: nullableTimestamp("archived_at"),
     createdAt: timestamp("created_at"),
-    updatedAt: timestamp("updated_at"),
+    updatedAt: updatedTimestamp(),
   },
   (table) => ({
     projectIdx: index("tasks_project_idx").on(table.projectId),
@@ -259,7 +262,7 @@ export const searchDocuments = sqliteTable(
     embeddingError: text("embedding_error"),
     metadata: jsonObject("metadata"),
     createdAt: timestamp("created_at"),
-    updatedAt: timestamp("updated_at"),
+    updatedAt: updatedTimestamp(),
   },
   (table) => ({
     sourceIdx: index("search_documents_source_idx").on(

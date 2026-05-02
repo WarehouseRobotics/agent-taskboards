@@ -29,6 +29,12 @@ describe("database schema", () => {
     }
   });
 
+  it("rejects SQLite file URI database paths", () => {
+    expect(() => createDatabaseClient("file:/tmp/taskboards.sqlite")).toThrow(
+      /filesystem path/,
+    );
+  });
+
   it("applies migrations and persists the taskboard object graph", () => {
     tmpDir = mkdtempSync(join(tmpdir(), "taskboards-db-"));
     const databasePath = join(tmpDir, "test.sqlite");
@@ -42,6 +48,8 @@ describe("database schema", () => {
 
     client = createDatabaseClient(databasePath);
     const { db } = client;
+
+    expect(client.sqlite.pragma("journal_mode", { simple: true })).toBe("wal");
 
     const project = db
       .insert(projects)
@@ -166,5 +174,41 @@ describe("database schema", () => {
     expect(activity.taskId).toBe(task.id);
     expect(searchDocument.sourceId).toBe(task.id);
     expect(task.labels).toEqual(["database", "drizzle"]);
+  });
+
+  it("bumps updatedAt when Drizzle updates mutable records", () => {
+    tmpDir = mkdtempSync(join(tmpdir(), "taskboards-db-"));
+    const databasePath = join(tmpDir, "test.sqlite");
+    const initialTimestamp = new Date(0);
+
+    runMigrations({
+      databasePath,
+      migrationsDir: resolve(process.cwd(), "drizzle"),
+    });
+
+    client = createDatabaseClient(databasePath);
+    const { db } = client;
+
+    const project = db
+      .insert(projects)
+      .values({
+        name: "Before update",
+        createdAt: initialTimestamp,
+        updatedAt: initialTimestamp,
+      })
+      .returning()
+      .get();
+
+    const updatedProject = db
+      .update(projects)
+      .set({ description: "Touched by an update" })
+      .where(eq(projects.id, project.id))
+      .returning()
+      .get();
+
+    expect(updatedProject.createdAt).toEqual(initialTimestamp);
+    expect(updatedProject.updatedAt.getTime()).toBeGreaterThan(
+      initialTimestamp.getTime(),
+    );
   });
 });

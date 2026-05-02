@@ -3,7 +3,7 @@ set -eu
 
 case "${TASKBOARDS_DEBUG:-}" in
   1|true|TRUE|yes|YES|on|ON|debug|DEBUG)
-    export PORT="${API_PORT:-3000}"
+    export PORT=3000
     exec npm run dev
     ;;
   *)

@@ -1,6 +1,6 @@
 import express from "express";
 import { join, resolve } from "node:path";
-import { getDatabaseClient } from "./db/client.js";
+import { closeDatabaseClient, getDatabaseClient } from "./db/client.js";
 import { runMigrations } from "./db/migrate.js";
 
 const app = express();
@@ -41,6 +41,33 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`API server listening on port ${port}`);
 });
+
+let isShuttingDown = false;
+
+function shutdown(signal: NodeJS.Signals) {
+  if (isShuttingDown) {
+    return;
+  }
+
+  isShuttingDown = true;
+  console.log(`Received ${signal}; shutting down`);
+
+  server.close((error) => {
+    try {
+      closeDatabaseClient();
+    } finally {
+      if (error) {
+        console.error("Error while closing API server", error);
+        process.exitCode = 1;
+      }
+
+      process.exit();
+    }
+  });
+}
+
+process.once("SIGINT", shutdown);
+process.once("SIGTERM", shutdown);
