@@ -114,6 +114,36 @@ export interface ProjectTreeItem {
   taskCount: number | null;
 }
 
+export type SearchSourceType = "board" | "task" | "comment";
+
+export interface SearchInput {
+  query: string;
+  projectId?: string;
+  boardId?: string;
+  taskId?: string;
+  sourceTypes?: SearchSourceType[];
+  includeArchived?: boolean;
+  limit?: number;
+}
+
+export interface SearchResult {
+  searchDocumentId: string;
+  sourceType: SearchSourceType;
+  sourceId: string;
+  projectId: string | null;
+  boardId: string | null;
+  taskId: string | null;
+  title: string | null;
+  snippet: string;
+  distance: number;
+  metadata: unknown;
+}
+
+export interface SearchResponse {
+  query: string;
+  results: SearchResult[];
+}
+
 export interface TaskContext {
   project: Project;
   board: Board;

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import type { Health, ProjectTreeItem, View } from "../../domain/types";
+import type { Health, ProjectTreeItem, SearchResult, View } from "../../domain/types";
 import { glyphForName } from "../../lib/task-display";
-import { Icon, Kbd, Mono, SkeletonRows, type IconName } from "../ui";
+import { Icon, Mono, SkeletonRows, type IconName } from "../ui";
+import { SidebarSearch } from "./SidebarSearch";
 
 export function Sidebar({
   activeBoardId,
@@ -10,6 +11,8 @@ export function Sidebar({
   loading,
   onCreateBoard,
   onCreateProject,
+  onOpenSearchResult,
+  onSearchSubmit,
   onSelectBoard,
   onSelectProject,
   onSelectView,
@@ -22,6 +25,8 @@ export function Sidebar({
   loading: boolean;
   onCreateBoard: () => void;
   onCreateProject: () => void;
+  onOpenSearchResult: (result: SearchResult) => void;
+  onSearchSubmit: (query: string) => void;
   onSelectBoard: (projectId: string, boardId: string) => void;
   onSelectProject: (projectId: string) => void;
   onSelectView: (view: View) => void;
@@ -46,11 +51,11 @@ export function Sidebar({
           <Icon name="command" />
         </button>
       </div>
-      <div className="sidebar__search">
-        <Icon name="search" />
-        <span>Search...</span>
-        <Kbd>/</Kbd>
-      </div>
+      <SidebarSearch
+        onOpenResult={onOpenSearchResult}
+        onSubmitQuery={onSearchSubmit}
+        projectTree={projectTree}
+      />
       <nav className="sidebar__nav">
         <NavItem active={view === "board"} count={projectTree.length} icon="board" label="Boards" onClick={() => onSelectView("board")} />
         <NavItem active={view === "projects"} count={projectTree.length} icon="list" label="Projects" onClick={() => onSelectView("projects")} />

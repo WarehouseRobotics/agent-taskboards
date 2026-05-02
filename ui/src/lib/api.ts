@@ -3,6 +3,8 @@ import type {
   Board,
   Health,
   Project,
+  SearchInput,
+  SearchResponse,
   Task,
   TaskActivity,
   TaskComment,
@@ -173,6 +175,12 @@ export const api = {
 
   getTaskContext: async (taskId: string) =>
     request<TaskContext>(`/api/tasks/${encodeURIComponent(taskId)}/context`),
+
+  search: (input: SearchInput) =>
+    request<SearchResponse>("/api/search", {
+      method: "POST",
+      body: jsonBody(input),
+    }),
 
   createComment: async (
     taskId: string,

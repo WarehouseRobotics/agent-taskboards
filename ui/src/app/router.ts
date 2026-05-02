@@ -3,11 +3,14 @@ export const defaultSettingsSection = "general";
 export type AppRoute =
   | { view: "board"; projectId: string | null; boardId: string | null; taskId: string | null }
   | { view: "projects"; projectId: string | null }
-  | { view: "search" }
+  | { view: "search"; query: string | null }
   | { view: "maintenance" }
   | { view: "settings"; section: string };
 
-export function parseRoute(pathname = window.location.pathname): AppRoute {
+export function parseRoute(
+  pathname = window.location.pathname,
+  search = window.location.search,
+): AppRoute {
   const parts = pathname.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
 
   if (parts[0] === "projects") {
@@ -27,7 +30,9 @@ export function parseRoute(pathname = window.location.pathname): AppRoute {
   }
 
   if (parts[0] === "search") {
-    return { view: "search" };
+    const query = new URLSearchParams(search).get("q");
+    const trimmed = query?.trim();
+    return { view: "search", query: trimmed ? trimmed : null };
   }
 
   if (parts[0] === "maintenance") {
@@ -54,6 +59,9 @@ export function routePath(route: AppRoute) {
   }
   if (route.view === "settings") {
     return `/settings/${encodeURIComponent(route.section)}`;
+  }
+  if (route.view === "search") {
+    return route.query ? `/search?q=${encodeURIComponent(route.query)}` : "/search";
   }
   return `/${route.view}`;
 }

@@ -7,9 +7,10 @@ import { api } from "../lib/api";
 import { apiMessage } from "../lib/errors";
 import { backgroundSyncIntervalMs, type TaskDraftsById } from "./sync";
 import { persistTheme, storedTheme } from "../lib/theme";
-import type { Theme, View } from "../domain/types";
+import type { SearchResult, Theme, View } from "../domain/types";
 import { BoardWorkspace } from "../features/boards";
 import { ProjectsWorkspace } from "../features/projects";
+import { SearchWorkspace } from "../features/search";
 import { SettingsWorkspace } from "../features/settings";
 import { PlannedWorkspace } from "../features/planned";
 import { CreateBoardPanel, CreateProjectPanel } from "./CreateResourcePanels";
@@ -36,7 +37,8 @@ export function App() {
   const navigate = useCallback(
     (nextRoute: AppRoute, mode: "push" | "replace" = "push") => {
       const nextPath = routePath(nextRoute);
-      if (window.location.pathname !== nextPath) {
+      const currentPath = `${window.location.pathname}${window.location.search}`;
+      if (currentPath !== nextPath) {
         window.history[mode === "replace" ? "replaceState" : "pushState"]({}, "", nextPath);
       }
       applyRoute(nextRoute);
@@ -196,8 +198,43 @@ export function App() {
       navigate({ view: "settings", section: defaultSettingsSection });
       return;
     }
+    if (nextView === "search") {
+      navigate({ view: "search", query: null });
+      return;
+    }
     navigate({ view: nextView });
   };
+
+  const openSearchResult = useCallback(
+    (result: SearchResult) => {
+      if (!result.projectId || !result.boardId) {
+        return;
+      }
+      const taskId =
+        result.sourceType === "board" ? null : result.taskId ?? result.sourceId;
+      navigate({
+        view: "board",
+        projectId: result.projectId,
+        boardId: result.boardId,
+        taskId,
+      });
+    },
+    [navigate],
+  );
+
+  const handleSearchSubmit = useCallback(
+    (nextQuery: string) => {
+      navigate({ view: "search", query: nextQuery });
+    },
+    [navigate],
+  );
+
+  const handleSearchQueryChange = useCallback(
+    (nextQuery: string | null) => {
+      navigate({ view: "search", query: nextQuery }, "replace");
+    },
+    [navigate],
+  );
 
   return (
     <div className="tb app-shell" data-theme={theme}>
@@ -208,6 +245,8 @@ export function App() {
         loading={loadingProjects}
         onCreateBoard={() => setNewBoardOpen(true)}
         onCreateProject={() => setNewProjectOpen(true)}
+        onOpenSearchResult={openSearchResult}
+        onSearchSubmit={handleSearchSubmit}
         onSelectBoard={(projectId, boardId) => {
           navigate({ view: "board", projectId, boardId, taskId: null });
         }}
@@ -320,7 +359,14 @@ export function App() {
             projectTree={displayedProjectTree}
           />
         )}
-        {view === "search" && <PlannedWorkspace icon="search" title="Search" health={health} />}
+        {view === "search" && (
+          <SearchWorkspace
+            initialQuery={route.view === "search" ? route.query : null}
+            onOpenResult={openSearchResult}
+            onQueryChange={handleSearchQueryChange}
+            projectTree={displayedProjectTree}
+          />
+        )}
         {view === "maintenance" && <PlannedWorkspace icon="database" title="Maintenance" health={health} />}
         {view === "settings" && (
           <SettingsWorkspace
