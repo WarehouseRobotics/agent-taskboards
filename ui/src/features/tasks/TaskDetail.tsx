@@ -1,9 +1,17 @@
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { ActorType, BoardColumn, TaskActivity, TaskComment, TaskContext } from "../../domain/types";
 import { apiMessage } from "../../lib/errors";
 import { formatDate } from "../../lib/format";
 import { columnStatus } from "../../lib/task-display";
 import { Avatar, Button, EmptyState, Icon, InlineError, LabelChip, Mono, PriorityFlag, StatusIcon } from "../../components/ui";
+import {
+  descriptionSizeTier,
+  persistDescriptionView,
+  storedDescriptionView,
+  type TaskDescriptionView,
+} from "./task-description-view";
 
 interface TaskEditFields {
   description: string;
@@ -63,6 +71,12 @@ export function TaskDetail({
   const [detailToast, setDetailToast] = useState<{ message: string; tone: "success" | "warning" } | null>(null);
   const [saving, setSaving] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
+  const [descriptionView, setDescriptionView] = useState<TaskDescriptionView>(() => storedDescriptionView());
+
+  const changeDescriptionView = useCallback((mode: TaskDescriptionView) => {
+    setDescriptionView(mode);
+    persistDescriptionView(mode);
+  }, []);
   const detailRef = useRef<HTMLElement | null>(null);
   const detailToastTimeout = useRef<number | null>(null);
   const task = context?.task;
@@ -292,23 +306,59 @@ export function TaskDetail({
           rows={2}
           value={activeDraft.current.title}
         />
-        <div className="detail-section">
-          <h2>Description</h2>
-          <textarea
-            aria-label="Task description"
-            className="task-description-input"
-            onChange={(event) => {
-              setDraft({
-                ...activeDraft,
-                current: { ...activeDraft.current, description: event.target.value },
-                taskId: task.id,
-              });
-              setEditError(null);
-            }}
-            onKeyDown={saveOnShortcut}
-            placeholder="No description yet."
-            value={activeDraft.current.description}
-          />
+        <div
+          className={`detail-section task-description task-description--${descriptionSizeTier(activeDraft.current.description)}`}
+        >
+          <div className="detail-section__heading">
+            <h2>Description</h2>
+            <div className="segmented" role="tablist" aria-label="Description view">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={descriptionView === "edit"}
+                className={descriptionView === "edit" ? "segmented__item segmented__item--active" : "segmented__item"}
+                onClick={() => changeDescriptionView("edit")}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={descriptionView === "preview"}
+                className={descriptionView === "preview" ? "segmented__item segmented__item--active" : "segmented__item"}
+                onClick={() => changeDescriptionView("preview")}
+              >
+                Preview
+              </button>
+            </div>
+          </div>
+          {descriptionView === "edit" ? (
+            <textarea
+              aria-label="Task description"
+              className="task-description-input"
+              onChange={(event) => {
+                setDraft({
+                  ...activeDraft,
+                  current: { ...activeDraft.current, description: event.target.value },
+                  taskId: task.id,
+                });
+                setEditError(null);
+              }}
+              onKeyDown={saveOnShortcut}
+              placeholder="No description yet."
+              value={activeDraft.current.description}
+            />
+          ) : (
+            <div className="task-description-preview" aria-label="Task description preview">
+              {activeDraft.current.description.trim() ? (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {activeDraft.current.description}
+                </ReactMarkdown>
+              ) : (
+                <p className="task-description-preview__placeholder">No description yet.</p>
+              )}
+            </div>
+          )}
         </div>
         <InlineError message={editError ?? titleError} />
         <div className="form-actions">

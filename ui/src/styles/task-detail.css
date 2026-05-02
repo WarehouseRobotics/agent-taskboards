@@ -44,9 +44,140 @@
   text-wrap: pretty;
 }
 
+.task-description {
+  --task-desc-height: 112px;
+}
+
+.task-description--mid {
+  --task-desc-height: 240px;
+}
+
+.task-description--large {
+  --task-desc-height: 400px;
+}
+
 .task-description-input {
+  height: var(--task-desc-height);
   min-height: 112px;
   line-height: 1.55;
+  resize: none;
+}
+
+.task-description-preview {
+  height: var(--task-desc-height);
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-input);
+  color: var(--fg);
+  font-size: var(--fs-13);
+  line-height: 1.55;
+  padding: 8px 10px;
+  text-wrap: pretty;
+}
+
+.task-description-preview__placeholder {
+  margin: 0;
+  color: var(--fg-faint);
+}
+
+.task-description-preview > :first-child {
+  margin-top: 0;
+}
+
+.task-description-preview > :last-child {
+  margin-bottom: 0;
+}
+
+.task-description-preview h1,
+.task-description-preview h2,
+.task-description-preview h3,
+.task-description-preview h4,
+.task-description-preview h5,
+.task-description-preview h6 {
+  margin: var(--s-3) 0 var(--s-2);
+  border: 0;
+  padding: 0;
+  color: var(--fg);
+  font-size: var(--fs-13);
+  font-weight: 500;
+  letter-spacing: var(--tracking-tight);
+  text-transform: none;
+}
+
+.task-description-preview p {
+  margin: 0 0 var(--s-2);
+}
+
+.task-description-preview ul,
+.task-description-preview ol {
+  margin: 0 0 var(--s-2);
+  padding-left: 20px;
+}
+
+.task-description-preview li {
+  margin: 2px 0;
+}
+
+.task-description-preview a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.task-description-preview code {
+  background: var(--bg-surface-2);
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  padding: 0 4px;
+}
+
+.task-description-preview pre {
+  margin: 0 0 var(--s-2);
+  border: 1px solid var(--line-faint);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface-2);
+  font-size: var(--fs-12);
+  line-height: 1.5;
+  overflow-x: auto;
+  padding: 8px 10px;
+}
+
+.task-description-preview pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.task-description-preview blockquote {
+  margin: 0 0 var(--s-2);
+  border-left: 2px solid var(--line);
+  padding: 0 var(--s-2);
+  color: var(--fg-muted);
+}
+
+.task-description-preview hr {
+  margin: var(--s-3) 0;
+  border: 0;
+  border-top: 1px solid var(--line-faint);
+}
+
+.task-description-preview table {
+  margin: 0 0 var(--s-2);
+  border-collapse: collapse;
+  font-size: var(--fs-12);
+}
+
+.task-description-preview th,
+.task-description-preview td {
+  border: 1px solid var(--line-faint);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.task-description-preview th {
+  color: var(--fg);
+  font-weight: 500;
 }
 
 .task-edit-form .inline-error {
