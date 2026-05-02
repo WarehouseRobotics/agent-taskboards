@@ -1,10 +1,19 @@
-import { useMemo } from "react";
+import { useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Board, BoardColumn, Project, Task, TaskContext, TaskPriority } from "../../domain/types";
-import { glyphForName } from "../../lib/task-display";
-import { Button, EmptyState, Icon, InlineError, Mono } from "../../components/ui";
+import { columnStatus, glyphForName } from "../../lib/task-display";
+import { formatDate } from "../../lib/format";
+import { Button, EmptyState, Icon, InlineError, LabelChip, Mono, PriorityFlag, StatusIcon } from "../../components/ui";
 import { Topbar } from "../../components/layout";
 import { TaskDetail } from "../tasks";
 import { BoardColumnView } from "./BoardColumnView";
+import {
+  boardSortOptions,
+  persistBoardDisplayMode,
+  sortBoardTasks,
+  storedBoardDisplayMode,
+  type BoardDisplayMode,
+  type BoardSortKey,
+} from "./board-view-state";
 
 export function BoardWorkspace({
   activeBoard,
@@ -67,18 +76,26 @@ export function BoardWorkspace({
   syncError: string | null;
   tasks: Task[];
 }) {
+  const [displayMode, setDisplayMode] = useState<BoardDisplayMode>(storedBoardDisplayMode);
+  const [sortKey, setSortKey] = useState<BoardSortKey>("position");
+  const sortedTasks = useMemo(() => sortBoardTasks(tasks, columns, sortKey), [columns, sortKey, tasks]);
+  const columnsById = useMemo(() => new Map(columns.map((column) => [column.id, column])), [columns]);
   const tasksByColumn = useMemo(() => {
     const map = new Map<string, Task[]>();
     for (const column of columns) {
       map.set(column.id, []);
     }
-    for (const task of [...tasks].sort((a, b) => a.position - b.position)) {
+    for (const task of sortedTasks) {
       map.get(task.columnId)?.push(task);
     }
     return map;
-  }, [columns, tasks]);
+  }, [columns, sortedTasks]);
 
   const loadingWorkspace = loadingProjects || loadingBoard;
+  const setDisplayPreference = (mode: BoardDisplayMode) => {
+    setDisplayMode(mode);
+    persistBoardDisplayMode(mode);
+  };
 
   if (!activeProject) {
     return (
@@ -142,9 +159,20 @@ export function BoardWorkspace({
           <div className="board-main">
             <div className="subtoolbar">
               <div className="segmented">
-                <span className="segmented__item segmented__item--active">Board</span>
-                <span className="segmented__item">List</span>
-                <span className="segmented__item">Timeline</span>
+                <button
+                  className={displayMode === "board" ? "segmented__item segmented__item--active" : "segmented__item"}
+                  onClick={() => setDisplayPreference("board")}
+                  type="button"
+                >
+                  Board
+                </button>
+                <button
+                  className={displayMode === "list" ? "segmented__item segmented__item--active" : "segmented__item"}
+                  onClick={() => setDisplayPreference("list")}
+                  type="button"
+                >
+                  List
+                </button>
               </div>
               <Mono faded>
                 {loadingWorkspace
@@ -152,13 +180,27 @@ export function BoardWorkspace({
                   : `${tasks.length} tasks · ${columns.length} columns · ${tasks.filter((task) => task.completedAt).length} done`}
               </Mono>
               <span className="subtoolbar__spacer" />
-              <span className="toolbar-label">Group by</span>
-              <button className="small-select" type="button">Status <Icon name="down" size={12} /></button>
               <span className="toolbar-label">Sort</span>
-              <button className="small-select" type="button">Position <Icon name="down" size={12} /></button>
+              <select
+                aria-label="Sort tasks"
+                className="small-select"
+                onChange={(event) => setSortKey(event.target.value as BoardSortKey)}
+                value={sortKey}
+              >
+                {boardSortOptions.map((option) => (
+                  <option key={option.key} value={option.key}>{option.label}</option>
+                ))}
+              </select>
             </div>
             {loadingWorkspace ? (
               <BoardColumnsSkeleton />
+            ) : displayMode === "list" ? (
+              <BoardTaskList
+                activeTaskId={activeTaskId}
+                columnsById={columnsById}
+                onOpenTask={onOpenTask}
+                tasks={sortedTasks}
+              />
             ) : (
               <div className="board-columns">
                 {columns.map((column) => (
@@ -196,6 +238,81 @@ export function BoardWorkspace({
         </div>
       )}
     </>
+  );
+}
+
+function BoardTaskList({
+  activeTaskId,
+  columnsById,
+  onOpenTask,
+  tasks,
+}: {
+  activeTaskId: string | null;
+  columnsById: Map<string, BoardColumn>;
+  onOpenTask: (taskId: string) => void;
+  tasks: Task[];
+}) {
+  if (tasks.length === 0) {
+    return <div className="board-list-empty">No tasks</div>;
+  }
+
+  return (
+    <div className="board-list" role="region" aria-label="Board task list">
+      <table>
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Priority</th>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Labels</th>
+            <th>Created</th>
+            <th>Updated</th>
+            <th>Done</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map((task) => {
+            const column = columnsById.get(task.columnId);
+            const status = columnStatus(column);
+            return (
+              <tr
+                className={task.id === activeTaskId ? "board-list__row board-list__row--active" : "board-list__row"}
+                key={task.id}
+                onClick={() => onOpenTask(task.id)}
+                onKeyDown={(event: ReactKeyboardEvent<HTMLTableRowElement>) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onOpenTask(task.id);
+                  }
+                }}
+                tabIndex={0}
+              >
+                <td>
+                  <span className="board-list__status">
+                    <StatusIcon status={status} size={12} />
+                    {column?.name ?? "Unknown"}
+                  </span>
+                </td>
+                <td><PriorityFlag priority={task.priority} /></td>
+                <td><Mono faded>{task.id}</Mono></td>
+                <td className="board-list__title">{task.title}</td>
+                <td>
+                  <span className="board-list__labels">
+                    {task.labels.slice(0, 3).map((label) => (
+                      <LabelChip key={label} label={label} />
+                    ))}
+                  </span>
+                </td>
+                <td>{formatDate(task.createdAt)}</td>
+                <td>{formatDate(task.updatedAt)}</td>
+                <td>{task.completedAt ? <StatusIcon status="done" size={12} /> : <span className="board-list__dash">-</span>}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

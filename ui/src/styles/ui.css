@@ -53,6 +53,7 @@
 
 .btn:focus-visible,
 .icon-btn:focus-visible,
+.segmented__item:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
@@ -151,6 +152,7 @@ button:disabled {
   color: var(--fg-muted);
   cursor: pointer;
   font-size: var(--fs-11);
+  height: 24px;
   padding: 2px 6px;
 }
 .create-task-form,

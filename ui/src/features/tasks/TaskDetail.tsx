@@ -1,4 +1,4 @@
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ActorType, BoardColumn, TaskActivity, TaskComment, TaskContext } from "../../domain/types";
 import { apiMessage } from "../../lib/errors";
 import { formatDate } from "../../lib/format";
@@ -60,15 +60,42 @@ export function TaskDetail({
   const [comment, setComment] = useState("");
   const [draft, setDraft] = useState<TaskEditDraft>(emptyTaskDraft);
   const [editError, setEditError] = useState<string | null>(null);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [detailToast, setDetailToast] = useState<{ message: string; tone: "success" | "warning" } | null>(null);
   const [saving, setSaving] = useState(false);
-  const saveMessageTimeout = useRef<number | null>(null);
+  const [showActivity, setShowActivity] = useState(false);
+  const detailRef = useRef<HTMLElement | null>(null);
+  const detailToastTimeout = useRef<number | null>(null);
   const task = context?.task;
   const taskId = task?.id ?? "";
   const serverTitle = task?.title ?? "";
   const serverDescription = task?.description ?? "";
   const column = columns.find((item) => item.id === task?.columnId) ?? context?.board.columns?.find((item) => item.id === task?.columnId);
-  const entries = useMemo(() => mergeTimeline(context?.comments ?? [], context?.activity ?? []), [context?.activity, context?.comments]);
+  const entries = useMemo(
+    () => mergeTimeline(context?.comments ?? [], showActivity ? context?.activity ?? [] : []),
+    [context?.activity, context?.comments, showActivity],
+  );
+  const activeDraft = task && draft.taskId === task.id
+    ? draft
+    : makeTaskDraft(task?.id ?? "", serverTitle, serverDescription);
+  const editDirty = task ? isTaskDraftDirty(activeDraft) : false;
+  const hasPendingChanges = editDirty || Boolean(comment.trim());
+
+  const showDetailToast = useCallback((message: string, tone: "success" | "warning" = "success") => {
+    setDetailToast({ message, tone });
+    if (detailToastTimeout.current) {
+      window.clearTimeout(detailToastTimeout.current);
+    }
+    detailToastTimeout.current = window.setTimeout(() => setDetailToast(null), 2400);
+  }, []);
+
+  const requestClose = useCallback(() => {
+    if (hasPendingChanges) {
+      showDetailToast("Changes pending", "warning");
+      return;
+    }
+
+    onClose();
+  }, [hasPendingChanges, onClose, showDetailToast]);
 
   useEffect(() => {
     if (!taskId) {
@@ -87,7 +114,9 @@ export function TaskDetail({
   }, [serverDescription, serverTitle, taskId]);
 
   useEffect(() => {
-    setSaveMessage(null);
+    setComment("");
+    setDetailToast(null);
+    setShowActivity(false);
   }, [taskId]);
 
   useEffect(() => {
@@ -125,15 +154,41 @@ export function TaskDetail({
 
   useEffect(() => {
     return () => {
-      if (saveMessageTimeout.current) {
-        window.clearTimeout(saveMessageTimeout.current);
+      if (detailToastTimeout.current) {
+        window.clearTimeout(detailToastTimeout.current);
       }
     };
   }, []);
 
+  useEffect(() => {
+    if (!taskId) {
+      return;
+    }
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const panel = detailRef.current;
+      const target = event.target;
+      if (!panel || !(target instanceof Node) || panel.contains(target)) {
+        return;
+      }
+
+      if (hasPendingChanges) {
+        event.preventDefault();
+        event.stopPropagation();
+        showDetailToast("Changes pending", "warning");
+        return;
+      }
+
+      onClose();
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown, true);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointerDown, true);
+  }, [hasPendingChanges, onClose, showDetailToast, taskId]);
+
   if (loading && !context) {
     return (
-      <aside className="task-detail">
+      <aside className="task-detail" ref={detailRef}>
         <div className="detail-skeleton" />
       </aside>
     );
@@ -141,7 +196,7 @@ export function TaskDetail({
 
   if (!context || !task) {
     return (
-      <aside className="task-detail">
+      <aside className="task-detail" ref={detailRef}>
         <button className="icon-btn task-detail__close" onClick={onClose} title="Close task">
           <Icon name="close" />
         </button>
@@ -151,22 +206,10 @@ export function TaskDetail({
   }
 
   const status = columnStatus(column);
-  const activeDraft = draft.taskId === task.id
-    ? draft
-    : makeTaskDraft(task.id, serverTitle, serverDescription);
   const trimmedTitle = activeDraft.current.title.trim();
   const trimmedDescription = activeDraft.current.description.trim();
-  const editDirty = isTaskDraftDirty(activeDraft);
   const titleError = editDirty && !trimmedTitle ? "Title is required" : null;
   const canSave = editDirty && Boolean(trimmedTitle) && !saving;
-
-  const showSavedMessage = () => {
-    setSaveMessage("Task updated");
-    if (saveMessageTimeout.current) {
-      window.clearTimeout(saveMessageTimeout.current);
-    }
-    saveMessageTimeout.current = window.setTimeout(() => setSaveMessage(null), 2400);
-  };
 
   const resetDraft = () => {
     setDraft(makeTaskDraft(task.id, serverTitle, serverDescription));
@@ -191,7 +234,7 @@ export function TaskDetail({
         description: trimmedDescription || null,
       });
       setDraft(makeTaskDraft(task.id, trimmedTitle, trimmedDescription));
-      showSavedMessage();
+      showDetailToast("Task updated");
     } catch (err) {
       setEditError(apiMessage(err));
     } finally {
@@ -216,7 +259,7 @@ export function TaskDetail({
   };
 
   return (
-    <aside className="task-detail">
+    <aside className="task-detail" ref={detailRef}>
       <div className="task-detail__top">
         <div className="detail-meta">
           <PriorityFlag priority={task.priority} />
@@ -224,17 +267,17 @@ export function TaskDetail({
           <span>created {formatDate(task.createdAt)}</span>
           <span>updated {formatDate(task.updatedAt)}</span>
         </div>
-        <button className="icon-btn" onClick={onClose} title="Close task">
+        <button className="icon-btn" onClick={requestClose} title="Close task">
           <Icon name="close" />
         </button>
       </div>
-      {saveMessage && (
-        <div className="detail-toast" role="status" aria-live="polite">
-          {saveMessage}
+      {detailToast && (
+        <div className={`detail-toast detail-toast--${detailToast.tone}`} role="status" aria-live="polite">
+          {detailToast.message}
         </div>
       )}
       <form className="task-edit-form" onSubmit={submitTaskEdit}>
-        <input
+        <textarea
           aria-label="Task title"
           className="task-title-input"
           onChange={(event) => {
@@ -246,6 +289,7 @@ export function TaskDetail({
             setEditError(null);
           }}
           onKeyDown={saveOnShortcut}
+          rows={2}
           value={activeDraft.current.title}
         />
         <div className="detail-section">
@@ -307,7 +351,15 @@ export function TaskDetail({
       <section className="detail-section">
         <div className="detail-section__heading">
           <h2>Activity & Comments</h2>
-          <Mono faded>{entries.length} entries</Mono>
+          <label className="detail-section__toggle">
+            <input
+              checked={showActivity}
+              onChange={(event) => setShowActivity(event.target.checked)}
+              type="checkbox"
+            />
+            <span>Show Activity</span>
+          </label>
+          <Mono faded>{entries.length} {entries.length === 1 ? "entry" : "entries"}</Mono>
         </div>
         <div className="timeline">
           {entries.map((entry) => (
