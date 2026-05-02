@@ -34,6 +34,7 @@ downloads:
 
 - `TASKBOARDS_EMBEDDING_MODEL_PATH` can override the model path
 - default context size is 512 tokens
+- indexed text is chunked conservatively to fit that limit
 - default inference threads is 2
 
 Run the local model smoke test inside the already-running container:
@@ -62,6 +63,22 @@ Each indexed chunk stores enough metadata to trace a search result back to
 the canonical object: object type, object ID, project ID, board ID when
 applicable, task ID when applicable, and timestamps.
 
+Long indexed texts are split before embedding. Chunking is intentionally
+conservative because the local embedding context defaults to 512 tokens and
+`bge-small-en-v1.5` has the same practical maximum. The chunker estimates token
+use by characters, targets roughly 390 tokens per chunk, and overlaps adjacent
+chunks so nearby context is not lost at boundaries.
+
+Chunking preserves markdown structure where possible:
+
+- short fenced code or diagram blocks stay in one chunk
+- short markdown tables stay in one chunk
+- oversized blocks split only as a fallback, preferring line boundaries
+
+Task chunks repeat compact task context, such as title, labels, and priority,
+so each description chunk can stand alone in vector search. Boards and comments
+keep their existing short-text shape when they fit in one chunk.
+
 ## Search Behavior
 
 Semantic search should be exposed through the API as a retrieval primitive for
@@ -78,6 +95,10 @@ Search supports:
 
 Search results should be useful without requiring a second query, but they
 should also include stable IDs so agents can fetch full canonical records.
+When multiple chunks from the same board, task, or comment match, the API
+returns the best matching chunk as a single result for that source. This keeps
+long specifications from crowding out other relevant sources while preserving a
+useful snippet.
 
 ## Index Lifecycle
 
@@ -93,6 +114,8 @@ Expected lifecycle events:
 
 - create embeddings when boards, tasks, or comments are created
 - update embeddings when indexed text changes
+- remove stale chunk rows and vectors when text shrinks or chunk boundaries
+  change
 - preserve or mark embeddings for archived content depending on search filters
 - support full reindexing as a maintenance action
 

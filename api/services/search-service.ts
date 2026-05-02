@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, notInArray } from "drizzle-orm";
 import type { DatabaseClient } from "../db/client.js";
 import {
   boards,
@@ -13,6 +13,12 @@ import {
   tasks,
 } from "../db/schema.js";
 import {
+  chunkEmbeddingText,
+  DEFAULT_EMBEDDING_CHUNK_OPTIONS,
+  EMBEDDING_CHUNKING_VERSION,
+  type EmbeddingTextChunk,
+} from "../embeddings/chunking.js";
+import {
   LocalEmbeddingModel,
   type EmbeddingResult,
 } from "../embeddings/local.js";
@@ -22,6 +28,9 @@ const INDEXED_SOURCE_TYPES = ["board", "task", "comment"] as const;
 export type IndexedSourceType = (typeof INDEXED_SOURCE_TYPES)[number];
 
 const EMBEDDING_DIMENSIONS = 384;
+const SEARCH_VECTOR_MIN_LIMIT = 50;
+const SEARCH_VECTOR_INITIAL_MULTIPLIER = 16;
+const SEARCH_VECTOR_MAX_LIMIT = 2_000;
 
 export type EmbeddingModel = {
   embed(text: string): Promise<EmbeddingResult>;
@@ -45,9 +54,22 @@ type IndexedSearchDocumentRow = SearchDocumentRow & {
   };
 };
 
+type IndexDocumentInput = {
+  sourceType: IndexedSourceType;
+  sourceId: string;
+  projectId: string;
+  boardId: string;
+  taskId: string | null;
+  chunkKey: string;
+  title: string | null;
+  body: string;
+  metadata: Record<string, unknown>;
+};
+
 export type EmbeddingIndexResult = {
   status: "indexed" | "skipped" | "error";
   searchDocumentId?: string;
+  searchDocumentIds?: string[];
   error?: string;
 };
 
@@ -89,8 +111,8 @@ export class SearchService {
     board: Board,
     options: { force?: boolean } = {},
   ): Promise<EmbeddingIndexResult> {
-    return this.indexDocument(
-      {
+    return this.indexSourceDocuments(
+      makeChunkedIndexDocuments({
         sourceType: "board",
         sourceId: board.id,
         projectId: board.projectId,
@@ -99,8 +121,8 @@ export class SearchService {
         chunkKey: "board:content",
         title: board.name,
         body: formatBoardEmbeddingText(board),
-        metadata: {},
-      },
+        metadata: { sourceTextField: "formatted" },
+      }),
       options,
     );
   }
@@ -109,28 +131,15 @@ export class SearchService {
     task: Task,
     options: { force?: boolean } = {},
   ): Promise<EmbeddingIndexResult> {
-    return this.indexDocument(
-      {
-        sourceType: "task",
-        sourceId: task.id,
-        projectId: task.projectId,
-        boardId: task.boardId,
-        taskId: task.id,
-        chunkKey: "task:content",
-        title: task.title,
-        body: formatTaskEmbeddingText(task),
-        metadata: {},
-      },
-      options,
-    );
+    return this.indexSourceDocuments(makeTaskIndexDocuments(task), options);
   }
 
   async indexComment(
     comment: TaskComment,
     options: { force?: boolean } = {},
   ): Promise<EmbeddingIndexResult> {
-    return this.indexDocument(
-      {
+    return this.indexSourceDocuments(
+      makeChunkedIndexDocuments({
         sourceType: "comment",
         sourceId: comment.id,
         projectId: comment.projectId,
@@ -139,8 +148,8 @@ export class SearchService {
         chunkKey: "comment:body",
         title: this.getTaskTitle(comment.taskId),
         body: formatCommentEmbeddingText(comment),
-        metadata: {},
-      },
+        metadata: { sourceTextField: "body" },
+      }),
       options,
     );
   }
@@ -178,65 +187,60 @@ export class SearchService {
     validateEmbeddingDimensions(queryEmbedding);
     const queryVector = vectorBuffer(queryEmbedding.vector);
     const limit = input.limit;
-    const vectorLimit = Math.min(Math.max(limit * 8, 20), 200);
     const sourceTypes = input.sourceTypes ?? [...INDEXED_SOURCE_TYPES];
-    const vectorRows: SearchDocumentVectorRow[] = [];
+    let vectorLimit = initialSearchVectorLimit(limit);
+    let results: SearchResult[] = [];
 
-    for (const sourceType of sourceTypes) {
-      vectorRows.push(
-        ...this.searchVectors({
-          queryVector,
-          limit: vectorLimit,
-          sourceType,
-          projectId: input.projectId,
-          boardId: input.boardId,
-          taskId: input.taskId,
-        }),
+    while (vectorLimit <= SEARCH_VECTOR_MAX_LIMIT) {
+      results = this.searchGroupedSources({
+        input,
+        queryVector,
+        sourceTypes,
+        vectorLimit,
+      });
+
+      if (results.length >= limit || vectorLimit === SEARCH_VECTOR_MAX_LIMIT) {
+        return results.slice(0, limit);
+      }
+
+      vectorLimit = Math.min(vectorLimit * 2, SEARCH_VECTOR_MAX_LIMIT);
+    }
+
+    return results.slice(0, limit);
+  }
+
+  private async indexSourceDocuments(
+    documents: IndexDocumentInput[],
+    options: { force?: boolean },
+  ): Promise<EmbeddingIndexResult> {
+    if (documents.length === 0) {
+      return { status: "skipped" };
+    }
+
+    const first = documents[0];
+    if (!first) {
+      return { status: "skipped" };
+    }
+
+    const results: EmbeddingIndexResult[] = [];
+    for (const document of documents) {
+      results.push(await this.indexDocumentChunk(document, options));
+    }
+
+    const aggregate = aggregateIndexResults(results);
+    if (aggregate.status !== "error") {
+      this.deleteStaleChunks(
+        first.sourceType,
+        first.sourceId,
+        documents.map((document) => document.chunkKey),
       );
     }
 
-    const byDocumentId = new Map<string, number>();
-    for (const row of vectorRows) {
-      const existingDistance = byDocumentId.get(row.search_document_id);
-      if (existingDistance === undefined || row.distance < existingDistance) {
-        byDocumentId.set(row.search_document_id, row.distance);
-      }
-    }
-
-    const rows = this.loadSearchDocuments([...byDocumentId.keys()]);
-    return rows
-      .filter((row) => row.document.embeddingStatus === "indexed")
-      .filter(hasIndexedSourceType)
-      .filter((row) => input.includeArchived || isActiveSearchRow(row))
-      .map((row) => ({
-        searchDocumentId: row.document.id,
-        sourceType: row.document.sourceType,
-        sourceId: row.document.sourceId,
-        projectId: row.document.projectId,
-        boardId: row.document.boardId,
-        taskId: row.document.taskId,
-        title: row.document.title,
-        snippet: makeSnippet(row.document.body),
-        distance:
-          byDocumentId.get(row.document.id) ?? Number.POSITIVE_INFINITY,
-        metadata: row.document.metadata,
-      }))
-      .sort((left, right) => left.distance - right.distance)
-      .slice(0, limit);
+    return aggregate;
   }
 
-  private async indexDocument(
-    document: {
-      sourceType: IndexedSourceType;
-      sourceId: string;
-      projectId: string;
-      boardId: string;
-      taskId: string | null;
-      chunkKey: string;
-      title: string | null;
-      body: string;
-      metadata: Record<string, unknown>;
-    },
+  private async indexDocumentChunk(
+    document: IndexDocumentInput,
     options: { force?: boolean },
   ): Promise<EmbeddingIndexResult> {
     const bodyHash = hashText(document.body);
@@ -368,6 +372,82 @@ export class SearchService {
     }
   }
 
+  private deleteStaleChunks(
+    sourceType: IndexedSourceType,
+    sourceId: string,
+    chunkKeys: string[],
+  ) {
+    this.db
+      .delete(searchDocuments)
+      .where(
+        and(
+          eq(searchDocuments.sourceType, sourceType),
+          eq(searchDocuments.sourceId, sourceId),
+          notInArray(searchDocuments.chunkKey, chunkKeys),
+        ),
+      )
+      .run();
+  }
+
+  private searchGroupedSources(input: {
+    queryVector: Buffer;
+    input: SearchInput;
+    sourceTypes: IndexedSourceType[];
+    vectorLimit: number;
+  }) {
+    const vectorRows: SearchDocumentVectorRow[] = [];
+
+    for (const sourceType of input.sourceTypes) {
+      vectorRows.push(
+        ...this.searchVectors({
+          queryVector: input.queryVector,
+          limit: input.vectorLimit,
+          sourceType,
+          projectId: input.input.projectId,
+          boardId: input.input.boardId,
+          taskId: input.input.taskId,
+        }),
+      );
+    }
+
+    const byDocumentId = new Map<string, number>();
+    for (const row of vectorRows) {
+      const existingDistance = byDocumentId.get(row.search_document_id);
+      if (existingDistance === undefined || row.distance < existingDistance) {
+        byDocumentId.set(row.search_document_id, row.distance);
+      }
+    }
+
+    const rows = this.loadSearchDocuments([...byDocumentId.keys()]);
+    const candidates = rows
+      .filter((row) => row.document.embeddingStatus === "indexed")
+      .filter(hasIndexedSourceType)
+      .filter((row) => input.input.includeArchived || isActiveSearchRow(row))
+      .map((row) => ({
+        searchDocumentId: row.document.id,
+        sourceType: row.document.sourceType,
+        sourceId: row.document.sourceId,
+        projectId: row.document.projectId,
+        boardId: row.document.boardId,
+        taskId: row.document.taskId,
+        title: row.document.title,
+        snippet: makeSnippet(row.document.body),
+        distance: byDocumentId.get(row.document.id) ?? Number.POSITIVE_INFINITY,
+        metadata: row.document.metadata,
+      }))
+      .sort((left, right) => left.distance - right.distance);
+
+    const bySource = new Map<string, SearchResult>();
+    for (const candidate of candidates) {
+      const key = `${candidate.sourceType}:${candidate.sourceId}`;
+      if (!bySource.has(key)) {
+        bySource.set(key, candidate);
+      }
+    }
+
+    return [...bySource.values()];
+  }
+
   private searchVectors(input: {
     queryVector: Buffer;
     limit: number;
@@ -466,6 +546,102 @@ export function formatCommentEmbeddingText(comment: Pick<TaskComment, "body">) {
   return comment.body;
 }
 
+function makeChunkedIndexDocuments(document: IndexDocumentInput) {
+  const chunks = chunkEmbeddingText(document.body);
+  return chunks.map((chunk) =>
+    makeIndexDocumentChunk(document, chunk, chunk.count === 1),
+  );
+}
+
+function makeTaskIndexDocuments(task: Task) {
+  const base: IndexDocumentInput = {
+    sourceType: "task",
+    sourceId: task.id,
+    projectId: task.projectId,
+    boardId: task.boardId,
+    taskId: task.id,
+    chunkKey: "task:content",
+    title: task.title,
+    body: formatTaskEmbeddingText(task),
+    metadata: { sourceTextField: "formatted" },
+  };
+  const fullChunks = chunkEmbeddingText(base.body);
+  if (fullChunks.length === 1 || !task.description?.trim()) {
+    return makeChunkedIndexDocuments(base);
+  }
+
+  const labels = normalizeLabels(task.labels);
+  const context = joinEmbeddingLines([
+    `Task: ${task.title}`,
+    labels.length > 0 ? `Tags: ${labels.join(", ")}` : undefined,
+    `Priority: ${task.priority}`,
+  ]);
+  const descriptionPrefix = `${context}\nDescription:\n`;
+  const maxBodyChars = embeddingMaxChars();
+  const descriptionChunks = chunkEmbeddingText(task.description, {
+    maxChars: Math.max(400, maxBodyChars - descriptionPrefix.length),
+  });
+
+  const chunkedDocuments = descriptionChunks.map((chunk) =>
+    makeIndexDocumentChunk(
+      {
+        ...base,
+        body: `${descriptionPrefix}${chunk.text}`,
+        metadata: { sourceTextField: "description" },
+      },
+      {
+        ...chunk,
+        text: `${descriptionPrefix}${chunk.text}`,
+      },
+      descriptionChunks.length === 1,
+    ),
+  );
+
+  if (
+    chunkedDocuments.some((document) => document.body.length > maxBodyChars)
+  ) {
+    return makeChunkedIndexDocuments(base);
+  }
+
+  return chunkedDocuments;
+}
+
+function makeIndexDocumentChunk(
+  document: IndexDocumentInput,
+  chunk: EmbeddingTextChunk,
+  isOnlyChunk: boolean,
+): IndexDocumentInput {
+  return {
+    ...document,
+    chunkKey: isOnlyChunk
+      ? document.chunkKey
+      : `${document.chunkKey}:${String(chunk.index + 1).padStart(4, "0")}`,
+    body: chunk.text,
+    metadata: {
+      ...document.metadata,
+      chunkIndex: chunk.index,
+      chunkCount: chunk.count,
+      startOffset: chunk.startOffset,
+      endOffset: chunk.endOffset,
+      chunkingVersion: EMBEDDING_CHUNKING_VERSION,
+    },
+  };
+}
+
+function embeddingMaxChars() {
+  return (
+    DEFAULT_EMBEDDING_CHUNK_OPTIONS.charsPerToken *
+    DEFAULT_EMBEDDING_CHUNK_OPTIONS.maxTokens
+  );
+}
+
+function initialSearchVectorLimit(limit: number) {
+  return Math.min(
+    Math.max(limit * SEARCH_VECTOR_INITIAL_MULTIPLIER, SEARCH_VECTOR_MIN_LIMIT),
+    SEARCH_VECTOR_MAX_LIMIT,
+  );
+}
+
 function joinEmbeddingLines(lines: Array<string | undefined>) {
   return lines.filter((line): line is string => Boolean(line)).join("\n");
 }
@@ -481,6 +657,38 @@ function countIndexResult(
   } else {
     counts.errored += 1;
   }
+}
+
+function aggregateIndexResults(
+  results: EmbeddingIndexResult[],
+): EmbeddingIndexResult {
+  const searchDocumentIds = results.flatMap((result) =>
+    result.searchDocumentId ? [result.searchDocumentId] : [],
+  );
+  const errored = results.find((result) => result.status === "error");
+  if (errored) {
+    return {
+      status: "error",
+      searchDocumentId: errored.searchDocumentId ?? searchDocumentIds[0],
+      searchDocumentIds,
+      error: errored.error,
+    };
+  }
+
+  const indexed = results.find((result) => result.status === "indexed");
+  if (indexed) {
+    return {
+      status: "indexed",
+      searchDocumentId: indexed.searchDocumentId ?? searchDocumentIds[0],
+      searchDocumentIds,
+    };
+  }
+
+  return {
+    status: "skipped",
+    searchDocumentId: searchDocumentIds[0],
+    searchDocumentIds,
+  };
 }
 
 function hashText(text: string) {
