@@ -33,6 +33,12 @@ The board view should make task state easy to scan and change:
 The UI should keep movement semantics aligned with the API. Moving a card in the
 UI should map to the same explicit task move operation that agents use.
 
+Task creation should be quick and local to the board context. A column-level
+`New task` affordance opens an inline form in that column with the minimum useful
+fields: title, optional description, labels, and priority. Focus states inside
+the form must render fully inside the column scroller so keyboard users can see
+the active field without clipped outlines.
+
 ## Task Detail Experience
 
 Task detail should preserve enough context for humans and agents to coordinate:
@@ -42,6 +48,14 @@ Task detail should preserve enough context for humans and agents to coordinate:
 - activity entries for important state changes
 - stable task ID visible enough for API or script usage
 - related search results when useful
+
+The task detail surface is an editing workspace, not just a read-only property
+rail. When a task is open from the board, the detail sidebar should become wide
+enough for focused task work while still preserving board context. The task
+title and description are editable in place, saved explicitly with a Save action
+or Cmd/Ctrl+Enter, and cancellable before save. Blank titles should be rejected
+near the field. Successful edits should produce calm in-app feedback and refresh
+the board card and task context from the API.
 
 Comments should be treated as durable task memory, not disposable chat.
 

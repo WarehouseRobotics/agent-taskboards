@@ -155,8 +155,10 @@ Every primary screen uses the same chrome:
   expandable project tree, footer health indicator. 240px fixed.
 - **Topbar carries breadcrumbs.** Project glyph → board → task title (when
   applicable). Stable IDs sit inline next to the title in mono.
-- **Right rail for task properties.** 300px fixed; never floats. Properties,
-  API reference, and semantic-related results.
+- **Task detail rail.** When a task is open, the right rail becomes the primary
+  task work surface. It stays attached to the board, never floats, and uses a
+  responsive width that is wide enough for editing while preserving column
+  scanning on the left.
 - **No modals for primary work.** Task detail is a route, not a dialog.
   Confirmation dialogs are reserved for destructive actions.
 
@@ -185,6 +187,10 @@ Rules:
   count red.
 
 Empty columns get a dashed-border placeholder and a `+ New task` affordance.
+Opening task creation in a column expands an inline form in that column for
+title, optional description, labels, and priority. The form remains dense, and
+its focused inputs must have enough inset space for the full 2px accent outline
+plus gap to render without clipping inside the column frame.
 
 ---
 
@@ -218,6 +224,10 @@ Agent interoperability must be visible without overwhelming humans.
 - **Stable IDs are first-class.** Always rendered in mono. On task detail they
   sit beside the title and in a dedicated API reference block. A `Copy ID`
   button is always one click away.
+- **Task title and description are editable in place.** The task detail rail
+  uses explicit Save/Cancel controls for title and description edits, supports
+  Cmd/Ctrl+Enter to save, rejects blank titles inline, and gives restrained
+  success feedback.
 - **Activity vs comments are typed.** Activity entries (status changes, links,
   creates) are single-line. Comments include a quoted body block.
 - **API terminology matches docs.** `authorKind`, `taskMove`, `boardId`, etc.
