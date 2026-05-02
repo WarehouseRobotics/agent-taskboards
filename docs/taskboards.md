@@ -133,6 +133,7 @@ should stay local and ignored.
 
 - `docs/tasks-and-boards.md`: domain model and ownership rules
 - `docs/api.md`: implemented starter API contract and planned API areas
+- `docs/agent-api.md`: planned markdown-first API contract for coding agents
 - `docs/data.md`: storage, timestamps, JSON fields, and low-level data details
 - `docs/text-embedding.md`: local embedding and semantic search design
 - `docs/ui.md`: UI architecture and user experience principles
