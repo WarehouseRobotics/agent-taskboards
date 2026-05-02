@@ -4,6 +4,10 @@ export const backgroundSyncIntervalMs = 10000;
 
 type EditableTaskFields = Pick<Task, "description" | "labels" | "priority" | "title">;
 
+interface MergeProjectTreeOptions {
+  preserveEmptyIncoming?: boolean;
+}
+
 export interface TaskDraftState {
   fields?: Partial<EditableTaskFields>;
   localModifiedAt: number;
@@ -11,7 +15,15 @@ export interface TaskDraftState {
 
 export type TaskDraftsById = Record<string, TaskDraftState | undefined>;
 
-export function mergeProjectTree(current: ProjectTreeItem[], incoming: ProjectTreeItem[]) {
+export function mergeProjectTree(
+  current: ProjectTreeItem[],
+  incoming: ProjectTreeItem[],
+  options: MergeProjectTreeOptions = {},
+) {
+  if (options.preserveEmptyIncoming && current.length > 0 && incoming.length === 0) {
+    return current;
+  }
+
   const currentByProjectId = new Map(current.map((item) => [item.project.id, item]));
 
   return incoming.map((item) => {

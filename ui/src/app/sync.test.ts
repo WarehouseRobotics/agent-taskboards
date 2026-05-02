@@ -29,6 +29,20 @@ describe("sync merge helpers", () => {
     ]);
   });
 
+  it("can preserve the current project tree when a quiet sync gets an empty response", () => {
+    const project = makeProject("project-a");
+    const current: ProjectTreeItem[] = [
+      {
+        project,
+        boards: [makeBoard("board-a", project.id)],
+        taskCount: 3,
+      },
+    ];
+
+    expect(mergeProjectTree(current, [], { preserveEmptyIncoming: true })).toBe(current);
+    expect(mergeProjectTree(current, [])).toEqual([]);
+  });
+
   it("uses server task order and removes tasks that no longer exist remotely", () => {
     const board = makeBoard("board-a", "project-a", [
       makeTask("task-a", { position: 0 }),

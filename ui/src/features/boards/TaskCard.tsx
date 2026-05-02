@@ -72,6 +72,9 @@ export function TaskCard({
     .join(" ");
   const onKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter") {
+      if (menuOpen) {
+        return;
+      }
       onOpenTask(task.id);
     }
     if (event.key === "ArrowLeft") {

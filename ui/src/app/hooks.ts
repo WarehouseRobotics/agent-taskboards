@@ -5,6 +5,8 @@ import { routePath, type AppRoute } from "./router";
 import type { Board, Health, ProjectTreeItem, Task, TaskContext } from "../domain/types";
 import { mergeBoard, mergeProjectTree, type TaskDraftsById } from "./sync";
 
+const maxTaskContextCacheSize = 25;
+
 interface LoadOptions {
   normalizeRoute?: boolean;
   quiet?: boolean;
@@ -83,7 +85,12 @@ export function useProjectTree({
           taskCount: null,
         })),
       );
-      setProjectTree((current) => mergeProjectTree(current, tree));
+      setProjectTree((current) => mergeProjectTree(current, tree, { preserveEmptyIncoming: options.quiet }));
+      if (options.quiet && tree.length === 0) {
+        setError(null);
+        setSyncError(null);
+        return;
+      }
       setError(null);
       setSyncError(null);
 
@@ -101,18 +108,14 @@ export function useProjectTree({
 
       const currentRoute = routeRef.current;
       const routeTaskId = currentRoute.view === "board" ? currentRoute.taskId : null;
-      if (
-        options.normalizeRoute !== false &&
-        currentRoute.view === "board" &&
-        !routeTaskId &&
-        nextProject?.project.id &&
-        nextBoard?.id
-      ) {
+      if (options.normalizeRoute !== false && currentRoute.view === "board") {
+        const routeBoardStillValid =
+          currentRoute.projectId === nextProject?.project.id && currentRoute.boardId === nextBoard?.id;
         const normalizedRoute: AppRoute = {
           view: "board",
-          projectId: nextProject.project.id,
-          boardId: nextBoard.id,
-          taskId: null,
+          projectId: nextProject?.project.id ?? null,
+          boardId: nextBoard?.id ?? null,
+          taskId: routeBoardStillValid ? routeTaskId : null,
         };
         if (window.location.pathname !== routePath(normalizedRoute)) {
           navigateRef.current(normalizedRoute, "replace");
@@ -256,7 +259,18 @@ export function useTaskContexts(activeTaskId: string | null) {
         setLoadingTask(true);
       }
       const context = await api.getTaskContext(taskId);
-      setTaskContexts((current) => ({ ...current, [taskId]: context }));
+      setTaskContexts((current) => {
+        const next = { ...current };
+        delete next[taskId];
+        next[taskId] = context;
+
+        const cachedTaskIds = Object.keys(next);
+        const staleTaskIds = cachedTaskIds.slice(0, Math.max(0, cachedTaskIds.length - maxTaskContextCacheSize));
+        for (const staleTaskId of staleTaskIds) {
+          delete next[staleTaskId];
+        }
+        return next;
+      });
       setError(null);
       setSyncError(null);
     })();
