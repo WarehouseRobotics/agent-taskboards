@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Agent Taskboards — Design</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles/tokens.css" />
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #1c1c1e; }
+    body { font-family: "Inter", system-ui, sans-serif; color: #eee; }
+    .frame {
+      width: 1440px; height: 900px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--bg-app);
+      border: 1px solid var(--line);
+      box-shadow: 0 18px 48px rgba(0,0,0,.32);
+    }
+    .frame[data-theme="light"] { box-shadow: 0 18px 48px rgba(60,55,50,.18); }
+  </style>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Order matters: primitives → data → screens → canvas → app -->
+  <script type="text/babel" src="components/primitives.jsx"></script>
+  <script type="text/babel" src="components/data.jsx"></script>
+  <script type="text/babel" src="components/board.jsx"></script>
+  <script type="text/babel" src="components/task.jsx"></script>
+  <script type="text/babel" src="components/projects.jsx"></script>
+  <script type="text/babel" src="components/settings.jsx"></script>
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Wrap each screen in a fixed-size, theme-scoped frame
+    const Frame = ({ theme, children, label }) => (
+      <div className="tb frame" data-theme={theme} data-screen-label={label}>
+        {children}
+      </div>
+    );
+
+    function App() {
+      // Theme is global to the whole canvas
+      const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+        "theme": "dark",
+        "showCanvasNotes": true
+      }/*EDITMODE-END*/;
+      const [tweaks, setTweak] = window.useTweaks ? window.useTweaks(TWEAK_DEFAULTS) : [TWEAK_DEFAULTS, () => {}];
+      const theme = tweaks.theme;
+
+      // Provide theme to every artboard via attribute
+      return (
+        <>
+          <DesignCanvas>
+            <DCSection id="boards" title="Boards & Tasks" subtitle="Primary working surfaces — Kanban + task detail">
+              <DCArtboard id="board-dark" label="01 · Board view" width={1440} height={900}>
+                <Frame theme={theme} label="01 Board"><BoardScreen /></Frame>
+              </DCArtboard>
+              <DCArtboard id="task-dark" label="02 · Task detail" width={1440} height={900}>
+                <Frame theme={theme} label="02 Task"><TaskScreen /></Frame>
+              </DCArtboard>
+            </DCSection>
+            <DCSection id="overview" title="Project & Settings" subtitle="Cross-project overview and local instance settings">
+              <DCArtboard id="projects-dark" label="03 · Projects list" width={1440} height={900}>
+                <Frame theme={theme} label="03 Projects"><ProjectsScreen /></Frame>
+              </DCArtboard>
+              <DCArtboard id="settings-dark" label="04 · Settings" width={1440} height={900}>
+                <Frame theme={theme} label="04 Settings"><SettingsScreen /></Frame>
+              </DCArtboard>
+            </DCSection>
+          </DesignCanvas>
+
+          <TweaksPanel title="Tweaks">
+            <TweakSection title="Theme">
+              <TweakRadio
+                label="Mode"
+                value={tweaks.theme}
+                options={[{value:"dark",label:"Dark"},{value:"light",label:"Light"}]}
+                onChange={(v) => setTweak("theme", v)}
+              />
+            </TweakSection>
+            <TweakSection title="Canvas">
+              <TweakToggle
+                label="Show canvas notes"
+                value={tweaks.showCanvasNotes}
+                onChange={(v) => setTweak("showCanvasNotes", v)}
+              />
+            </TweakSection>
+          </TweaksPanel>
+        </>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
