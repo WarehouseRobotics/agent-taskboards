@@ -14,6 +14,7 @@ export function TaskDetail({
   onCompleteTask,
   onMoveTask,
   onPostComment,
+  onTaskDraftChange,
   onUpdateTask,
 }: {
   columns: BoardColumn[];
@@ -24,6 +25,7 @@ export function TaskDetail({
   onCompleteTask: (taskId: string) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onPostComment: (taskId: string, body: string) => Promise<void>;
+  onTaskDraftChange: (taskId: string, fields: { title?: string; description?: string | null } | null) => void;
   onUpdateTask: (taskId: string, input: { title?: string; description?: string | null }) => Promise<void>;
 }) {
   const [comment, setComment] = useState("");
@@ -71,6 +73,39 @@ export function TaskDetail({
   useEffect(() => {
     setSaveMessage(null);
   }, [taskId]);
+
+  useEffect(() => {
+    if (!taskId) {
+      return;
+    }
+
+    return () => onTaskDraftChange(taskId, null);
+  }, [onTaskDraftChange, taskId]);
+
+  useEffect(() => {
+    if (!taskId || draft.taskId !== taskId) {
+      return;
+    }
+
+    const draftDirty = draft.title !== draft.baseTitle || draft.description !== draft.baseDescription;
+    onTaskDraftChange(
+      taskId,
+      draftDirty
+        ? {
+            description: draft.description,
+            title: draft.title,
+          }
+        : null,
+    );
+  }, [
+    draft.baseDescription,
+    draft.baseTitle,
+    draft.description,
+    draft.taskId,
+    draft.title,
+    onTaskDraftChange,
+    taskId,
+  ]);
 
   useEffect(() => {
     return () => {

@@ -66,7 +66,7 @@ export function useProjectTree({
     options: LoadOptions = {},
   ) => {
     if (loadProjectsRef.current) {
-      return;
+      return loadProjectsRef.current.catch(() => undefined);
     }
 
     const loadPromise = (async () => {
@@ -187,8 +187,9 @@ export function useBoard(
     }
 
     const boardKey = `${activeProjectId}:${activeBoardId}`;
-    if (loadBoardRef.current[boardKey]) {
-      return;
+    const existingLoad = loadBoardRef.current[boardKey];
+    if (existingLoad) {
+      return existingLoad.catch(() => undefined);
     }
 
     const loadPromise = (async () => {
@@ -247,7 +248,7 @@ export function useTaskContexts(activeTaskId: string | null) {
   const loadTaskContext = useCallback(async (taskId: string, options: LoadOptions = {}) => {
     const existing = loadTaskContextRef.current[taskId];
     if (existing) {
-      return;
+      return existing.catch(() => undefined);
     }
 
     const loadPromise = (async () => {

@@ -45,13 +45,11 @@ describe("sync merge helpers", () => {
     expect(merged.tasks?.[0]?.title).toBe("B moved");
   });
 
-  it("keeps a locally dirty task if it disappears from the server response", () => {
+  it("drops a locally dirty task if it disappears from the server response", () => {
     const board = makeBoard("board-a", "project-a", [makeTask("task-a")]);
     const incoming = makeBoard("board-a", "project-a", []);
 
-    expect(mergeBoard(board, incoming, { "task-a": { localModifiedAt: 1 } }).tasks).toEqual([
-      makeTask("task-a"),
-    ]);
+    expect(mergeBoard(board, incoming, { "task-a": { localModifiedAt: 1 } }).tasks).toEqual([]);
   });
 
   it("protects dirty task fields from server replacement", () => {

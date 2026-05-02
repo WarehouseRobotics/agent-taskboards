@@ -30,17 +30,10 @@ export function mergeBoard(current: Board | null, incoming: Board, taskDrafts: T
   }
 
   const currentTasksById = new Map((current.tasks ?? []).map((task) => [task.id, task]));
-  const incomingTaskIds = new Set((incoming.tasks ?? []).map((task) => task.id));
   const mergedTasks = (incoming.tasks ?? []).map((serverTask) => {
     const currentTask = currentTasksById.get(serverTask.id);
     return mergeTask(currentTask, serverTask, taskDrafts[serverTask.id]);
   });
-
-  for (const currentTask of current.tasks ?? []) {
-    if (!incomingTaskIds.has(currentTask.id) && taskDrafts[currentTask.id]) {
-      mergedTasks.push(currentTask);
-    }
-  }
 
   return {
     ...incoming,

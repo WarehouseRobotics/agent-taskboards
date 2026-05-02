@@ -5,7 +5,7 @@ import { defaultSettingsSection, parseRoute, routePath, viewFromRoute } from "./
 import { useBoard, useHealth, useProjectTree, useTaskContexts, withCurrentTaskCounts } from "./hooks";
 import { api } from "../lib/api";
 import { apiMessage } from "../lib/errors";
-import { backgroundSyncIntervalMs } from "./sync";
+import { backgroundSyncIntervalMs, type TaskDraftsById } from "./sync";
 import { persistTheme, storedTheme } from "../lib/theme";
 import type { Theme, View } from "../domain/types";
 import { BoardWorkspace } from "../features/boards";
@@ -32,6 +32,7 @@ export function App() {
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newBoardOpen, setNewBoardOpen] = useState(false);
   const [newTaskColumnId, setNewTaskColumnId] = useState<string | null>(null);
+  const [taskDrafts, setTaskDrafts] = useState<TaskDraftsById>({});
 
   const setTheme = (next: Theme) => {
     setThemeState(next);
@@ -53,6 +54,8 @@ export function App() {
       setActiveTaskId(null);
       return;
     }
+    setActiveProjectId(null);
+    setActiveBoardId(null);
     setActiveTaskId(null);
   }, []);
 
@@ -91,6 +94,29 @@ export function App() {
 
   const selectedProjectId = activeProjectId ?? resolvedProjectId;
   const selectedBoardId = activeBoardId ?? resolvedBoardId;
+  const trackTaskDraft = useCallback(
+    (taskId: string, fields: { title?: string; description?: string | null } | null) => {
+      setTaskDrafts((current) => {
+        if (!fields) {
+          if (!current[taskId]) {
+            return current;
+          }
+          const next = { ...current };
+          delete next[taskId];
+          return next;
+        }
+
+        return {
+          ...current,
+          [taskId]: {
+            fields,
+            localModifiedAt: Date.now(),
+          },
+        };
+      });
+    },
+    [],
+  );
   const {
     board,
     columns,
@@ -99,7 +125,7 @@ export function App() {
     loadingBoard,
     syncError: boardSyncError,
     tasks,
-  } = useBoard(selectedProjectId, selectedBoardId);
+  } = useBoard(selectedProjectId, selectedBoardId, taskDrafts);
   const {
     error: taskError,
     loadTaskContext,
@@ -280,6 +306,7 @@ export function App() {
               }
             }}
             onRefresh={refreshAfterMutation}
+            onTaskDraftChange={trackTaskDraft}
             onUpdateTask={async (taskId, input) => {
               setMutationError(null);
               await api.updateTask(taskId, input);
