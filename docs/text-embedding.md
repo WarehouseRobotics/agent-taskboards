@@ -16,6 +16,37 @@ The planned v1 embedding stack is:
 
 This design keeps task data and embeddings on the developer's machine.
 
+## Local Development Setup
+
+The Docker image includes the native build tools needed by `node-llama-cpp`.
+For development, keep the GGUF model on the host at:
+
+```sh
+models-gguf/bge-small-en-v1.5-f32.gguf
+```
+
+The Compose bind mount exposes that file inside the running container at the
+same `/app/models-gguf/...` path. The directory is ignored by git and Docker
+build context so model weights stay local.
+
+The embedding wrapper defaults to CPU-only execution and disables runtime
+downloads:
+
+- `TASKBOARDS_EMBEDDING_MODEL_PATH` can override the model path
+- default context size is 512 tokens
+- default inference threads is 2
+
+Run the local model smoke test inside the already-running container:
+
+```sh
+docker compose exec taskboards npm run test:embeddings
+```
+
+The smoke test loads the GGUF file, creates a 384-dimensional embedding, and
+checks that two related task-board phrases are closer than unrelated text. If
+the GGUF file is not present, the integration portion is skipped so regular
+test runs do not require committing model weights.
+
 ## Indexed Content
 
 The embedding index should cover content that helps humans and agents recover
