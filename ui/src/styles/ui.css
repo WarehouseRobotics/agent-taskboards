@@ -36,7 +36,7 @@
   font-size: var(--fs-12);
   font-weight: 450;
   padding: 4px 10px;
-  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
   white-space: nowrap;
 }
 
@@ -44,6 +44,11 @@
 .icon-btn:hover:not(:disabled),
 .new-task-button:hover {
   background: var(--bg-hover);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: var(--accent-glow);
 }
 
 .btn:focus-visible,
@@ -333,4 +338,3 @@ select {
 .tb ::-webkit-scrollbar-thumb:hover {
   background: var(--line-strong);
 }
-

@@ -29,6 +29,7 @@ export function BoardWorkspace({
   onOpenTask,
   onPostComment,
   onRefresh,
+  syncError,
   tasks,
 }: {
   activeBoard: Board | null;
@@ -59,6 +60,7 @@ export function BoardWorkspace({
   onOpenTask: (taskId: string) => void;
   onPostComment: (taskId: string, body: string) => Promise<void>;
   onRefresh: (taskId?: string | null) => Promise<void>;
+  syncError: string | null;
   tasks: Task[];
 }) {
   const tasksByColumn = useMemo(() => {
@@ -121,7 +123,7 @@ export function BoardWorkspace({
           { label: activeBoard?.name ?? "No board", id: activeBoard?.id, icon: <Icon name="board" /> },
         ]}
       />
-      <InlineError message={error ?? mutationError} />
+      <InlineError message={error ?? mutationError ?? (syncError ? `Background sync failed: ${syncError}` : null)} />
       {!activeBoard && !loadingWorkspace && (
         <div className="workspace-pane">
           <EmptyState

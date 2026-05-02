@@ -3,6 +3,12 @@ import { api } from "../lib/api";
 import { apiMessage } from "../lib/errors";
 import { routePath, type AppRoute } from "./router";
 import type { Board, Health, ProjectTreeItem, Task, TaskContext } from "../domain/types";
+import { mergeBoard, mergeProjectTree, type TaskDraftsById } from "./sync";
+
+interface LoadOptions {
+  normalizeRoute?: boolean;
+  quiet?: boolean;
+}
 
 export function useHealth() {
   const [health, setHealth] = useState<Health | null>(null);
@@ -38,10 +44,12 @@ export function useProjectTree({
   const [projectTree, setProjectTree] = useState<ProjectTreeItem[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [resolvedProjectId, setResolvedProjectId] = useState<string | null>(activeProjectId);
   const [resolvedBoardId, setResolvedBoardId] = useState<string | null>(activeBoardId);
   const activeBoardIdRef = useRef(activeBoardId);
   const activeProjectIdRef = useRef(activeProjectId);
+  const loadProjectsRef = useRef<Promise<void> | null>(null);
   const navigateRef = useRef(navigate);
   const routeRef = useRef(route);
 
@@ -52,9 +60,19 @@ export function useProjectTree({
     routeRef.current = route;
   }, [activeBoardId, activeProjectId, navigate, route]);
 
-  const loadProjects = useCallback(async (preferredProjectId?: string | null, preferredBoardId?: string | null) => {
-    setLoadingProjects(true);
-    try {
+  const loadProjects = useCallback(async (
+    preferredProjectId?: string | null,
+    preferredBoardId?: string | null,
+    options: LoadOptions = {},
+  ) => {
+    if (loadProjectsRef.current) {
+      return;
+    }
+
+    const loadPromise = (async () => {
+      if (!options.quiet) {
+        setLoadingProjects(true);
+      }
       const nextPreferredProjectId = preferredProjectId === undefined ? activeProjectIdRef.current : preferredProjectId;
       const nextPreferredBoardId = preferredBoardId === undefined ? activeBoardIdRef.current : preferredBoardId;
       const projects = await api.listProjects();
@@ -65,8 +83,9 @@ export function useProjectTree({
           taskCount: null,
         })),
       );
-      setProjectTree(tree);
+      setProjectTree((current) => mergeProjectTree(current, tree));
       setError(null);
+      setSyncError(null);
 
       const currentProject = nextPreferredProjectId
         ? tree.find((item) => item.project.id === nextPreferredProjectId)
@@ -82,7 +101,13 @@ export function useProjectTree({
 
       const currentRoute = routeRef.current;
       const routeTaskId = currentRoute.view === "board" ? currentRoute.taskId : null;
-      if (currentRoute.view === "board" && !routeTaskId && nextProject?.project.id && nextBoard?.id) {
+      if (
+        options.normalizeRoute !== false &&
+        currentRoute.view === "board" &&
+        !routeTaskId &&
+        nextProject?.project.id &&
+        nextBoard?.id
+      ) {
         const normalizedRoute: AppRoute = {
           view: "board",
           projectId: nextProject.project.id,
@@ -93,10 +118,24 @@ export function useProjectTree({
           navigateRef.current(normalizedRoute, "replace");
         }
       }
+    })();
+
+    loadProjectsRef.current = loadPromise;
+    try {
+      await loadPromise;
     } catch (err) {
-      setError(apiMessage(err));
+      if (options.quiet) {
+        setSyncError(apiMessage(err));
+      } else {
+        setError(apiMessage(err));
+      }
     } finally {
-      setLoadingProjects(false);
+      if (loadProjectsRef.current === loadPromise) {
+        loadProjectsRef.current = null;
+      }
+      if (!options.quiet) {
+        setLoadingProjects(false);
+      }
     }
   }, []);
 
@@ -112,30 +151,76 @@ export function useProjectTree({
     resolvedBoardId,
     resolvedProjectId,
     setError,
+    syncError,
   };
 }
 
-export function useBoard(activeProjectId: string | null, activeBoardId: string | null) {
+export function useBoard(
+  activeProjectId: string | null,
+  activeBoardId: string | null,
+  taskDrafts: TaskDraftsById = {},
+) {
   const [board, setBoard] = useState<Board | null>(null);
   const [loadingBoard, setLoadingBoard] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const activeBoardIdRef = useRef(activeBoardId);
+  const activeProjectIdRef = useRef(activeProjectId);
+  const loadBoardRef = useRef<Record<string, Promise<void> | undefined>>({});
+  const taskDraftsRef = useRef(taskDrafts);
 
-  const loadBoard = useCallback(async () => {
+  useEffect(() => {
+    activeBoardIdRef.current = activeBoardId;
+    activeProjectIdRef.current = activeProjectId;
+  }, [activeBoardId, activeProjectId]);
+
+  useEffect(() => {
+    taskDraftsRef.current = taskDrafts;
+  }, [taskDrafts]);
+
+  const loadBoard = useCallback(async (options: LoadOptions = {}) => {
     if (!activeProjectId || !activeBoardId) {
-      setBoard(null);
+      if (!options.quiet) {
+        setBoard(null);
+      }
       return;
     }
 
-    setLoadingBoard(true);
-    try {
+    const boardKey = `${activeProjectId}:${activeBoardId}`;
+    if (loadBoardRef.current[boardKey]) {
+      return;
+    }
+
+    const loadPromise = (async () => {
+      if (!options.quiet) {
+        setLoadingBoard(true);
+      }
       const nextBoard = await api.getBoard(activeProjectId, activeBoardId);
-      setBoard(nextBoard);
+      if (activeProjectIdRef.current !== activeProjectId || activeBoardIdRef.current !== activeBoardId) {
+        return;
+      }
+      setBoard((current) => mergeBoard(current, nextBoard, taskDraftsRef.current));
       setError(null);
+      setSyncError(null);
+    })();
+
+    loadBoardRef.current[boardKey] = loadPromise;
+    try {
+      await loadPromise;
     } catch (err) {
-      setError(apiMessage(err));
-      setBoard(null);
+      if (options.quiet) {
+        setSyncError(apiMessage(err));
+      } else {
+        setError(apiMessage(err));
+        setBoard(null);
+      }
     } finally {
-      setLoadingBoard(false);
+      if (loadBoardRef.current[boardKey] === loadPromise) {
+        delete loadBoardRef.current[boardKey];
+      }
+      if (!options.quiet) {
+        setLoadingBoard(false);
+      }
     }
   }, [activeBoardId, activeProjectId]);
 
@@ -149,24 +234,48 @@ export function useBoard(activeProjectId: string | null, activeBoardId: string |
   );
   const tasks = board?.tasks ?? [];
 
-  return { board, columns, error, loadBoard, loadingBoard, tasks };
+  return { board, columns, error, loadBoard, loadingBoard, syncError, tasks };
 }
 
 export function useTaskContexts(activeTaskId: string | null) {
   const [taskContexts, setTaskContexts] = useState<Record<string, TaskContext>>({});
   const [loadingTask, setLoadingTask] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const loadTaskContextRef = useRef<Record<string, Promise<void> | undefined>>({});
 
-  const loadTaskContext = useCallback(async (taskId: string) => {
-    setLoadingTask(true);
-    try {
+  const loadTaskContext = useCallback(async (taskId: string, options: LoadOptions = {}) => {
+    const existing = loadTaskContextRef.current[taskId];
+    if (existing) {
+      return;
+    }
+
+    const loadPromise = (async () => {
+      if (!options.quiet) {
+        setLoadingTask(true);
+      }
       const context = await api.getTaskContext(taskId);
       setTaskContexts((current) => ({ ...current, [taskId]: context }));
       setError(null);
+      setSyncError(null);
+    })();
+
+    loadTaskContextRef.current[taskId] = loadPromise;
+    try {
+      await loadPromise;
     } catch (err) {
-      setError(apiMessage(err));
+      if (options.quiet) {
+        setSyncError(apiMessage(err));
+      } else {
+        setError(apiMessage(err));
+      }
     } finally {
-      setLoadingTask(false);
+      if (loadTaskContextRef.current[taskId] === loadPromise) {
+        delete loadTaskContextRef.current[taskId];
+      }
+      if (!options.quiet) {
+        setLoadingTask(false);
+      }
     }
   }, []);
 
@@ -180,6 +289,7 @@ export function useTaskContexts(activeTaskId: string | null) {
     error,
     loadTaskContext,
     loadingTask,
+    syncError,
     taskContext: activeTaskId ? taskContexts[activeTaskId] : undefined,
   };
 }

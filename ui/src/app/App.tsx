@@ -5,6 +5,7 @@ import { defaultSettingsSection, parseRoute, routePath, viewFromRoute } from "./
 import { useBoard, useHealth, useProjectTree, useTaskContexts, withCurrentTaskCounts } from "./hooks";
 import { api } from "../lib/api";
 import { apiMessage } from "../lib/errors";
+import { backgroundSyncIntervalMs } from "./sync";
 import { persistTheme, storedTheme } from "../lib/theme";
 import type { Theme, View } from "../domain/types";
 import { BoardWorkspace } from "../features/boards";
@@ -80,6 +81,7 @@ export function App() {
     projectTree,
     resolvedBoardId,
     resolvedProjectId,
+    syncError: projectSyncError,
   } = useProjectTree({
     activeBoardId,
     activeProjectId,
@@ -95,12 +97,14 @@ export function App() {
     error: boardError,
     loadBoard,
     loadingBoard,
+    syncError: boardSyncError,
     tasks,
   } = useBoard(selectedProjectId, selectedBoardId);
   const {
     error: taskError,
     loadTaskContext,
     loadingTask,
+    syncError: taskSyncError,
     taskContext,
   } = useTaskContexts(activeTaskId);
 
@@ -111,6 +115,7 @@ export function App() {
   const activeBoard = board ?? projectTree.flatMap((item) => item.boards).find((item) => item.id === selectedBoardId) ?? null;
   const displayedProjectTree = withCurrentTaskCounts(projectTree, selectedBoardId, tasks);
   const error = projectError ?? boardError ?? taskError;
+  const syncError = projectSyncError ?? boardSyncError ?? taskSyncError;
 
   const refreshAfterMutation = useCallback(
     async (taskId?: string | null) => {
@@ -121,6 +126,36 @@ export function App() {
     },
     [loadBoard, loadProjects, loadTaskContext, selectedBoardId, selectedProjectId],
   );
+
+  const backgroundSync = useCallback(async () => {
+    if (document.hidden) {
+      return;
+    }
+
+    await Promise.all([
+      loadProjects(selectedProjectId, selectedBoardId, { normalizeRoute: false, quiet: true }),
+      loadBoard({ quiet: true }),
+      activeTaskId ? loadTaskContext(activeTaskId, { quiet: true }) : Promise.resolve(),
+    ]);
+  }, [activeTaskId, loadBoard, loadProjects, loadTaskContext, selectedBoardId, selectedProjectId]);
+
+  useEffect(() => {
+    const sync = () => {
+      void backgroundSync();
+    };
+    const intervalId = window.setInterval(sync, backgroundSyncIntervalMs);
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        sync();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [backgroundSync]);
 
   const moveTask = useCallback(
     async (taskId: string, input: { columnId?: string; position?: number }) => {
@@ -245,6 +280,7 @@ export function App() {
               }
             }}
             onRefresh={refreshAfterMutation}
+            syncError={syncError}
             tasks={tasks}
           />
         )}

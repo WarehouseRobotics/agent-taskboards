@@ -67,6 +67,10 @@
   border-left-color: var(--accent);
 }
 
+.task-card--menu-open {
+  z-index: 10;
+}
+
 .task-card__meta,
 .task-card__footer,
 .detail-meta,
@@ -102,7 +106,7 @@
 
 .task-card__menu {
   position: absolute;
-  z-index: 5;
+  z-index: 20;
   top: 26px;
   right: 8px;
   display: flex;

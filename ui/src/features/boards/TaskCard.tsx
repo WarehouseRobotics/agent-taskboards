@@ -63,6 +63,13 @@ export function TaskCard({
     setMenuOpen(false);
     void action();
   };
+  const cardClassName = [
+    "task-card",
+    active ? "task-card--active" : null,
+    menuOpen ? "task-card--menu-open" : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
   const onKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter") {
       onOpenTask(task.id);
@@ -79,7 +86,7 @@ export function TaskCard({
 
   return (
     <article
-      className={active ? "task-card task-card--active" : "task-card"}
+      className={cardClassName}
       draggable
       ref={cardRef}
       onContextMenu={(event) => {
