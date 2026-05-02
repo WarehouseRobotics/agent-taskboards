@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Sidebar } from "../components/layout";
 import type { AppRoute } from "./router";
-import { defaultSettingsSection, parseRoute, routePath, viewFromRoute } from "./router";
+import { defaultSettingsSection, parseRoute, routePath } from "./router";
 import { useBoard, useHealth, useProjectTree, useTaskContexts, withCurrentTaskCounts } from "./hooks";
 import { api } from "../lib/api";
 import { apiMessage } from "../lib/errors";
@@ -18,16 +18,6 @@ export function App() {
   const initialRoute = useMemo(() => parseRoute(), []);
   const [theme, setThemeState] = useState<Theme>(storedTheme);
   const [route, setRoute] = useState<AppRoute>(initialRoute);
-  const [view, setView] = useState<View>(() => viewFromRoute(initialRoute));
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(
-    initialRoute.view === "board" || initialRoute.view === "projects" ? initialRoute.projectId : null,
-  );
-  const [activeBoardId, setActiveBoardId] = useState<string | null>(
-    initialRoute.view === "board" ? initialRoute.boardId : null,
-  );
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(
-    initialRoute.view === "board" ? initialRoute.taskId : null,
-  );
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newBoardOpen, setNewBoardOpen] = useState(false);
@@ -41,22 +31,6 @@ export function App() {
 
   const applyRoute = useCallback((nextRoute: AppRoute) => {
     setRoute(nextRoute);
-    setView(nextRoute.view);
-    if (nextRoute.view === "board") {
-      setActiveProjectId(nextRoute.projectId);
-      setActiveBoardId(nextRoute.boardId);
-      setActiveTaskId(nextRoute.taskId);
-      return;
-    }
-    if (nextRoute.view === "projects") {
-      setActiveProjectId(nextRoute.projectId);
-      setActiveBoardId(null);
-      setActiveTaskId(null);
-      return;
-    }
-    setActiveProjectId(null);
-    setActiveBoardId(null);
-    setActiveTaskId(null);
   }, []);
 
   const navigate = useCallback(
@@ -76,6 +50,10 @@ export function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [applyRoute]);
 
+  const view = route.view;
+  const activeProjectId = route.view === "board" || route.view === "projects" ? route.projectId : null;
+  const activeBoardId = route.view === "board" ? route.boardId : null;
+  const activeTaskId = route.view === "board" ? route.taskId : null;
   const health = useHealth();
   const {
     error: projectError,
@@ -309,8 +287,13 @@ export function App() {
             onTaskDraftChange={trackTaskDraft}
             onUpdateTask={async (taskId, input) => {
               setMutationError(null);
-              await api.updateTask(taskId, input);
-              await refreshAfterMutation(taskId);
+              try {
+                await api.updateTask(taskId, input);
+                await refreshAfterMutation(taskId);
+              } catch (err) {
+                setMutationError(apiMessage(err));
+                throw err;
+              }
             }}
             syncError={syncError}
             tasks={tasks}

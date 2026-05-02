@@ -1,5 +1,3 @@
-import type { View } from "../domain/types";
-
 export const defaultSettingsSection = "general";
 
 export type AppRoute =
@@ -58,8 +56,4 @@ export function routePath(route: AppRoute) {
     return `/settings/${encodeURIComponent(route.section)}`;
   }
   return `/${route.view}`;
-}
-
-export function viewFromRoute(route: AppRoute): View {
-  return route.view;
 }

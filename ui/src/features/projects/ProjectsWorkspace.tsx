@@ -19,7 +19,6 @@ export function ProjectsWorkspace({
   projectTree: ProjectTreeItem[];
 }) {
   const totalBoards = projectTree.reduce((sum, item) => sum + item.boards.length, 0);
-  const loadedTasks = projectTree.reduce((sum, item) => sum + (item.taskCount ?? 0), 0);
   return (
     <>
       <Topbar
@@ -30,7 +29,6 @@ export function ProjectsWorkspace({
         <div className="stat-strip">
           <Stat label="Projects" value={projectTree.length} hint="active scopes" />
           <Stat label="Boards" value={totalBoards} hint="across projects" />
-          <Stat label="Loaded tasks" value={loadedTasks} hint="current board cache" />
           <Stat label="Agents" value="API" hint="shared control surface" tone="agent" />
         </div>
         {loading ? (
@@ -43,7 +41,6 @@ export function ProjectsWorkspace({
               <span>Project</span>
               <span>Path</span>
               <span>Boards</span>
-              <span>Tasks</span>
               <span>Updated</span>
             </div>
             {projectTree.map((item) => (
@@ -61,7 +58,6 @@ export function ProjectsWorkspace({
                 </span>
                 <Mono faded>{item.project.repositoryPath ?? "none"}</Mono>
                 <Mono>{item.boards.length}</Mono>
-                <Mono>{item.taskCount ?? "not loaded"}</Mono>
                 <span>{formatDate(item.project.updatedAt)}</span>
               </button>
             ))}

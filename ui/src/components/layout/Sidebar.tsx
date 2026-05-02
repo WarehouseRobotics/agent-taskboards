@@ -89,7 +89,7 @@ export function Sidebar({
         <span className={health?.ok ? "health-dot health-dot--ok" : "health-dot health-dot--bad"} />
         <Mono>{health?.ok ? "api healthy" : "api offline"}</Mono>
         <span className="sidebar__version">
-          <Mono faded>v0.1.0</Mono>
+          <Mono faded>v{__APP_VERSION__}</Mono>
         </span>
       </div>
     </aside>

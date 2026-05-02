@@ -1,6 +1,6 @@
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import type { TaskPriority } from "../../domain/types";
-import { apiMessage } from "../../lib/errors";
+import { useFormSubmission } from "../../lib/useFormSubmission";
 import { Button, InlineError } from "../../components/ui";
 
 const defaultPriority: TaskPriority = "normal";
@@ -18,31 +18,19 @@ export function CreateTaskForm({
   const [description, setDescription] = useState("");
   const [labels, setLabels] = useState("");
   const [priority, setPriority] = useState<TaskPriority>(defaultPriority);
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
+  const { error, setError, submit, submitting } = useFormSubmission(async () => {
     if (!title.trim()) {
       setError("Title is required");
       return;
     }
-    setSubmitting(true);
-    setError(null);
-    try {
-      await onSubmit({
-        title: title.trim(),
-        description: description.trim() || null,
-        columnId,
-        priority,
-        labels: labels.split(",").map((label) => label.trim()).filter(Boolean),
-      });
-    } catch (err) {
-      setError(apiMessage(err));
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    await onSubmit({
+      title: title.trim(),
+      description: description.trim() || null,
+      columnId,
+      priority,
+      labels: labels.split(",").map((label) => label.trim()).filter(Boolean),
+    });
+  });
 
   return (
     <form className="create-task-form" onSubmit={submit}>

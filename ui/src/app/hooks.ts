@@ -153,7 +153,6 @@ export function useProjectTree({
     projectTree,
     resolvedBoardId,
     resolvedProjectId,
-    setError,
     syncError,
   };
 }

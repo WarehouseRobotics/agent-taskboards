@@ -54,7 +54,7 @@
 .project-table__header,
 .project-row {
   display: grid;
-  grid-template-columns: minmax(220px, 2fr) minmax(160px, 1.4fr) 80px 100px 120px;
+  grid-template-columns: minmax(220px, 2fr) minmax(160px, 1.4fr) 80px 120px;
   align-items: center;
   gap: var(--s-3);
 }
@@ -101,4 +101,3 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-

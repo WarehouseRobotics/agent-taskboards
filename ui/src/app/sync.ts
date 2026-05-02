@@ -30,7 +30,6 @@ export function mergeProjectTree(
     const currentItem = currentByProjectId.get(item.project.id);
     return {
       ...item,
-      boards: item.boards,
       taskCount: item.taskCount ?? currentItem?.taskCount ?? null,
     };
   });
@@ -49,7 +48,6 @@ export function mergeBoard(current: Board | null, incoming: Board, taskDrafts: T
 
   return {
     ...incoming,
-    columns: incoming.columns,
     tasks: mergedTasks,
   };
 }

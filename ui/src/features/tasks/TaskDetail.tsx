@@ -5,6 +5,35 @@ import { formatDate } from "../../lib/format";
 import { columnStatus } from "../../lib/task-display";
 import { Avatar, Button, EmptyState, Icon, InlineError, LabelChip, Mono, PriorityFlag, StatusIcon } from "../../components/ui";
 
+interface TaskEditFields {
+  description: string;
+  title: string;
+}
+
+interface TaskEditDraft {
+  base: TaskEditFields;
+  current: TaskEditFields;
+  taskId: string;
+}
+
+const emptyTaskDraft: TaskEditDraft = {
+  base: { description: "", title: "" },
+  current: { description: "", title: "" },
+  taskId: "",
+};
+
+function makeTaskDraft(taskId: string, title: string, description: string): TaskEditDraft {
+  return {
+    base: { description, title },
+    current: { description, title },
+    taskId,
+  };
+}
+
+function isTaskDraftDirty(draft: TaskEditDraft) {
+  return draft.current.title !== draft.base.title || draft.current.description !== draft.base.description;
+}
+
 export function TaskDetail({
   columns,
   context,
@@ -29,13 +58,7 @@ export function TaskDetail({
   onUpdateTask: (taskId: string, input: { title?: string; description?: string | null }) => Promise<void>;
 }) {
   const [comment, setComment] = useState("");
-  const [draft, setDraft] = useState({
-    baseDescription: "",
-    baseTitle: "",
-    description: "",
-    taskId: "",
-    title: "",
-  });
+  const [draft, setDraft] = useState<TaskEditDraft>(emptyTaskDraft);
   const [editError, setEditError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -53,19 +76,12 @@ export function TaskDetail({
     }
 
     setDraft((current) => {
-      const nextDraft = {
-        baseDescription: serverDescription,
-        baseTitle: serverTitle,
-        description: serverDescription,
-        taskId,
-        title: serverTitle,
-      };
+      const nextDraft = makeTaskDraft(taskId, serverTitle, serverDescription);
       if (current.taskId !== taskId) {
         return nextDraft;
       }
 
-      const currentDirty = current.title !== current.baseTitle || current.description !== current.baseDescription;
-      return currentDirty ? current : nextDraft;
+      return isTaskDraftDirty(current) ? current : nextDraft;
     });
     setEditError(null);
   }, [serverDescription, serverTitle, taskId]);
@@ -87,22 +103,22 @@ export function TaskDetail({
       return;
     }
 
-    const draftDirty = draft.title !== draft.baseTitle || draft.description !== draft.baseDescription;
+    const draftDirty = isTaskDraftDirty(draft);
     onTaskDraftChange(
       taskId,
       draftDirty
         ? {
-            description: draft.description,
-            title: draft.title,
+            description: draft.current.description,
+            title: draft.current.title,
           }
         : null,
     );
   }, [
-    draft.baseDescription,
-    draft.baseTitle,
-    draft.description,
+    draft.base.description,
+    draft.base.title,
+    draft.current.description,
+    draft.current.title,
     draft.taskId,
-    draft.title,
     onTaskDraftChange,
     taskId,
   ]);
@@ -137,16 +153,10 @@ export function TaskDetail({
   const status = columnStatus(column);
   const activeDraft = draft.taskId === task.id
     ? draft
-    : {
-        baseDescription: serverDescription,
-        baseTitle: serverTitle,
-        description: serverDescription,
-        taskId: task.id,
-        title: serverTitle,
-      };
-  const trimmedTitle = activeDraft.title.trim();
-  const trimmedDescription = activeDraft.description.trim();
-  const editDirty = activeDraft.title !== activeDraft.baseTitle || activeDraft.description !== activeDraft.baseDescription;
+    : makeTaskDraft(task.id, serverTitle, serverDescription);
+  const trimmedTitle = activeDraft.current.title.trim();
+  const trimmedDescription = activeDraft.current.description.trim();
+  const editDirty = isTaskDraftDirty(activeDraft);
   const titleError = editDirty && !trimmedTitle ? "Title is required" : null;
   const canSave = editDirty && Boolean(trimmedTitle) && !saving;
 
@@ -159,13 +169,7 @@ export function TaskDetail({
   };
 
   const resetDraft = () => {
-    setDraft({
-      baseDescription: serverDescription,
-      baseTitle: serverTitle,
-      description: serverDescription,
-      taskId: task.id,
-      title: serverTitle,
-    });
+    setDraft(makeTaskDraft(task.id, serverTitle, serverDescription));
     setEditError(null);
   };
 
@@ -186,13 +190,7 @@ export function TaskDetail({
         title: trimmedTitle,
         description: trimmedDescription || null,
       });
-      setDraft({
-        baseDescription: trimmedDescription,
-        baseTitle: trimmedTitle,
-        description: trimmedDescription,
-        taskId: task.id,
-        title: trimmedTitle,
-      });
+      setDraft(makeTaskDraft(task.id, trimmedTitle, trimmedDescription));
       showSavedMessage();
     } catch (err) {
       setEditError(apiMessage(err));
@@ -240,11 +238,15 @@ export function TaskDetail({
           aria-label="Task title"
           className="task-title-input"
           onChange={(event) => {
-            setDraft((current) => ({ ...current, taskId: task.id, title: event.target.value }));
+            setDraft({
+              ...activeDraft,
+              current: { ...activeDraft.current, title: event.target.value },
+              taskId: task.id,
+            });
             setEditError(null);
           }}
           onKeyDown={saveOnShortcut}
-          value={activeDraft.title}
+          value={activeDraft.current.title}
         />
         <div className="detail-section">
           <h2>Description</h2>
@@ -252,12 +254,16 @@ export function TaskDetail({
             aria-label="Task description"
             className="task-description-input"
             onChange={(event) => {
-              setDraft((current) => ({ ...current, taskId: task.id, description: event.target.value }));
+              setDraft({
+                ...activeDraft,
+                current: { ...activeDraft.current, description: event.target.value },
+                taskId: task.id,
+              });
               setEditError(null);
             }}
             onKeyDown={saveOnShortcut}
             placeholder="No description yet."
-            value={activeDraft.description}
+            value={activeDraft.current.description}
           />
         </div>
         <InlineError message={editError ?? titleError} />

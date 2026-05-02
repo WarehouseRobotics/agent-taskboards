@@ -1,5 +1,5 @@
-import { FormEvent, useState } from "react";
-import { apiMessage } from "../lib/errors";
+import { useState } from "react";
+import { useFormSubmission } from "../lib/useFormSubmission";
 import { Button, Field, InlineError } from "../components/ui";
 import { Sheet } from "../components/layout";
 
@@ -27,29 +27,17 @@ function ProjectForm({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [repositoryPath, setRepositoryPath] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
+  const { error, setError, submit, submitting } = useFormSubmission(async () => {
     if (!name.trim()) {
       setError("Project name is required");
       return;
     }
-    setSubmitting(true);
-    setError(null);
-    try {
-      await onSubmit({
-        name: name.trim(),
-        description: description.trim() || null,
-        repositoryPath: repositoryPath.trim() || null,
-      });
-    } catch (err) {
-      setError(apiMessage(err));
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    await onSubmit({
+      name: name.trim(),
+      description: description.trim() || null,
+      repositoryPath: repositoryPath.trim() || null,
+    });
+  });
 
   return (
     <form className="sheet-form" onSubmit={submit}>
@@ -74,25 +62,13 @@ export function CreateBoardPanel({
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
+  const { error, setError, submit, submitting } = useFormSubmission(async () => {
     if (!name.trim()) {
       setError("Board name is required");
       return;
     }
-    setSubmitting(true);
-    setError(null);
-    try {
-      await onSubmit({ name: name.trim(), description: description.trim() || null });
-    } catch (err) {
-      setError(apiMessage(err));
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    await onSubmit({ name: name.trim(), description: description.trim() || null });
+  });
 
   return (
     <Sheet title="New board" onCancel={onCancel}>

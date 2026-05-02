@@ -184,7 +184,7 @@ export const api = {
         method: "POST",
         body: jsonBody({
           authorType: input.authorType ?? "human",
-          authorName: input.authorName ?? "you",
+          authorName: input.authorName ?? null,
           body: input.body,
         }),
       },
