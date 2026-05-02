@@ -2,6 +2,7 @@ import type { Express } from "express";
 import type { DatabaseClient } from "../db/client.js";
 import type { MigrationResult } from "../db/migrate.js";
 import type { ApiServices } from "../services/index.js";
+import { registerAgentRoutes } from "./agent-routes.js";
 import { registerBoardRoutes } from "./board-routes.js";
 import { registerHealthRoutes } from "./health-routes.js";
 import { registerProjectRoutes } from "./project-routes.js";
@@ -20,4 +21,5 @@ export function registerRoutes(app: Express, options: RegisterRoutesOptions) {
   registerBoardRoutes(app, options.services);
   registerTaskRoutes(app, options.services);
   registerSearchRoutes(app, options.services);
+  registerAgentRoutes(app, options);
 }
