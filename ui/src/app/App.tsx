@@ -280,6 +280,11 @@ export function App() {
               }
             }}
             onRefresh={refreshAfterMutation}
+            onUpdateTask={async (taskId, input) => {
+              setMutationError(null);
+              await api.updateTask(taskId, input);
+              await refreshAfterMutation(taskId);
+            }}
             syncError={syncError}
             tasks={tasks}
           />

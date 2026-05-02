@@ -122,6 +122,25 @@ export const api = {
     return body;
   },
 
+  updateTask: async (
+    taskId: string,
+    input: {
+      title?: string;
+      description?: string | null;
+      priority?: TaskPriority;
+      labels?: string[];
+    },
+  ) => {
+    const body = await request<{ task: Task; activity: TaskActivity }>(
+      `/api/tasks/${encodeURIComponent(taskId)}`,
+      {
+        method: "PATCH",
+        body: jsonBody(input),
+      },
+    );
+    return body;
+  },
+
   moveTask: async (
     taskId: string,
     input: { columnId?: string; columnKey?: string; position?: number },

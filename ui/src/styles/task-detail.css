@@ -1,9 +1,11 @@
 .task-detail {
+  --task-detail-width: clamp(360px, 36vw, 560px);
+
   display: flex;
-  flex: 0 0 300px;
+  flex: 0 0 var(--task-detail-width);
   flex-direction: column;
   gap: var(--s-4);
-  width: 300px;
+  width: var(--task-detail-width);
   min-height: 0;
   overflow-y: auto;
   padding: var(--s-5) 18px;
@@ -24,14 +26,42 @@
   font-size: var(--fs-11);
 }
 
-.task-detail h1 {
+.task-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.task-title-input {
   margin: -4px 0 0;
+  padding: 5px var(--s-2);
   color: var(--fg);
   font-size: var(--fs-22);
   font-weight: 600;
   letter-spacing: var(--tracking-tight);
   line-height: var(--lh-tight);
   text-wrap: pretty;
+}
+
+.task-description-input {
+  min-height: 112px;
+  line-height: 1.55;
+}
+
+.task-edit-form .inline-error {
+  padding: 6px 8px;
+  border: 1px solid color-mix(in oklch, var(--status-blocked) 35%, var(--line));
+  border-radius: var(--r-md);
+}
+
+.detail-toast {
+  align-self: flex-start;
+  border: 1px solid color-mix(in oklch, var(--status-done) 35%, var(--line));
+  border-radius: var(--r-md);
+  background: color-mix(in oklch, var(--status-done) 10%, var(--bg-surface));
+  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  padding: 5px 8px;
 }
 
 .detail-status-row {
@@ -72,12 +102,6 @@
   text-transform: uppercase;
 }
 
-.description-box {
-  min-height: 74px;
-  white-space: pre-wrap;
-}
-
-.description-box,
 .data-card {
   border: 1px solid var(--line-faint);
   border-radius: var(--r-md);

@@ -29,6 +29,7 @@ export function BoardWorkspace({
   onOpenTask,
   onPostComment,
   onRefresh,
+  onUpdateTask,
   syncError,
   tasks,
 }: {
@@ -60,6 +61,7 @@ export function BoardWorkspace({
   onOpenTask: (taskId: string) => void;
   onPostComment: (taskId: string, body: string) => Promise<void>;
   onRefresh: (taskId?: string | null) => Promise<void>;
+  onUpdateTask: (taskId: string, input: { title?: string; description?: string | null }) => Promise<void>;
   syncError: string | null;
   tasks: Task[];
 }) {
@@ -185,6 +187,7 @@ export function BoardWorkspace({
               onCompleteTask={onCompleteTask}
               onMoveTask={onMoveTask}
               onPostComment={onPostComment}
+              onUpdateTask={onUpdateTask}
             />
           )}
         </div>

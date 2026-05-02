@@ -206,6 +206,45 @@ describe("starter API", () => {
     expect(objectProp(blockedResponse.body, "task").completedAt).toBeNull();
   });
 
+  it("updates task title and description and records activity", async () => {
+    const { projectId, boardId } = await createProjectAndBoard();
+    const task = objectProp(
+      (
+        await api("POST", `/api/projects/${projectId}/boards/${boardId}/tasks`, {
+          title: "Original title",
+          description: "Original description",
+        })
+      ).body,
+      "task",
+    );
+    const taskId = stringProp(task, "id");
+
+    const updateResponse = await api("PATCH", `/api/tasks/${taskId}`, {
+      title: "Updated title",
+      description: null,
+    });
+
+    expect(updateResponse.status).toBe(200);
+    const updatedTask = objectProp(updateResponse.body, "task");
+    expect(stringProp(updatedTask, "title")).toBe("Updated title");
+    expect(updatedTask.description).toBeNull();
+    expect(
+      stringProp(objectProp(updateResponse.body, "activity"), "eventType"),
+    ).toBe("task.updated");
+
+    const blankTitle = await api("PATCH", `/api/tasks/${taskId}`, {
+      title: " ",
+    });
+    expect(blankTitle.status).toBe(400);
+
+    const activityResponse = await api("GET", `/api/tasks/${taskId}/activity`);
+    expect(
+      arrayProp(activityResponse.body, "activity").map((item) =>
+        stringProp(asObject(item), "eventType"),
+      ),
+    ).toEqual(["task.created", "task.updated"]);
+  });
+
   it("archives active resources and hides them unless includeArchived is true", async () => {
     const { projectId, boardId } = await createProjectAndBoard();
     const task = objectProp(

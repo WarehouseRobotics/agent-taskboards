@@ -1,8 +1,9 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { ActorType, BoardColumn, TaskActivity, TaskComment, TaskContext } from "../../domain/types";
+import { apiMessage } from "../../lib/errors";
 import { formatDate } from "../../lib/format";
 import { columnStatus } from "../../lib/task-display";
-import { Avatar, Button, EmptyState, Icon, LabelChip, Mono, PriorityFlag, StatusIcon } from "../../components/ui";
+import { Avatar, Button, EmptyState, Icon, InlineError, LabelChip, Mono, PriorityFlag, StatusIcon } from "../../components/ui";
 
 export function TaskDetail({
   columns,
@@ -13,6 +14,7 @@ export function TaskDetail({
   onCompleteTask,
   onMoveTask,
   onPostComment,
+  onUpdateTask,
 }: {
   columns: BoardColumn[];
   context?: TaskContext;
@@ -22,11 +24,61 @@ export function TaskDetail({
   onCompleteTask: (taskId: string) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onPostComment: (taskId: string, body: string) => Promise<void>;
+  onUpdateTask: (taskId: string, input: { title?: string; description?: string | null }) => Promise<void>;
 }) {
   const [comment, setComment] = useState("");
+  const [draft, setDraft] = useState({
+    baseDescription: "",
+    baseTitle: "",
+    description: "",
+    taskId: "",
+    title: "",
+  });
+  const [editError, setEditError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const saveMessageTimeout = useRef<number | null>(null);
   const task = context?.task;
+  const taskId = task?.id ?? "";
+  const serverTitle = task?.title ?? "";
+  const serverDescription = task?.description ?? "";
   const column = columns.find((item) => item.id === task?.columnId) ?? context?.board.columns?.find((item) => item.id === task?.columnId);
   const entries = useMemo(() => mergeTimeline(context?.comments ?? [], context?.activity ?? []), [context?.activity, context?.comments]);
+
+  useEffect(() => {
+    if (!taskId) {
+      return;
+    }
+
+    setDraft((current) => {
+      const nextDraft = {
+        baseDescription: serverDescription,
+        baseTitle: serverTitle,
+        description: serverDescription,
+        taskId,
+        title: serverTitle,
+      };
+      if (current.taskId !== taskId) {
+        return nextDraft;
+      }
+
+      const currentDirty = current.title !== current.baseTitle || current.description !== current.baseDescription;
+      return currentDirty ? current : nextDraft;
+    });
+    setEditError(null);
+  }, [serverDescription, serverTitle, taskId]);
+
+  useEffect(() => {
+    setSaveMessage(null);
+  }, [taskId]);
+
+  useEffect(() => {
+    return () => {
+      if (saveMessageTimeout.current) {
+        window.clearTimeout(saveMessageTimeout.current);
+      }
+    };
+  }, []);
 
   if (loading && !context) {
     return (
@@ -48,6 +100,78 @@ export function TaskDetail({
   }
 
   const status = columnStatus(column);
+  const activeDraft = draft.taskId === task.id
+    ? draft
+    : {
+        baseDescription: serverDescription,
+        baseTitle: serverTitle,
+        description: serverDescription,
+        taskId: task.id,
+        title: serverTitle,
+      };
+  const trimmedTitle = activeDraft.title.trim();
+  const trimmedDescription = activeDraft.description.trim();
+  const editDirty = activeDraft.title !== activeDraft.baseTitle || activeDraft.description !== activeDraft.baseDescription;
+  const titleError = editDirty && !trimmedTitle ? "Title is required" : null;
+  const canSave = editDirty && Boolean(trimmedTitle) && !saving;
+
+  const showSavedMessage = () => {
+    setSaveMessage("Task updated");
+    if (saveMessageTimeout.current) {
+      window.clearTimeout(saveMessageTimeout.current);
+    }
+    saveMessageTimeout.current = window.setTimeout(() => setSaveMessage(null), 2400);
+  };
+
+  const resetDraft = () => {
+    setDraft({
+      baseDescription: serverDescription,
+      baseTitle: serverTitle,
+      description: serverDescription,
+      taskId: task.id,
+      title: serverTitle,
+    });
+    setEditError(null);
+  };
+
+  const submitTaskEdit = async (event?: FormEvent) => {
+    event?.preventDefault();
+    if (!trimmedTitle) {
+      setEditError("Title is required");
+      return;
+    }
+    if (!editDirty) {
+      return;
+    }
+
+    setSaving(true);
+    setEditError(null);
+    try {
+      await onUpdateTask(task.id, {
+        title: trimmedTitle,
+        description: trimmedDescription || null,
+      });
+      setDraft({
+        baseDescription: trimmedDescription,
+        baseTitle: trimmedTitle,
+        description: trimmedDescription,
+        taskId: task.id,
+        title: trimmedTitle,
+      });
+      showSavedMessage();
+    } catch (err) {
+      setEditError(apiMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveOnShortcut = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      void submitTaskEdit();
+    }
+  };
 
   const submitComment = async (event: FormEvent) => {
     event.preventDefault();
@@ -71,7 +195,44 @@ export function TaskDetail({
           <Icon name="close" />
         </button>
       </div>
-      <h1>{task.title}</h1>
+      {saveMessage && (
+        <div className="detail-toast" role="status" aria-live="polite">
+          {saveMessage}
+        </div>
+      )}
+      <form className="task-edit-form" onSubmit={submitTaskEdit}>
+        <input
+          aria-label="Task title"
+          className="task-title-input"
+          onChange={(event) => {
+            setDraft((current) => ({ ...current, taskId: task.id, title: event.target.value }));
+            setEditError(null);
+          }}
+          onKeyDown={saveOnShortcut}
+          value={activeDraft.title}
+        />
+        <div className="detail-section">
+          <h2>Description</h2>
+          <textarea
+            aria-label="Task description"
+            className="task-description-input"
+            onChange={(event) => {
+              setDraft((current) => ({ ...current, taskId: task.id, description: event.target.value }));
+              setEditError(null);
+            }}
+            onKeyDown={saveOnShortcut}
+            placeholder="No description yet."
+            value={activeDraft.description}
+          />
+        </div>
+        <InlineError message={editError ?? titleError} />
+        <div className="form-actions">
+          <Button type="button" variant="ghost" onClick={resetDraft} disabled={!editDirty || saving}>Cancel</Button>
+          <Button type="submit" variant="primary" disabled={!canSave} title="Save task">
+            {saving ? "Saving" : "Save"}
+          </Button>
+        </div>
+      </form>
       <div className="detail-status-row">
         <span><StatusIcon status={status} size={12} /> {column?.name ?? "Unknown"}</span>
         <span>{task.priority}</span>
@@ -89,10 +250,6 @@ export function TaskDetail({
         <Button icon={<Icon name="check" />} onClick={() => onCompleteTask(task.id)} variant="outline">Complete</Button>
         <Button icon={<Icon name="archive" />} onClick={() => onArchiveTask(task.id)} variant="danger">Archive</Button>
       </div>
-      <section className="detail-section">
-        <h2>Description</h2>
-        <div className="description-box">{task.description || "No description yet."}</div>
-      </section>
       <section className="detail-section">
         <h2>Properties</h2>
         <div className="prop-grid">
