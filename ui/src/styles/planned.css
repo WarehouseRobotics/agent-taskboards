@@ -1,0 +1,27 @@
+.planned-panel {
+  display: flex;
+  max-width: 520px;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.planned-panel h1,
+.settings-pane h1 {
+  margin: 0;
+  color: var(--fg);
+  font-size: var(--fs-22);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+}
+
+.planned-panel p {
+  margin: 0;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+
+.data-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}

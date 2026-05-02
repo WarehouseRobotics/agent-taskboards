@@ -1,0 +1,104 @@
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  margin-bottom: var(--s-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--s-3) var(--s-4);
+  border-left: 1px solid var(--line-faint);
+}
+
+.stat:first-child {
+  border-left: 0;
+}
+
+.stat span {
+  color: var(--fg-faint);
+  font-size: var(--fs-10);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.stat strong {
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-22);
+  font-weight: 500;
+}
+
+.stat .stat__agent {
+  color: var(--agent-tint);
+}
+
+.stat small {
+  color: var(--fg-faint);
+  font-size: var(--fs-11);
+}
+
+.project-table {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+}
+
+.project-table__header,
+.project-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) minmax(160px, 1.4fr) 80px 100px 120px;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.project-table__header {
+  padding: var(--s-2) var(--s-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-surface-2);
+  color: var(--fg-faint);
+  font-size: var(--fs-10);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.project-row {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line-faint);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 10px var(--s-4);
+  text-align: left;
+}
+
+.project-row:hover,
+.project-row--active {
+  background: var(--bg-hover);
+}
+
+.project-row__name {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.project-row__name strong {
+  display: block;
+  overflow: hidden;
+  color: var(--fg);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
