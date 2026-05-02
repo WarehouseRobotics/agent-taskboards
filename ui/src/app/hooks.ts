@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { apiMessage } from "../lib/errors";
 import { routePath, type AppRoute } from "./router";
@@ -40,11 +40,23 @@ export function useProjectTree({
   const [error, setError] = useState<string | null>(null);
   const [resolvedProjectId, setResolvedProjectId] = useState<string | null>(activeProjectId);
   const [resolvedBoardId, setResolvedBoardId] = useState<string | null>(activeBoardId);
-  const routeTaskId = route.view === "board" ? route.taskId : null;
+  const activeBoardIdRef = useRef(activeBoardId);
+  const activeProjectIdRef = useRef(activeProjectId);
+  const navigateRef = useRef(navigate);
+  const routeRef = useRef(route);
 
-  const loadProjects = useCallback(async (preferredProjectId = activeProjectId, preferredBoardId = activeBoardId) => {
+  useEffect(() => {
+    activeBoardIdRef.current = activeBoardId;
+    activeProjectIdRef.current = activeProjectId;
+    navigateRef.current = navigate;
+    routeRef.current = route;
+  }, [activeBoardId, activeProjectId, navigate, route]);
+
+  const loadProjects = useCallback(async (preferredProjectId?: string | null, preferredBoardId?: string | null) => {
     setLoadingProjects(true);
     try {
+      const nextPreferredProjectId = preferredProjectId === undefined ? activeProjectIdRef.current : preferredProjectId;
+      const nextPreferredBoardId = preferredBoardId === undefined ? activeBoardIdRef.current : preferredBoardId;
       const projects = await api.listProjects();
       const tree = await Promise.all(
         projects.map(async (project) => ({
@@ -56,19 +68,21 @@ export function useProjectTree({
       setProjectTree(tree);
       setError(null);
 
-      const currentProject = preferredProjectId
-        ? tree.find((item) => item.project.id === preferredProjectId)
+      const currentProject = nextPreferredProjectId
+        ? tree.find((item) => item.project.id === nextPreferredProjectId)
         : null;
       const nextProject = currentProject ?? tree[0] ?? null;
-      const currentBoard = preferredBoardId
-        ? nextProject?.boards.find((item) => item.id === preferredBoardId)
+      const currentBoard = nextPreferredBoardId
+        ? nextProject?.boards.find((item) => item.id === nextPreferredBoardId)
         : null;
       const nextBoard = currentBoard ?? nextProject?.boards[0] ?? null;
 
       setResolvedProjectId(nextProject?.project.id ?? null);
       setResolvedBoardId(nextBoard?.id ?? null);
 
-      if (route.view === "board" && !routeTaskId && nextProject?.project.id && nextBoard?.id) {
+      const currentRoute = routeRef.current;
+      const routeTaskId = currentRoute.view === "board" ? currentRoute.taskId : null;
+      if (currentRoute.view === "board" && !routeTaskId && nextProject?.project.id && nextBoard?.id) {
         const normalizedRoute: AppRoute = {
           view: "board",
           projectId: nextProject.project.id,
@@ -76,7 +90,7 @@ export function useProjectTree({
           taskId: null,
         };
         if (window.location.pathname !== routePath(normalizedRoute)) {
-          navigate(normalizedRoute, "replace");
+          navigateRef.current(normalizedRoute, "replace");
         }
       }
     } catch (err) {
@@ -84,7 +98,7 @@ export function useProjectTree({
     } finally {
       setLoadingProjects(false);
     }
-  }, [activeBoardId, activeProjectId, navigate, route.view, routeTaskId]);
+  }, []);
 
   useEffect(() => {
     loadProjects();

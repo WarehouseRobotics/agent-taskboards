@@ -14,6 +14,7 @@ export function BoardWorkspace({
   columns,
   error,
   loadingBoard,
+  loadingProjects,
   loadingTask,
   mutationError,
   newTaskColumnId,
@@ -37,6 +38,7 @@ export function BoardWorkspace({
   columns: BoardColumn[];
   error: string | null;
   loadingBoard: boolean;
+  loadingProjects: boolean;
   loadingTask: boolean;
   mutationError: string | null;
   newTaskColumnId: string | null;
@@ -70,17 +72,27 @@ export function BoardWorkspace({
     return map;
   }, [columns, tasks]);
 
+  const loadingWorkspace = loadingProjects || loadingBoard;
+
   if (!activeProject) {
     return (
       <>
         <Topbar crumbs={[{ label: "Boards", icon: <Icon name="board" /> }]} />
-        <div className="workspace-pane">
-          <EmptyState
-            title="No project selected"
-            body="Create a project from the sidebar to make the first working board."
-            action={<Button icon={<Icon name="plus" />} onClick={onCreateProject} variant="primary">Create First Project</Button>}
-          />
-        </div>
+        {loadingProjects ? (
+          <div className="board-layout">
+            <div className="board-main">
+              <BoardColumnsSkeleton />
+            </div>
+          </div>
+        ) : (
+          <div className="workspace-pane">
+            <EmptyState
+              title="No project selected"
+              body="Create a project from the sidebar to make the first working board."
+              action={<Button icon={<Icon name="plus" />} onClick={onCreateProject} variant="primary">Create First Project</Button>}
+            />
+          </div>
+        )}
       </>
     );
   }
@@ -94,7 +106,7 @@ export function BoardWorkspace({
               Sync
             </Button>
             <Button
-              disabled={!columns[0]}
+              disabled={loadingWorkspace || !columns[0]}
               icon={<Icon name="plus" />}
               kbd="N"
               onClick={() => onOpenCreateTask(columns[0]?.id ?? null)}
@@ -110,7 +122,7 @@ export function BoardWorkspace({
         ]}
       />
       <InlineError message={error ?? mutationError} />
-      {!activeBoard && !loadingBoard && (
+      {!activeBoard && !loadingWorkspace && (
         <div className="workspace-pane">
           <EmptyState
             title="No boards in this project"
@@ -119,7 +131,7 @@ export function BoardWorkspace({
           />
         </div>
       )}
-      {activeBoard && (
+      {(activeBoard || loadingWorkspace) && (
         <div className={activeTaskId ? "board-layout board-layout--detail" : "board-layout"}>
           <div className="board-main">
             <div className="subtoolbar">
@@ -129,20 +141,18 @@ export function BoardWorkspace({
                 <span className="segmented__item">Timeline</span>
               </div>
               <Mono faded>
-                {tasks.length} tasks · {columns.length} columns · {tasks.filter((task) => task.completedAt).length} done
+                {loadingWorkspace
+                  ? "Loading board"
+                  : `${tasks.length} tasks · ${columns.length} columns · ${tasks.filter((task) => task.completedAt).length} done`}
               </Mono>
               <span className="subtoolbar__spacer" />
               <span className="toolbar-label">Group by</span>
-              <button className="small-select">Status <Icon name="down" size={12} /></button>
+              <button className="small-select" type="button">Status <Icon name="down" size={12} /></button>
               <span className="toolbar-label">Sort</span>
-              <button className="small-select">Position <Icon name="down" size={12} /></button>
+              <button className="small-select" type="button">Position <Icon name="down" size={12} /></button>
             </div>
-            {loadingBoard ? (
-              <div className="board-columns">
-                {Array.from({ length: 6 }, (_, index) => (
-                  <div className="column-skeleton" key={index} />
-                ))}
-              </div>
+            {loadingWorkspace ? (
+              <BoardColumnsSkeleton />
             ) : (
               <div className="board-columns">
                 {columns.map((column) => (
@@ -178,5 +188,15 @@ export function BoardWorkspace({
         </div>
       )}
     </>
+  );
+}
+
+function BoardColumnsSkeleton() {
+  return (
+    <div className="board-columns" aria-label="Loading board">
+      {Array.from({ length: 6 }, (_, index) => (
+        <div className="column-skeleton" key={index} />
+      ))}
+    </div>
   );
 }

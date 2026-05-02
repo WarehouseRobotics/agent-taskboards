@@ -189,6 +189,7 @@ export function App() {
             columns={columns}
             error={error}
             loadingBoard={loadingBoard}
+            loadingProjects={loadingProjects}
             loadingTask={loadingTask}
             mutationError={mutationError}
             newTaskColumnId={newTaskColumnId}
@@ -218,22 +219,18 @@ export function App() {
             }}
             onCreateTask={async (input) => {
               if (!selectedProjectId || !selectedBoardId) {
-                return;
+                throw new Error("Select a board before creating a task.");
               }
               setMutationError(null);
-              try {
-                const created = await api.createTask(selectedProjectId, selectedBoardId, input);
-                setNewTaskColumnId(null);
-                await refreshAfterMutation(null);
-                navigate({
-                  view: "board",
-                  projectId: selectedProjectId,
-                  boardId: selectedBoardId,
-                  taskId: created.task.id,
-                });
-              } catch (err) {
-                setMutationError(apiMessage(err));
-              }
+              const created = await api.createTask(selectedProjectId, selectedBoardId, input);
+              setNewTaskColumnId(null);
+              await refreshAfterMutation(null);
+              navigate({
+                view: "board",
+                projectId: selectedProjectId,
+                boardId: selectedBoardId,
+                taskId: created.task.id,
+              });
             }}
             onMoveTask={moveTask}
             onOpenCreateTask={(columnId) => setNewTaskColumnId(columnId)}

@@ -1,4 +1,4 @@
-import { KeyboardEvent, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from "react";
 import type { BoardColumn, Task } from "../../domain/types";
 import { columnStatus } from "../../lib/task-display";
 import { Icon, LabelChip, Mono, PriorityFlag, StatusIcon } from "../../components/ui";
@@ -23,16 +23,47 @@ export function TaskCard({
   task: Task;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const cardRef = useRef<HTMLElement>(null);
   const status = columnStatus(column);
   const columnIndex = columns.findIndex((item) => item.id === column.id);
   const doneColumn = columns.find((item) => item.isDone);
+  const menuId = `task-menu-${task.id}`;
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return undefined;
+    }
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!cardRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [menuOpen]);
+
   const moveAdjacent = (direction: -1 | 1) => {
     const nextColumn = columns[columnIndex + direction];
     if (nextColumn) {
       onMoveTask(task.id, { columnId: nextColumn.id });
     }
   };
-  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+  const closeAndRun = (action: () => void | Promise<void>) => {
+    setMenuOpen(false);
+    void action();
+  };
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter") {
       onOpenTask(task.id);
     }
@@ -50,6 +81,7 @@ export function TaskCard({
     <article
       className={active ? "task-card task-card--active" : "task-card"}
       draggable
+      ref={cardRef}
       onContextMenu={(event) => {
         event.preventDefault();
         setMenuOpen((current) => !current);
@@ -81,12 +113,16 @@ export function TaskCard({
         )}
         <span className="task-card__spacer" />
         <button
+          aria-controls={menuOpen ? menuId : undefined}
+          aria-expanded={menuOpen}
+          aria-haspopup="menu"
           className="icon-btn"
           onClick={(event) => {
             event.stopPropagation();
             setMenuOpen((current) => !current);
           }}
           title="Task actions"
+          type="button"
         >
           <Icon name="more" strokeWidth={2.3} />
         </button>
@@ -102,11 +138,11 @@ export function TaskCard({
         </div>
       )}
       {menuOpen && (
-        <div className="task-card__menu" onClick={(event) => event.stopPropagation()}>
-          <button disabled={columnIndex <= 0} onClick={() => moveAdjacent(-1)}>Move left</button>
-          <button disabled={columnIndex >= columns.length - 1} onClick={() => moveAdjacent(1)}>Move right</button>
-          <button disabled={!doneColumn} onClick={() => doneColumn && onMoveTask(task.id, { columnId: doneColumn.id })}>Move to done</button>
-          <button className="danger-text" onClick={() => onArchiveTask(task.id)}>Archive</button>
+        <div className="task-card__menu" id={menuId} onClick={(event) => event.stopPropagation()} role="menu">
+          <button disabled={columnIndex <= 0} onClick={() => closeAndRun(() => moveAdjacent(-1))} role="menuitem" type="button">Move left</button>
+          <button disabled={columnIndex >= columns.length - 1} onClick={() => closeAndRun(() => moveAdjacent(1))} role="menuitem" type="button">Move right</button>
+          <button disabled={!doneColumn} onClick={() => closeAndRun(() => doneColumn && onMoveTask(task.id, { columnId: doneColumn.id }))} role="menuitem" type="button">Move to done</button>
+          <button className="danger-text" onClick={() => closeAndRun(() => onArchiveTask(task.id))} role="menuitem" type="button">Archive</button>
         </div>
       )}
     </article>
