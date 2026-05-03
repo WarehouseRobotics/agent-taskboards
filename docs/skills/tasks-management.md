@@ -23,24 +23,48 @@ There should be a concise idiomatic surface for most common tasks, to ensure eff
 
 ## Control Script Contract
 
-The planned skill should ship with a bash control script that wraps the local
-API. The script should be easy for agents to call from a shell and easy for
-humans to inspect.
+The skill ships with a thin bash wrapper at
+`skills/tasks-management/scripts/taskboards`. It is the single entry point
+agents should use; raw `curl` against `/api/agents` is reserved for cases the
+wrapper does not cover.
 
-The script should provide commands for:
+Invocation grammar:
 
-- health checks
-- listing and selecting projects
-- listing and selecting boards
-- creating, reading, updating, moving, archiving, and completing tasks
-- appending task comments
-- reading task context, including comments and activity
-- text and semantic search
-- maintenance actions such as embedding reindexing
+```text
+taskboards <verb> <path-or-shortcut> [key=value ...] [--json BODY | --data @FILE]
+```
 
-Task and context fetching commands will usually return formatted Markdown content, ready for use in context.
-Other simpler atomic update commands should return deterministic JSON by default so agents can parse them
-with `jq` or equivalent tooling. 
+`<verb>` is one of `get`, `post`, `patch`, `delete`, or one of the shortcuts
+below. `<path>` is API-relative (the wrapper prepends
+`$TASKBOARDS_HOST_URL/api/agents/`). Bare `key=value` arguments become
+URL-encoded query string entries. `--json` sets a JSON body inline; `--data`
+forwards a curl-style `@file` body.
+
+Built-in shortcuts:
+
+- `taskboards health` and `taskboards help` for orientation
+- `taskboards context <taskId>` for a full task view with comments and activity
+- `taskboards move <taskId> <columnKey>` for column transitions
+- `taskboards complete <taskId>` and `taskboards archive <taskId>` for task
+  state changes
+- `taskboards comment <taskId> <body...>` to append an agent comment with
+  identity auto-filled from env
+
+Responses are passed through verbatim. The agentic API already returns markdown
+with TOON, YAML, JSON, or no structured block depending on `format=`, so agents
+can request the form they want without wrapper-side reshaping. Atomic mutations
+(move, complete, archive, patch, comment-create) still emit a TOON block with
+the new IDs that agents can scan or pipe into other tooling.
+
+Wrapper environment:
+
+- `TASKBOARDS_HOST_URL` — base URL (default `http://localhost:8142`).
+- `TASKBOARDS_API_KEY` — bearer token; sent only when non-empty.
+- `TASKBOARDS_AGENT_NAME` — comment author name (default `Claude Code`).
+- `TASKBOARDS_AGENT_REF` — comment author reference (default
+  `$CLAUDE_SESSION_ID` if set, else `local`).
+
+
 
 ## Agent Workflow
 

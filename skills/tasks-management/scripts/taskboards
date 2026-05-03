@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+# taskboards — thin wrapper around the Agent Taskboards `/api/agents` surface.
+# Resolves base URL and bearer auth from env, marshals key=value query args,
+# and provides a few shortcuts for the high-traffic operations.
+#
+# See skills/tasks-management/SKILL.md for usage and conventions.
+
+set -euo pipefail
+
+HOST="${TASKBOARDS_HOST_URL:-http://localhost:8142}"
+API_KEY="${TASKBOARDS_API_KEY:-}"
+AGENT_NAME="${TASKBOARDS_AGENT_NAME:-Claude Code}"
+AGENT_REF="${TASKBOARDS_AGENT_REF:-${CLAUDE_SESSION_ID:-local}}"
+
+usage() {
+  cat <<'EOF'
+Usage: taskboards <verb> <path-or-shortcut> [key=value ...] [--json BODY | --data @FILE]
+
+Passthrough verbs: get, post, patch, delete
+  taskboards get projects repositoryPath="$PWD"
+  taskboards get tasks boardId=board_123 status=pending view=brief
+  taskboards post projects/<projectId>/boards/<boardId>/tasks --json '{"title":"..."}'
+  taskboards patch tasks/<taskId> --json '{"priority":"high"}'
+
+Shortcuts:
+  taskboards health                        GET /api/agents/health
+  taskboards help                          GET /api/agents/help
+  taskboards context <taskId>              full task context with comments+activity
+  taskboards move <taskId> <columnKey>     POST /api/agents/tasks/<id>/move
+  taskboards complete <taskId>             POST /api/agents/tasks/<id>/complete
+  taskboards archive <taskId>              POST /api/agents/tasks/<id>/archive
+  taskboards comment <taskId> <body...>    POST /api/agents/tasks/<id>/comments
+
+Env:
+  TASKBOARDS_HOST_URL    base URL (default http://localhost:8142)
+  TASKBOARDS_API_KEY     bearer token (default empty)
+  TASKBOARDS_AGENT_NAME  comment author name (default "Claude Code")
+  TASKBOARDS_AGENT_REF   comment author ref  (default $CLAUDE_SESSION_ID or "local")
+EOF
+}
+
+die() { echo "taskboards: $*" >&2; exit 2; }
+
+urlencode() {
+  local LC_ALL=C
+  local s="$1" i c hex out=""
+  for ((i = 0; i < ${#s}; i++)); do
+    c="${s:i:1}"
+    case "$c" in
+      [a-zA-Z0-9.~_-]) out+="$c" ;;
+      *) printf -v hex '%%%02X' "'$c"; out+="$hex" ;;
+    esac
+  done
+  printf '%s' "$out"
+}
+
+# Escape only the JSON-significant characters; pass UTF-8 bytes through.
+json_escape() {
+  local s="$1" i c out=""
+  for ((i = 0; i < ${#s}; i++)); do
+    c="${s:i:1}"
+    case "$c" in
+      '"')   out+='\"' ;;
+      '\')   out+='\\' ;;
+      $'\n') out+='\n' ;;
+      $'\r') out+='\r' ;;
+      $'\t') out+='\t' ;;
+      *)     out+="$c" ;;
+    esac
+  done
+  printf '%s' "$out"
+}
+
+[[ $# -gt 0 ]] || { usage >&2; exit 2; }
+
+case "$1" in
+  -h|--help) usage; exit 0 ;;
+esac
+
+cmd="$1"; shift
+verb=""
+path=""
+body=""
+content_type=""
+shortcut_kind=""
+declare -a query=()
+declare -a curl_data_args=()
+
+case "$cmd" in
+  get|GET)       verb="GET" ;;
+  post|POST)     verb="POST" ;;
+  patch|PATCH)   verb="PATCH" ;;
+  delete|DELETE) verb="DELETE" ;;
+  health)        verb="GET";  path="health" ;;
+  help)          verb="GET";  path="help" ;;
+  context)
+    [[ $# -ge 1 ]] || die "context: missing taskId"
+    verb="GET"; path="tasks/$1/context"
+    query+=("view=full" "include=$(urlencode "comments,activity")")
+    shift ;;
+  move)
+    [[ $# -ge 2 ]] || die "move: usage 'move <taskId> <columnKey>'"
+    verb="POST"; path="tasks/$1/move"
+    body="{\"columnKey\":\"$(json_escape "$2")\"}"
+    content_type="application/json"
+    shift 2 ;;
+  complete)
+    [[ $# -ge 1 ]] || die "complete: missing taskId"
+    verb="POST"; path="tasks/$1/complete"; shift ;;
+  archive)
+    [[ $# -ge 1 ]] || die "archive: missing taskId"
+    verb="POST"; path="tasks/$1/archive"; shift ;;
+  comment)
+    [[ $# -ge 1 ]] || die "comment: missing taskId"
+    verb="POST"; path="tasks/$1/comments"; shortcut_kind="comment"
+    shift ;;
+  *) die "unknown verb or shortcut: $cmd (try --help)" ;;
+esac
+
+# Passthrough verbs need an explicit path.
+if [[ -z "$path" ]]; then
+  [[ $# -ge 1 ]] || die "$cmd: missing path"
+  path="$1"; shift
+fi
+
+# Tolerate a leading slash or accidental "api/agents/" prefix from callers.
+path="${path#/}"
+path="${path#api/agents/}"
+
+declare -a comment_body_parts=()
+explicit_json=""
+explicit_data=""
+
+while [[ $# -gt 0 ]]; do
+  arg="$1"
+  case "$arg" in
+    --json)    [[ $# -ge 2 ]] || die "--json: missing body"
+               explicit_json="$2"; shift 2 ;;
+    --json=*)  explicit_json="${arg#--json=}"; shift ;;
+    --data)    [[ $# -ge 2 ]] || die "--data: missing value"
+               explicit_data="$2"; shift 2 ;;
+    --data=*)  explicit_data="${arg#--data=}"; shift ;;
+    *=*)
+      key="${arg%%=*}"; val="${arg#*=}"
+      query+=("$(urlencode "$key")=$(urlencode "$val")")
+      shift ;;
+    *)
+      if [[ "$shortcut_kind" == "comment" ]]; then
+        comment_body_parts+=("$arg"); shift
+      else
+        die "unknown argument: $arg (use key=value or --json/--data)"
+      fi ;;
+  esac
+done
+
+# Auto-fill comment body when the caller did not supply --json/--data.
+if [[ "$shortcut_kind" == "comment" && -z "$explicit_json" && -z "$explicit_data" ]]; then
+  [[ ${#comment_body_parts[@]} -gt 0 ]] || die "comment: missing body"
+  comment_body="${comment_body_parts[*]}"
+  body="{\"authorType\":\"agent\""
+  body+=",\"authorName\":\"$(json_escape "$AGENT_NAME")\""
+  body+=",\"authorRef\":\"$(json_escape "$AGENT_REF")\""
+  body+=",\"body\":\"$(json_escape "$comment_body")\"}"
+  content_type="application/json"
+fi
+
+if [[ -n "$explicit_json" ]]; then
+  body="$explicit_json"
+  content_type="application/json"
+fi
+if [[ -n "$explicit_data" ]]; then
+  curl_data_args+=(--data "$explicit_data")
+fi
+
+url="$HOST/api/agents/$path"
+if [[ ${#query[@]} -gt 0 ]]; then
+  qs=""
+  for q in "${query[@]}"; do qs+="&$q"; done
+  url+="?${qs:1}"
+fi
+
+declare -a curl_args=(-sS -X "$verb")
+[[ -n "$API_KEY" ]]      && curl_args+=(-H "Authorization: Bearer $API_KEY")
+[[ -n "$content_type" ]] && curl_args+=(-H "Content-Type: $content_type")
+[[ -n "$body" ]]         && curl_args+=(--data-raw "$body")
+[[ ${#curl_data_args[@]} -gt 0 ]] && curl_args+=("${curl_data_args[@]}")
+curl_args+=("$url")
+
+rc=0
+curl "${curl_args[@]}" || rc=$?
+if [[ $rc -ne 0 ]]; then
+  printf '\ntaskboards: request to %s failed (curl exit %s). Is the API up? Try `docker compose up`.\n' "$HOST" "$rc" >&2
+  exit "$rc"
+fi
