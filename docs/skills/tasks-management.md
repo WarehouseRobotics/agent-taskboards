@@ -1,7 +1,7 @@
 # Task Management Skill
 
 
-This planned skill teaches coding agents how to use Agent Taskboards as local
+This skill teaches coding agents how to use Agent Taskboards as local
 task memory and workflow state. It is a design target for the future skill and
 bash control script; it is not yet a final executable skill.
 
