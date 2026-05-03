@@ -96,6 +96,29 @@ Verify the install by starting a fresh Claude Code session in a project where
 the skill is installed and asking it to run `taskboards health`. The agent
 should pick the skill up automatically and respond with a healthy status block.
 
+If you played around and feel secure about letting the task management skill
+work freely, add a permission rule to `.claude/settings.json` (shared with the
+project) or `.claude/settings.local.json` (personal, gitignored) so Claude Code
+stops prompting on every wrapper call:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(*/skills/tasks-management/scripts/taskboards *)",
+      "Bash(*/skills/tasks-management/scripts/taskboards)"
+    ]
+  }
+}
+```
+
+The wildcard prefix matches the wrapper regardless of install location
+(`~/.claude/skills/...`, `<project>/.claude/skills/...`, or the literal
+`${CLAUDE_SKILL_DIR}/...` form the agent may type). The second entry covers
+the bare `taskboards` invocation with no trailing arguments. Permission
+patterns match the literal command string the agent sends to the Bash tool —
+they are not shell-expanded — so list every form you want to allow.
+
 Other agents that follow Claude's `SKILL.md` convention can use the same
 symlink approach into their own skill directory.
 
