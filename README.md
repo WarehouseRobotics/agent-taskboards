@@ -35,6 +35,29 @@ comments with a GGUF embedding model.
   and `sqlite-vec`.
 - Agent helper skill and wrapper script under `skills/tasks-management/`.
 
+## Before First Run: Download the Embeddings Model
+
+The local embedding model is expected at:
+
+```text
+models-gguf/bge-small-en-v1.5-f32.gguf
+```
+
+The model directory is ignored by git so model weights stay local. To download
+the expected GGUF file from Hugging Face:
+
+```sh
+mkdir -p models-gguf
+curl -L \
+  -o models-gguf/bge-small-en-v1.5-f32.gguf \
+  https://huggingface.co/CompendiumLabs/bge-small-en-v1.5-gguf/resolve/main/bge-small-en-v1.5-f32.gguf
+```
+
+GGUF is the model file format used by `llama.cpp` and `node-llama-cpp`. The
+`f32` file is the unquantized version expected by this repo's default settings;
+smaller quantized files exist, but use the exact filename above unless you also
+set `TASKBOARDS_EMBEDDING_MODEL_PATH` to point at a different model file.
+
 ## Quick Start
 
 Start the app in Docker:
@@ -122,6 +145,25 @@ they are not shell-expanded — so list every form you want to allow.
 Other agents that follow Claude's `SKILL.md` convention can use the same
 symlink approach into their own skill directory.
 
+## Adjust Your Project AGENTS.md/CLAUDE.md
+
+Go to the UI and create the project and the board (that's optional, but recommended). 
+Then, in your project instructions file, add the following (or similar):
+
+```
+## Project Task Management
+
+Use the task-management skill for tracking project tasks. When performing tasks, you should check taskboard context and track tasks' states using the taskboards skill. This project data:
+
+- taskboards project: `my-project-name` _(create if not found)_
+- main board: `main` _(create if not found)_
+
+Keep up with the task boards: **check and update taskboard tasks often!**
+
+```
+
+
+
 ## Runtime Data
 
 Docker Compose bind-mounts local runtime directories from the repository root:
@@ -163,27 +205,6 @@ Run the embedding smoke test:
 ```sh
 docker compose exec taskboards npm run test:embeddings
 ```
-
-The local embedding model is expected at:
-
-```text
-models-gguf/bge-small-en-v1.5-f32.gguf
-```
-
-The model directory is ignored by git so model weights stay local. To download
-the expected GGUF file from Hugging Face:
-
-```sh
-mkdir -p models-gguf
-curl -L \
-  -o models-gguf/bge-small-en-v1.5-f32.gguf \
-  https://huggingface.co/CompendiumLabs/bge-small-en-v1.5-gguf/resolve/main/bge-small-en-v1.5-f32.gguf
-```
-
-GGUF is the model file format used by `llama.cpp` and `node-llama-cpp`. The
-`f32` file is the unquantized version expected by this repo's default settings;
-smaller quantized files exist, but use the exact filename above unless you also
-set `TASKBOARDS_EMBEDDING_MODEL_PATH` to point at a different model file.
 
 ## Typical Workflows
 
