@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TaskAttachment } from "../../domain/types";
-import { appendImageAttachmentMarkdown, filesFromClipboardData } from "./TaskDetail";
+import { appendImageAttachmentMarkdown, filesFromClipboardData, isImageAttachment } from "./TaskDetail";
 
 describe("task attachment helpers", () => {
   it("appends image markdown links without saving the task description", () => {
@@ -13,6 +13,11 @@ describe("task attachment helpers", () => {
     expect(
       appendImageAttachmentMarkdown("", attachment({ originalName: "[bad]\nname.png" })),
     ).toBe("![bad  name.png](/uploads/tasks/task_1/att-screenshot.png)");
+  });
+
+  it("detects image attachments from content type", () => {
+    expect(isImageAttachment(attachment({ contentType: "image/webp" }))).toBe(true);
+    expect(isImageAttachment(attachment({ contentType: "application/pdf" }))).toBe(false);
   });
 
   it("extracts pasted files from clipboard items", () => {

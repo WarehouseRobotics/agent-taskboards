@@ -55,6 +55,10 @@ export function appendImageAttachmentMarkdown(description: string, attachment: T
   return prefix ? `${prefix}\n\n${markdown}` : markdown;
 }
 
+export function isImageAttachment(attachment: Pick<TaskAttachment, "contentType">) {
+  return attachment.contentType.startsWith("image/");
+}
+
 export function filesFromClipboardData(
   clipboardData: Pick<DataTransfer, "files" | "items"> | null,
 ) {
@@ -458,7 +462,7 @@ export function TaskDetail({
       for (const file of files) {
         const attachment = await onUploadTaskAttachment(task.id, file);
         uploaded += 1;
-        if (attachment.contentType.startsWith("image/")) {
+        if (isImageAttachment(attachment)) {
           images += 1;
           setDraft((current) => {
             const source =
@@ -710,7 +714,17 @@ export function TaskDetail({
           <div className="attachment-list">
             {attachments.map((attachment) => (
               <div className="attachment-row" key={attachment.id}>
-                <Icon name={attachment.contentType.startsWith("image/") ? "image" : "link"} />
+                {isImageAttachment(attachment) ? (
+                  <img
+                    alt={attachment.originalName}
+                    className="attachment-thumb"
+                    decoding="async"
+                    loading="lazy"
+                    src={attachment.url}
+                  />
+                ) : (
+                  <Icon name="link" />
+                )}
                 <a href={attachment.url} target="_blank" rel="noreferrer">
                   {attachment.originalName}
                 </a>

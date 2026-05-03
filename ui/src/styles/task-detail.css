@@ -356,7 +356,7 @@
 
 .attachment-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto;
   gap: var(--s-2);
   align-items: center;
   border: 1px solid var(--line-faint);
@@ -365,6 +365,19 @@
   color: var(--fg-muted);
   font-size: var(--fs-12);
   padding: 6px 8px;
+}
+
+.attachment-row > svg {
+  justify-self: center;
+}
+
+.attachment-thumb {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line-faint);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface-2);
+  object-fit: cover;
 }
 
 .attachment-row a {
