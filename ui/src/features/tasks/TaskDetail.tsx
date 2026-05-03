@@ -834,7 +834,11 @@ function TimelineEntry({ entry }: { entry: TimelineItem }) {
           <Mono faded>{formatDate(entry.at)}</Mono>
         </div>
         <div className={entry.kind === "comment" ? "timeline-entry__comment" : "timeline-entry__summary"}>
-          {entry.kind === "comment" ? entry.body : entry.summary}
+          {entry.kind === "comment" ? (
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {entry.body}
+            </ReactMarkdown>
+          ) : entry.summary}
         </div>
       </div>
     </div>

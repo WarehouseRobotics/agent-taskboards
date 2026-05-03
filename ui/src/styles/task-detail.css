@@ -492,6 +492,116 @@
   text-wrap: pretty;
 }
 
+.timeline-entry__comment > :first-child {
+  margin-top: 0;
+}
+
+.timeline-entry__comment > :last-child {
+  margin-bottom: 0;
+}
+
+.timeline-entry__comment h1,
+.timeline-entry__comment h2,
+.timeline-entry__comment h3,
+.timeline-entry__comment h4,
+.timeline-entry__comment h5,
+.timeline-entry__comment h6 {
+  margin: var(--s-2) 0 var(--s-1);
+  border: 0;
+  padding: 0;
+  color: var(--fg);
+  font-size: var(--fs-12);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.timeline-entry__comment p {
+  margin: 0 0 var(--s-2);
+}
+
+.timeline-entry__comment ul,
+.timeline-entry__comment ol {
+  margin: 0 0 var(--s-2);
+  padding-left: 18px;
+}
+
+.timeline-entry__comment li {
+  margin: 2px 0;
+}
+
+.timeline-entry__comment a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.timeline-entry__comment img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 0 var(--s-2);
+  border-radius: var(--r-sm);
+  object-fit: contain;
+}
+
+.timeline-entry__comment code {
+  background: var(--bg-surface-2);
+  border-radius: var(--r-sm);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  padding: 0 4px;
+}
+
+.timeline-entry__comment pre {
+  margin: 0 0 var(--s-2);
+  border: 1px solid var(--line-faint);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface-2);
+  color: var(--fg);
+  font-size: var(--fs-12);
+  line-height: 1.5;
+  overflow-x: auto;
+  padding: 8px 10px;
+}
+
+.timeline-entry__comment pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.timeline-entry__comment blockquote {
+  margin: 0 0 var(--s-2);
+  border-left: 2px solid var(--line);
+  padding: 0 var(--s-2);
+  color: var(--fg-muted);
+}
+
+.timeline-entry__comment hr {
+  margin: var(--s-2) 0;
+  border: 0;
+  border-top: 1px solid var(--line-faint);
+}
+
+.timeline-entry__comment table {
+  margin: 0 0 var(--s-2);
+  border-collapse: collapse;
+  font-size: var(--fs-12);
+}
+
+.timeline-entry__comment th,
+.timeline-entry__comment td {
+  border: 1px solid var(--line-faint);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.timeline-entry__comment th {
+  color: var(--fg);
+  font-weight: 500;
+}
+
 .timeline-entry__body--human .timeline-entry__comment {
   border-left-color: var(--human-tint);
 }
