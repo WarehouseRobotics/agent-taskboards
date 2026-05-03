@@ -82,3 +82,69 @@
   background: var(--bg-surface);
   padding: var(--s-2) var(--s-3);
 }
+
+.settings-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+}
+
+.settings-sheet__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.settings-sheet__section + .settings-sheet__section {
+  border-top: 1px solid var(--line-faint);
+  padding-top: var(--s-5);
+}
+
+.settings-sheet__heading {
+  margin: 0;
+  color: var(--fg);
+  font-size: var(--fs-16);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+}
+
+.settings-sheet__danger-zone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  border-top: 1px solid var(--line-faint);
+  padding-top: var(--s-3);
+}
+
+.settings-sheet__danger-label {
+  color: var(--fg-faint);
+  font-size: var(--fs-10);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.settings-sheet__danger-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  justify-content: flex-end;
+}
+
+.confirm-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.confirm-dialog__message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+
+.confirm-dialog__message p {
+  margin: 0;
+}

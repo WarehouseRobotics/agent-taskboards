@@ -96,6 +96,20 @@ export const api = {
     return body.project;
   },
 
+  archiveProject: async (projectId: string) => {
+    const body = await request<{ project: Project }>(
+      `/api/projects/${encodeURIComponent(projectId)}/archive`,
+      { method: "POST" },
+    );
+    return body.project;
+  },
+
+  deleteProject: async (projectId: string) => {
+    await request<unknown>(`/api/projects/${encodeURIComponent(projectId)}`, {
+      method: "DELETE",
+    });
+  },
+
   listBoards: async (projectId: string) => {
     const body = await request<{ boards: Board[] }>(
       `/api/projects/${encodeURIComponent(projectId)}/boards`,
@@ -129,6 +143,25 @@ export const api = {
       },
     );
     return body.board;
+  },
+
+  archiveBoard: async (projectId: string, boardId: string) => {
+    const body = await request<{ board: Board }>(
+      `/api/projects/${encodeURIComponent(projectId)}/boards/${encodeURIComponent(
+        boardId,
+      )}/archive`,
+      { method: "POST" },
+    );
+    return body.board;
+  },
+
+  deleteBoard: async (projectId: string, boardId: string) => {
+    await request<unknown>(
+      `/api/projects/${encodeURIComponent(projectId)}/boards/${encodeURIComponent(
+        boardId,
+      )}`,
+      { method: "DELETE" },
+    );
   },
 
   getBoard: async (projectId: string, boardId: string) => {

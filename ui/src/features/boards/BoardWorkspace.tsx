@@ -36,11 +36,10 @@ export function BoardWorkspace({
   onDeleteTaskAttachment,
   onMoveTask,
   onOpenCreateTask,
+  onOpenSettings,
   onOpenTask,
   onPostComment,
   onRefresh,
-  onRenameBoard,
-  onRenameProject,
   onTaskDraftChange,
   onUpdateTask,
   onUploadTaskAttachment,
@@ -73,11 +72,10 @@ export function BoardWorkspace({
   onDeleteTaskAttachment: (taskId: string, attachmentId: string) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onOpenCreateTask: (columnId: string | null) => void;
+  onOpenSettings: () => void;
   onOpenTask: (taskId: string) => void;
   onPostComment: (taskId: string, body: string) => Promise<void>;
   onRefresh: (taskId?: string | null) => Promise<void>;
-  onRenameBoard: () => void;
-  onRenameProject: () => void;
   onTaskDraftChange: (taskId: string, fields: { title?: string; description?: string | null } | null) => void;
   onUpdateTask: (taskId: string, input: { title?: string; description?: string | null }) => Promise<void>;
   onUploadTaskAttachment: (taskId: string, file: File) => Promise<TaskAttachment>;
@@ -133,11 +131,8 @@ export function BoardWorkspace({
       <Topbar
         actions={
           <>
-            <Button onClick={onRenameProject} variant="ghost">
-              Rename project
-            </Button>
-            <Button disabled={!activeBoard} onClick={onRenameBoard} variant="ghost">
-              Rename board
+            <Button icon={<Icon name="settings" />} onClick={onOpenSettings} variant="ghost">
+              Settings
             </Button>
             <Button icon={<Icon name="refresh" />} onClick={() => onRefresh(activeTaskId)} variant="ghost">
               Sync
