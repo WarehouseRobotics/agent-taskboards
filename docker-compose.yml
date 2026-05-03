@@ -5,6 +5,7 @@ services:
     environment:
       TASKBOARDS_DEBUG: "${TASKBOARDS_DEBUG-1}"
       TASKBOARDS_DB_PATH: "/data/taskboards.sqlite"
+      TASKBOARDS_HOST_URL: "http://localhost:8142"
     ports:
       - "8142:8142"
     volumes:
