@@ -838,12 +838,13 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
     sendAgentMarkdown(
       res,
       {
-        outcome: `Loaded context for project \`${context.project.id}\`, board \`${context.board.id}\`, task \`${context.task.id}\`.`,
+        outcome: `Loaded context for project \`${context.project.name}\`, board \`${context.board.name}\`, task \`${context.task.id}\`.`,
         sections: [
           {
             title: "What I found",
             lines: [
               ...taskMarkdownIntroLines(context, query.view),
+              `- Parent project: \`${context.project.id}\` ${context.project.name}.`,
               `- Parent board: \`${context.board.id}\` ${context.board.name}.`,
               `- Attachments: ${context.attachments.length}.`,
               `- Comments returned: ${includeComments ? commentPage.items.length : 0} of ${context.comments.length}.`,

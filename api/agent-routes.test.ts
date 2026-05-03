@@ -286,8 +286,10 @@ describe("agent markdown API", () => {
     );
     expect(context.text).not.toContain("```json");
     expect(context.text).toContain(
-      `Loaded context for project \`${projectId}\`, board \`${boardId}\`, task \`${taskId}\`.`,
+      `Loaded context for project \`test-project\`, board \`test-board\`, task \`${taskId}\`.`,
     );
+    expect(context.text).toContain(`- Parent project: \`${projectId}\` test-project.`);
+    expect(context.text).toContain(`- Parent board: \`${boardId}\` test-board.`);
     expect(context.text).toContain(
       "- Task: SQLite migration blocker.\nDebug sqlite-vec virtual table setup",
     );
