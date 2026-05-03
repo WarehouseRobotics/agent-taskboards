@@ -39,6 +39,8 @@ export function BoardWorkspace({
   onOpenTask,
   onPostComment,
   onRefresh,
+  onRenameBoard,
+  onRenameProject,
   onTaskDraftChange,
   onUpdateTask,
   onUploadTaskAttachment,
@@ -74,6 +76,8 @@ export function BoardWorkspace({
   onOpenTask: (taskId: string) => void;
   onPostComment: (taskId: string, body: string) => Promise<void>;
   onRefresh: (taskId?: string | null) => Promise<void>;
+  onRenameBoard: () => void;
+  onRenameProject: () => void;
   onTaskDraftChange: (taskId: string, fields: { title?: string; description?: string | null } | null) => void;
   onUpdateTask: (taskId: string, input: { title?: string; description?: string | null }) => Promise<void>;
   onUploadTaskAttachment: (taskId: string, file: File) => Promise<TaskAttachment>;
@@ -129,6 +133,12 @@ export function BoardWorkspace({
       <Topbar
         actions={
           <>
+            <Button onClick={onRenameProject} variant="ghost">
+              Rename project
+            </Button>
+            <Button disabled={!activeBoard} onClick={onRenameBoard} variant="ghost">
+              Rename board
+            </Button>
             <Button icon={<Icon name="refresh" />} onClick={() => onRefresh(activeTaskId)} variant="ghost">
               Sync
             </Button>

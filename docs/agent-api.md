@@ -12,6 +12,10 @@ The canonical JSON API documented in `docs/api.md` remains the source of truth
 for resource semantics. The agentic API mirrors those operations but presents
 responses as natural language with optional compact structured blocks.
 
+Project and board names are URL-safe slugs (`^[a-z0-9_-]+$`). Agentic path and
+query parameters named `projectId` or `boardId` accept either the durable ID or
+the slug name. Resolution is exact and tries ID first, then name.
+
 ## Design Goals
 
 - Help agents orient themselves quickly across projects, boards, and pending
@@ -196,6 +200,7 @@ canonical ID.
 
 Reads one project and, in `normal` or `full` views, summarizes its active boards
 and task counts when available.
+`:projectId` may be either a project ID or project name.
 
 ### `PATCH /api/agents/projects/:projectId`
 
@@ -212,6 +217,7 @@ comments, and activity are not hard-deleted.
 
 Lists boards for a project. Supports `q`, `includeArchived`, `view`, `limit`,
 and `format`.
+`:projectId` may be either a project ID or project name.
 
 The response should show enough parent context for agents to avoid mixing
 boards:
@@ -238,6 +244,7 @@ Reads a board. Supports:
 
 When `includeTasks=true`, tasks should be grouped by workflow column. Large
 columns must be truncated independently with exact follow-up calls.
+`:projectId` and `:boardId` may use IDs or slug names.
 
 ### `PATCH /api/agents/projects/:projectId/boards/:boardId`
 
@@ -281,6 +288,8 @@ Filtering semantics:
 
 - `projectId` scopes results to one project.
 - `boardId` scopes results to one board and implies its project when possible.
+  If a board name is used without a project and the name exists in multiple
+  projects, the request must include `projectId`.
 - `columnKey` matches board workflow column keys.
 - `status` is an agent-friendly grouping. `done` maps to done columns or
   completed tasks; `archived` requires archived records; `pending` excludes done

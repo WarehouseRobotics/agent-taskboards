@@ -13,7 +13,12 @@ import { ProjectsWorkspace } from "../features/projects";
 import { SearchWorkspace } from "../features/search";
 import { SettingsWorkspace } from "../features/settings";
 import { PlannedWorkspace } from "../features/planned";
-import { CreateBoardPanel, CreateProjectPanel } from "./CreateResourcePanels";
+import {
+  CreateBoardPanel,
+  CreateProjectPanel,
+  RenameBoardPanel,
+  RenameProjectPanel,
+} from "./CreateResourcePanels";
 
 export function App() {
   const initialRoute = useMemo(() => parseRoute(), []);
@@ -22,6 +27,8 @@ export function App() {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newBoardOpen, setNewBoardOpen] = useState(false);
+  const [renameProjectOpen, setRenameProjectOpen] = useState(false);
+  const [renameBoardOpen, setRenameBoardOpen] = useState(false);
   const [newTaskColumnId, setNewTaskColumnId] = useState<string | null>(null);
   const [taskDrafts, setTaskDrafts] = useState<TaskDraftsById>({});
 
@@ -333,6 +340,8 @@ export function App() {
               }
             }}
             onRefresh={refreshAfterMutation}
+            onRenameBoard={() => setRenameBoardOpen(true)}
+            onRenameProject={() => setRenameProjectOpen(true)}
             onTaskDraftChange={trackTaskDraft}
             onUpdateTask={async (taskId, input) => {
               setMutationError(null);
@@ -364,6 +373,7 @@ export function App() {
             activeProjectId={selectedProjectId}
             loading={loadingProjects}
             onCreateProject={() => setNewProjectOpen(true)}
+            onRenameProject={() => setRenameProjectOpen(true)}
             onSelectProject={(projectId) => {
               const project = projectTree.find((item) => item.project.id === projectId);
               if (project?.boards[0]) {
@@ -421,6 +431,35 @@ export function App() {
             setNewBoardOpen(false);
             navigate({ view: "board", projectId: selectedProjectId, boardId: created.id, taskId: null });
             await loadProjects(selectedProjectId, created.id);
+            await loadBoard();
+          }}
+        />
+      )}
+      {renameProjectOpen && activeProject && (
+        <RenameProjectPanel
+          initialName={activeProject.name}
+          onCancel={() => setRenameProjectOpen(false)}
+          onSubmit={async (input) => {
+            setMutationError(null);
+            const project = await api.updateProject(activeProject.id, input);
+            setRenameProjectOpen(false);
+            await loadProjects(project.id, selectedBoardId);
+          }}
+        />
+      )}
+      {renameBoardOpen && activeProject && activeBoard && (
+        <RenameBoardPanel
+          initialName={activeBoard.name}
+          onCancel={() => setRenameBoardOpen(false)}
+          onSubmit={async (input) => {
+            setMutationError(null);
+            const updatedBoard = await api.updateBoard(
+              activeProject.id,
+              activeBoard.id,
+              input,
+            );
+            setRenameBoardOpen(false);
+            await loadProjects(activeProject.id, updatedBoard.id);
             await loadBoard();
           }}
         />

@@ -257,7 +257,7 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
 
   app.get("/api/agents/projects/:projectId", (req, res) => {
     const query = parseQuery(req, agentReadQuerySchema);
-    const project = services.projects.getProject(
+    const project = services.projects.getProjectByRef(
       req.params.projectId,
       query.includeArchived,
     );
@@ -297,7 +297,11 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
     asyncHandler(async (req, res) => {
       const query = parseQuery(req, agentReadQuerySchema);
       const body = parseNonEmptyBody(req, projectUpdateSchema);
-      const project = services.projects.updateProject(req.params.projectId, body);
+      const existingProject = services.projects.getProjectByRef(
+        req.params.projectId,
+        false,
+      );
+      const project = services.projects.updateProject(existingProject.id, body);
 
       sendAgentMarkdown(
         res,
@@ -319,7 +323,11 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
 
   app.post("/api/agents/projects/:projectId/archive", (req, res) => {
     const query = parseQuery(req, agentReadQuerySchema);
-    const project = services.projects.archiveProject(req.params.projectId);
+    const existingProject = services.projects.getProjectByRef(
+      req.params.projectId,
+      false,
+    );
+    const project = services.projects.archiveProject(existingProject.id);
 
     sendAgentMarkdown(
       res,
@@ -343,7 +351,7 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
 
   app.get("/api/agents/projects/:projectId/boards", (req, res) => {
     const query = parseQuery(req, agentReadQuerySchema);
-    const project = services.projects.getProject(
+    const project = services.projects.getProjectByRef(
       req.params.projectId,
       query.includeArchived,
     );
@@ -400,7 +408,8 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
     asyncHandler(async (req, res) => {
       const query = parseQuery(req, agentReadQuerySchema);
       const body = parseBody(req, boardCreateSchema);
-      const created = await services.boards.createBoard(req.params.projectId, body);
+      const project = services.projects.getProjectByRef(req.params.projectId, false);
+      const created = await services.boards.createBoard(project.id, body);
 
       sendAgentMarkdown(
         res,
@@ -429,11 +438,11 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
 
   app.get("/api/agents/projects/:projectId/boards/:boardId", (req, res) => {
     const query = parseQuery(req, agentReadQuerySchema);
-    const project = services.projects.getProject(
+    const project = services.projects.getProjectByRef(
       req.params.projectId,
       query.includeArchived,
     );
-    const board = services.boards.getBoard(
+    const board = services.boards.getBoardByRef(
       project.id,
       req.params.boardId,
       query.includeArchived,
@@ -489,9 +498,18 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
     asyncHandler(async (req, res) => {
       const query = parseQuery(req, agentReadQuerySchema);
       const body = parseNonEmptyBody(req, boardUpdateSchema);
-      const board = await services.boards.updateBoard(
+      const project = services.projects.getProjectByRef(
         req.params.projectId,
+        false,
+      );
+      const existingBoard = services.boards.getBoardByRef(
+        project.id,
         req.params.boardId,
+        false,
+      );
+      const board = await services.boards.updateBoard(
+        project.id,
+        existingBoard.id,
         body,
       );
       const columns = services.boards.listBoardColumns(board.id);
@@ -518,9 +536,15 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
 
   app.post("/api/agents/projects/:projectId/boards/:boardId/archive", (req, res) => {
     const query = parseQuery(req, agentReadQuerySchema);
-    const board = services.boards.archiveBoard(
-      req.params.projectId,
+    const project = services.projects.getProjectByRef(req.params.projectId, false);
+    const existingBoard = services.boards.getBoardByRef(
+      project.id,
       req.params.boardId,
+      false,
+    );
+    const board = services.boards.archiveBoard(
+      project.id,
+      existingBoard.id,
     );
     const columns = services.boards.listBoardColumns(board.id);
 
@@ -595,9 +619,15 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
     asyncHandler(async (req, res) => {
       const query = parseQuery(req, agentReadQuerySchema);
       const body = parseBody(req, taskCreateSchema);
-      const created = await services.tasks.createTask(
-        req.params.projectId,
+      const project = services.projects.getProjectByRef(req.params.projectId, false);
+      const board = services.boards.getBoardByRef(
+        project.id,
         req.params.boardId,
+        false,
+      );
+      const created = await services.tasks.createTask(
+        project.id,
+        board.id,
         body,
       );
       const context = loadTaskWithParents(services, created.task.id, true);
@@ -1029,10 +1059,11 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
     "/api/agents/search",
     asyncHandler(async (req, res) => {
       const query = parseQuery(req, agentSearchQuerySchema);
+      const scope = resolveAgentScope(services, query, query.includeArchived);
       const input: SearchInput = {
         query: query.q,
-        projectId: query.projectId,
-        boardId: query.boardId,
+        projectId: scope.project?.id,
+        boardId: scope.board?.id,
         taskId: query.taskId,
         sourceTypes: query.sourceTypes,
         includeArchived: query.includeArchived,
@@ -1048,7 +1079,13 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
     asyncHandler(async (req, res) => {
       const query = parseQuery(req, agentReadQuerySchema);
       const body = parseBody(req, searchSchema);
-      const results = await services.search.search(body);
+      const scope = resolveAgentScope(services, body, body.includeArchived);
+      const input = {
+        ...body,
+        projectId: scope.project?.id,
+        boardId: scope.board?.id,
+      };
+      const results = await services.search.search(input);
       sendSearchResponse(res, query.format, body.query, results);
     }),
   );
@@ -1190,21 +1227,24 @@ async function discoverTasks(
 ): Promise<TaskDiscoveryRow[]> {
   const includeArchived =
     query.includeArchived || query.status === "archived" || query.status === "all";
+  const scope = resolveAgentScope(services, query, includeArchived);
   const semanticIds =
     query.q && query.semantic
-      ? await semanticTaskIds(services, query, includeArchived)
+      ? await semanticTaskIds(services, query, includeArchived, scope)
       : undefined;
   const semanticOrder = new Map(
     semanticIds?.map((result, index) => [result.sourceId, { result, index }]) ?? [],
   );
-  const projects = query.projectId
-    ? [services.projects.getProject(query.projectId, includeArchived)]
+  const projects = scope.project
+    ? [scope.project]
     : services.projects.listProjects(includeArchived);
   const rows: TaskDiscoveryRow[] = [];
 
   for (const project of projects) {
-    const boards = query.boardId
-      ? [services.boards.getBoard(project.id, query.boardId, includeArchived)]
+    const boards = scope.board
+      ? scope.board.projectId === project.id
+        ? [scope.board]
+        : []
       : services.boards.listBoards(project.id, includeArchived);
 
     for (const board of boards) {
@@ -1256,6 +1296,7 @@ async function semanticTaskIds(
   services: ApiServices,
   query: AgentTaskListQuery,
   includeArchived: boolean,
+  scope: AgentScope,
 ) {
   if (!query.q) {
     return [];
@@ -1263,12 +1304,49 @@ async function semanticTaskIds(
 
   return services.search.search({
     query: query.q,
-    projectId: query.projectId,
-    boardId: query.boardId,
+    projectId: scope.project?.id,
+    boardId: scope.board?.id,
     sourceTypes: ["task"],
     includeArchived,
     limit: Math.min(50, Math.max(query.limit + query.offset, query.limit)),
   });
+}
+
+type AgentScopeInput = {
+  projectId?: string;
+  boardId?: string;
+};
+
+type AgentScope = {
+  project?: Project;
+  board?: Board;
+};
+
+function resolveAgentScope(
+  services: ApiServices,
+  input: AgentScopeInput,
+  includeArchived: boolean,
+): AgentScope {
+  const project = input.projectId
+    ? services.projects.getProjectByRef(input.projectId, includeArchived)
+    : undefined;
+  const board = input.boardId
+    ? project
+      ? services.boards.getBoardByRef(project.id, input.boardId, includeArchived)
+      : services.boards.getBoardByRefAcrossProjects(
+          input.boardId,
+          includeArchived,
+        )
+    : undefined;
+  const boardProject =
+    board && !project
+      ? services.projects.getProject(board.projectId, includeArchived)
+      : undefined;
+
+  return {
+    project: project ?? boardProject,
+    board,
+  };
 }
 
 function matchesTaskQuery(

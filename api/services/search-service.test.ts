@@ -38,10 +38,10 @@ describe("search service", () => {
   it("formats board, task, and comment content for natural language embedding", () => {
     expect(
       formatBoardEmbeddingText({
-        name: "Implementation",
+        name: "implementation",
         description: "Starter API work",
       }),
-    ).toBe("Board: Implementation\nDescription: Starter API work");
+    ).toBe("Board: implementation\nDescription: Starter API work");
 
     expect(
       formatTaskEmbeddingText({
@@ -64,14 +64,14 @@ describe("search service", () => {
     const { db } = client;
     const project = db
       .insert(projects)
-      .values({ name: "Project" })
+      .values({ name: "project" })
       .returning()
       .get();
     const board = db
       .insert(boards)
       .values({
         projectId: project.id,
-        name: "Embedding board",
+        name: "embedding-board",
         description: "Vector work",
       })
       .returning()
@@ -137,14 +137,14 @@ describe("search service", () => {
     const { db } = client;
     const project = db
       .insert(projects)
-      .values({ name: "Project" })
+      .values({ name: "project" })
       .returning()
       .get();
     const board = db
       .insert(boards)
       .values({
         projectId: project.id,
-        name: "Chunk board",
+        name: "chunk-board",
       })
       .returning()
       .get();
@@ -231,12 +231,12 @@ describe("search service", () => {
     const { db } = client;
     const project = db
       .insert(projects)
-      .values({ name: "Project" })
+      .values({ name: "project" })
       .returning()
       .get();
     const board = db
       .insert(boards)
-      .values({ projectId: project.id, name: "Shrink board" })
+      .values({ projectId: project.id, name: "shrink-board" })
       .returning()
       .get();
     const column = db
@@ -286,12 +286,12 @@ describe("search service", () => {
     const { db } = client;
     const project = db
       .insert(projects)
-      .values({ name: "Project" })
+      .values({ name: "project" })
       .returning()
       .get();
     const board = db
       .insert(boards)
-      .values({ projectId: project.id, name: "Failure board" })
+      .values({ projectId: project.id, name: "failure-board" })
       .returning()
       .get();
     const column = db
@@ -358,14 +358,14 @@ describe("search service", () => {
     const { db } = client;
     const project = db
       .insert(projects)
-      .values({ name: "Project" })
+      .values({ name: "project" })
       .returning()
       .get();
     const board = db
       .insert(boards)
       .values({
         projectId: project.id,
-        name: "Cleanup board",
+        name: "cleanup-board",
       })
       .returning()
       .get();
@@ -397,14 +397,14 @@ describe("search service", () => {
     const { db } = client;
     const project = db
       .insert(projects)
-      .values({ name: "Project" })
+      .values({ name: "project" })
       .returning()
       .get();
     const board = db
       .insert(boards)
       .values({
         projectId: project.id,
-        name: "Search board",
+        name: "search-board",
       })
       .returning()
       .get();
@@ -462,14 +462,14 @@ describe("search service", () => {
     const { db } = client;
     const project = db
       .insert(projects)
-      .values({ name: "Project" })
+      .values({ name: "project" })
       .returning()
       .get();
     const board = db
       .insert(boards)
       .values({
         projectId: project.id,
-        name: "Grouped search board",
+        name: "grouped-search-board",
       })
       .returning()
       .get();
@@ -533,14 +533,14 @@ describe("search service", () => {
     const { db } = client;
     const project = db
       .insert(projects)
-      .values({ name: "Project" })
+      .values({ name: "project" })
       .returning()
       .get();
     const board = db
       .insert(boards)
       .values({
         projectId: project.id,
-        name: "Oversample board",
+        name: "oversample-board",
       })
       .returning()
       .get();

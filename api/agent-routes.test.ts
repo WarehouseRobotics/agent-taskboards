@@ -105,7 +105,7 @@ describe("agent markdown API", () => {
       jsonBlock(
         (
           await api("POST", "/api/agents/projects?format=json", {
-            name: "Agent Taskboards",
+            name: "agent-taskboards",
             repositoryPath: "/workspace/agent-taskboards",
           })
         ).text,
@@ -119,23 +119,23 @@ describe("agent markdown API", () => {
         (
           await api(
             "POST",
-            `/api/agents/projects/${projectId}/boards?format=json`,
-            { name: "Implementation" },
+            "/api/agents/projects/agent-taskboards/boards?format=json",
+            { name: "implementation" },
           )
         ).text,
       ),
       "board",
     );
-    const boardId = stringProp(board, "id");
+    expect(stringProp(board, "name")).toBe("implementation");
 
     await api(
       "POST",
-      `/api/agents/projects/${projectId}/boards/${boardId}/tasks`,
+      "/api/agents/projects/agent-taskboards/boards/implementation/tasks",
       { title: "First API task", columnKey: "ready" },
     );
     await api(
       "POST",
-      `/api/agents/projects/${projectId}/boards/${boardId}/tasks`,
+      "/api/agents/projects/agent-taskboards/boards/implementation/tasks",
       { title: "Second API task", columnKey: "ready" },
     );
 
@@ -150,7 +150,7 @@ describe("agent markdown API", () => {
 
     const boardRead = await api(
       "GET",
-      `/api/agents/projects/${projectId}/boards/${boardId}?includeTasks=true&perColumnLimit=1&format=json`,
+      "/api/agents/projects/agent-taskboards/boards/implementation?includeTasks=true&perColumnLimit=1&format=json",
     );
     expect(boardRead.text).toContain("Some columns were truncated");
     expect(boardRead.text).toContain("GET /api/agents/tasks?boardId=");
@@ -191,7 +191,7 @@ describe("agent markdown API", () => {
       taskIds(
         await api(
           "GET",
-          `/api/agents/tasks?boardId=${boardId}&columnKey=blocked&format=json`,
+          "/api/agents/tasks?boardId=test-board&columnKey=blocked&format=json",
         ),
       ),
     ).toEqual([blockedTask]);
@@ -200,7 +200,7 @@ describe("agent markdown API", () => {
       taskIds(
         await api(
           "GET",
-          `/api/agents/tasks?boardId=${boardId}&priority=high&labels=api,agent&q=markdown&format=json`,
+          "/api/agents/tasks?projectId=test-project&boardId=test-board&priority=high&labels=api,agent&q=markdown&format=json",
         ),
       ),
     ).toEqual([readyTask]);
@@ -209,7 +209,7 @@ describe("agent markdown API", () => {
       taskIds(
         await api(
           "GET",
-          `/api/agents/tasks?boardId=${boardId}&status=done&format=json`,
+          "/api/agents/tasks?boardId=test-board&status=done&format=json",
         ),
       ),
     ).toEqual([doneTask]);
@@ -218,7 +218,7 @@ describe("agent markdown API", () => {
       taskIds(
         await api(
           "GET",
-          `/api/agents/tasks?boardId=${boardId}&status=archived&format=json`,
+          "/api/agents/tasks?boardId=test-board&status=archived&format=json",
         ),
       ),
     ).toEqual([archivedTask]);
@@ -227,10 +227,25 @@ describe("agent markdown API", () => {
       taskIds(
         await api(
           "GET",
-          `/api/agents/tasks?boardId=${boardId}&q=vector&semantic=true&format=json`,
+          "/api/agents/tasks?boardId=test-board&q=vector&semantic=true&format=json",
         ),
       ),
     ).toContain(blockedTask);
+  });
+
+  it("requires project context for ambiguous board names", async () => {
+    await api("POST", "/api/agents/projects", { name: "alpha" });
+    await api("POST", "/api/agents/projects", { name: "beta" });
+    await api("POST", "/api/agents/projects/alpha/boards", { name: "shared" });
+    await api("POST", "/api/agents/projects/beta/boards", { name: "shared" });
+
+    const ambiguous = await api(
+      "GET",
+      "/api/agents/tasks?boardId=shared&format=json",
+    );
+
+    expect(ambiguous.status).toBe(400);
+    expect(ambiguous.text).toContain("Board name is ambiguous");
   });
 
   it("runs the agent write workflow and exposes context, comments, activity, and search", async () => {
@@ -313,7 +328,7 @@ describe("agent markdown API", () => {
     const searchPost = await api("POST", "/api/agents/search?format=json", {
       query: "blocked vector filtering",
       sourceTypes: ["comment"],
-      boardId,
+      boardId: "test-board",
     });
     expect(
       arrayProp(jsonBlock(searchPost.text), "results")
@@ -369,7 +384,7 @@ describe("agent markdown API", () => {
       jsonBlock(
         (
           await api("POST", "/api/agents/projects?format=json", {
-            name: "Test project",
+            name: "test-project",
           })
         ).text,
       ),
@@ -382,7 +397,7 @@ describe("agent markdown API", () => {
           await api(
             "POST",
             `/api/agents/projects/${projectId}/boards?format=json`,
-            { name: "Test board" },
+            { name: "test-board" },
           )
         ).text,
       ),

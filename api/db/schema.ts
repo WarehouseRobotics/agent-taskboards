@@ -77,6 +77,7 @@ export const projects = sqliteTable(
   (table) => ({
     activeIdx: index("projects_active_idx").on(table.archivedAt),
     nameIdx: index("projects_name_idx").on(table.name),
+    nameUnique: uniqueIndex("projects_name_unique").on(table.name),
   }),
 );
 
@@ -99,6 +100,10 @@ export const boards = sqliteTable(
     projectActiveIdx: index("boards_project_active_idx").on(
       table.projectId,
       table.archivedAt,
+    ),
+    projectNameUnique: uniqueIndex("boards_project_name_unique").on(
+      table.projectId,
+      table.name,
     ),
   }),
 );

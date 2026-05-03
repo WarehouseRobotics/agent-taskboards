@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, ne } from "drizzle-orm";
 import type { DatabaseClient } from "../db/client.js";
 import { projects } from "../db/schema.js";
 import { ApiError } from "../http/errors.js";
@@ -26,6 +26,7 @@ export class ProjectService {
   }
 
   createProject(input: ProjectCreateInput) {
+    this.ensureProjectNameAvailable(input.name);
     return this.db
       .insert(projects)
       .values({
@@ -37,6 +38,34 @@ export class ProjectService {
       })
       .returning()
       .get();
+  }
+
+  getProjectByRef(projectRef: string, includeArchived: boolean) {
+    const byId = includeArchived
+      ? this.db.select().from(projects).where(eq(projects.id, projectRef)).get()
+      : this.db
+          .select()
+          .from(projects)
+          .where(and(eq(projects.id, projectRef), isNull(projects.archivedAt)))
+          .get();
+
+    if (byId) {
+      return byId;
+    }
+
+    const byName = includeArchived
+      ? this.db.select().from(projects).where(eq(projects.name, projectRef)).get()
+      : this.db
+          .select()
+          .from(projects)
+          .where(and(eq(projects.name, projectRef), isNull(projects.archivedAt)))
+          .get();
+
+    if (!byName) {
+      throw new ApiError(404, "not_found", "Project not found");
+    }
+
+    return byName;
   }
 
   getProject(projectId: string, includeArchived: boolean) {
@@ -57,6 +86,9 @@ export class ProjectService {
 
   updateProject(projectId: string, input: ProjectUpdateInput) {
     this.getProject(projectId, false);
+    if (input.name) {
+      this.ensureProjectNameAvailable(input.name, projectId);
+    }
     return this.db
       .update(projects)
       .set(input)
@@ -73,5 +105,23 @@ export class ProjectService {
       .where(eq(projects.id, projectId))
       .returning()
       .get();
+  }
+
+  private ensureProjectNameAvailable(name: string, exceptProjectId?: string) {
+    const existing = exceptProjectId
+      ? this.db
+          .select({ id: projects.id })
+          .from(projects)
+          .where(and(eq(projects.name, name), ne(projects.id, exceptProjectId)))
+          .get()
+      : this.db
+          .select({ id: projects.id })
+          .from(projects)
+          .where(eq(projects.name, name))
+          .get();
+
+    if (existing) {
+      throw new ApiError(409, "invalid_state", "Project name already exists");
+    }
   }
 }

@@ -28,7 +28,7 @@ mixing context across unrelated work.
 Project concepts:
 
 - durable ID
-- human-readable name
+- URL-safe unique name
 - optional description
 - optional repository path
 - optional default branch
@@ -37,6 +37,9 @@ Project concepts:
 - creation and update timestamps
 
 Projects are archived instead of hard-deleted by normal user and API flows.
+Project names are globally unique and may contain only lowercase letters,
+numbers, underscores, and hyphens (`^[a-z0-9_-]+$`) so agents can safely use
+them in URLs and API calls.
 
 ## Boards
 
@@ -48,13 +51,15 @@ Board concepts:
 
 - durable ID
 - parent project ID
-- name and optional description
+- URL-safe name and optional description
 - ordered workflow columns
 - open-ended metadata
 - active or archived state
 - creation and update timestamps
 
 Boards are archived instead of hard-deleted by normal user and API flows.
+Board names are unique within their parent project and follow the same
+`^[a-z0-9_-]+$` URL-safe format as project names.
 
 ## Workflow Columns
 

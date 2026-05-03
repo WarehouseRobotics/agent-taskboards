@@ -78,6 +78,24 @@ export const api = {
     return body.project;
   },
 
+  updateProject: async (
+    projectId: string,
+    input: {
+      name?: string;
+      description?: string | null;
+      repositoryPath?: string | null;
+    },
+  ) => {
+    const body = await request<{ project: Project }>(
+      `/api/projects/${encodeURIComponent(projectId)}`,
+      {
+        method: "PATCH",
+        body: jsonBody(input),
+      },
+    );
+    return body.project;
+  },
+
   listBoards: async (projectId: string) => {
     const body = await request<{ boards: Board[] }>(
       `/api/projects/${encodeURIComponent(projectId)}/boards`,
@@ -90,6 +108,23 @@ export const api = {
       `/api/projects/${encodeURIComponent(projectId)}/boards`,
       {
         method: "POST",
+        body: jsonBody(input),
+      },
+    );
+    return body.board;
+  },
+
+  updateBoard: async (
+    projectId: string,
+    boardId: string,
+    input: { name?: string; description?: string | null },
+  ) => {
+    const body = await request<{ board: Board }>(
+      `/api/projects/${encodeURIComponent(projectId)}/boards/${encodeURIComponent(
+        boardId,
+      )}`,
+      {
+        method: "PATCH",
         body: jsonBody(input),
       },
     );

@@ -9,12 +9,14 @@ export function ProjectsWorkspace({
   activeProjectId,
   loading,
   onCreateProject,
+  onRenameProject,
   onSelectProject,
   projectTree,
 }: {
   activeProjectId: string | null;
   loading: boolean;
   onCreateProject: () => void;
+  onRenameProject: () => void;
   onSelectProject: (projectId: string) => void;
   projectTree: ProjectTreeItem[];
 }) {
@@ -22,7 +24,18 @@ export function ProjectsWorkspace({
   return (
     <>
       <Topbar
-        actions={<Button icon={<Icon name="plus" />} onClick={onCreateProject} variant="primary">New project</Button>}
+        actions={
+          <>
+            <Button
+              disabled={!activeProjectId}
+              onClick={onRenameProject}
+              variant="ghost"
+            >
+              Rename project
+            </Button>
+            <Button icon={<Icon name="plus" />} onClick={onCreateProject} variant="primary">New project</Button>
+          </>
+        }
         crumbs={[{ label: "Projects", icon: <Icon name="list" /> }]}
       />
       <div className="workspace-pane">

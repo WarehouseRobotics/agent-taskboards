@@ -80,7 +80,7 @@ describe("starter API", () => {
 
   it("creates projects, boards with default columns, tasks, comments, and context", async () => {
     const projectResponse = await api("POST", "/api/projects", {
-      name: "Agent Taskboards",
+      name: "agent-taskboards",
       description: "Local agent work tracking",
       repositoryPath: "/workspace/agent-taskboards",
       defaultBranch: "main",
@@ -90,13 +90,13 @@ describe("starter API", () => {
     expect(projectResponse.status).toBe(201);
     const project = objectProp(projectResponse.body, "project");
     const projectId = stringProp(project, "id");
-    expect(stringProp(project, "name")).toBe("Agent Taskboards");
+    expect(stringProp(project, "name")).toBe("agent-taskboards");
 
     const boardResponse = await api(
       "POST",
       `/api/projects/${projectId}/boards`,
       {
-        name: "Implementation",
+        name: "implementation",
       },
     );
 
@@ -436,7 +436,7 @@ describe("starter API", () => {
 
   it("searches indexed boards, tasks, and comments and respects archived filters", async () => {
     const projectResponse = await api("POST", "/api/projects", {
-      name: "Search project",
+      name: "search-project",
     });
     const projectId = stringProp(
       objectProp(projectResponse.body, "project"),
@@ -446,7 +446,7 @@ describe("starter API", () => {
       "POST",
       `/api/projects/${projectId}/boards`,
       {
-        name: "Vector search board",
+        name: "vector-search-board",
         description: "SQLite migration planning",
       },
     );
@@ -509,12 +509,68 @@ describe("starter API", () => {
     expect(arrayProp(archivedSearch.body, "results")).toHaveLength(1);
   });
 
+  it("enforces URL-safe unique project and board names", async () => {
+    const invalidProject = await api("POST", "/api/projects", {
+      name: "Agent Taskboards",
+    });
+    expect(invalidProject.status).toBe(400);
+
+    const project = objectProp(
+      (await api("POST", "/api/projects", { name: "unique-project" })).body,
+      "project",
+    );
+    const projectId = stringProp(project, "id");
+
+    const duplicateProject = await api("POST", "/api/projects", {
+      name: "unique-project",
+    });
+    expect(duplicateProject.status).toBe(409);
+    expect(
+      stringProp(objectProp(duplicateProject.body, "error"), "code"),
+    ).toBe("invalid_state");
+
+    const invalidProjectUpdate = await api("PATCH", `/api/projects/${projectId}`, {
+      name: "bug triage",
+    });
+    expect(invalidProjectUpdate.status).toBe(400);
+
+    const invalidBoard = await api("POST", `/api/projects/${projectId}/boards`, {
+      name: "board/one",
+    });
+    expect(invalidBoard.status).toBe(400);
+
+    const board = objectProp(
+      (
+        await api("POST", `/api/projects/${projectId}/boards`, {
+          name: "board-one",
+        })
+      ).body,
+      "board",
+    );
+    const boardId = stringProp(board, "id");
+
+    const duplicateBoard = await api("POST", `/api/projects/${projectId}/boards`, {
+      name: "board-one",
+    });
+    expect(duplicateBoard.status).toBe(409);
+    expect(stringProp(objectProp(duplicateBoard.body, "error"), "code")).toBe(
+      "invalid_state",
+    );
+
+    const invalidBoardUpdate = await api(
+      "PATCH",
+      `/api/projects/${projectId}/boards/${boardId}`,
+      { name: "bug triage" },
+    );
+    expect(invalidBoardUpdate.status).toBe(400);
+  });
+
   it("rejects invalid bodies and columns from the wrong board", async () => {
     const { projectId, boardId } = await createProjectAndBoard();
     const secondBoard = objectProp(
       (
         await api("POST", `/api/projects/${projectId}/boards`, {
-          name: "Other board",
+          name: "other-board",
         })
       ).body,
       "board",
@@ -562,14 +618,14 @@ describe("starter API", () => {
 
   async function createProjectAndBoard() {
     const project = objectProp(
-      (await api("POST", "/api/projects", { name: "Test project" })).body,
+      (await api("POST", "/api/projects", { name: "test-project" })).body,
       "project",
     );
     const projectId = stringProp(project, "id");
     const board = objectProp(
       (
         await api("POST", `/api/projects/${projectId}/boards`, {
-          name: "Test board",
+          name: "test-board",
         })
       ).body,
       "board",
@@ -682,7 +738,7 @@ describe("starter API with indexing errors", () => {
 
   it("keeps write endpoints successful when embedding indexing fails", async () => {
     const project = objectProp(
-      (await api("POST", "/api/projects", { name: "Project" })).body,
+      (await api("POST", "/api/projects", { name: "project" })).body,
       "project",
     );
     const projectId = stringProp(project, "id");
@@ -691,7 +747,7 @@ describe("starter API with indexing errors", () => {
       "POST",
       `/api/projects/${projectId}/boards`,
       {
-        name: "Indexing can fail",
+        name: "indexing-can-fail",
       },
     );
     expect(boardResponse.status).toBe(201);

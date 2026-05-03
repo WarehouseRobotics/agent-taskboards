@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, ne } from "drizzle-orm";
 import type { DatabaseClient } from "../db/client.js";
 import { boardColumns, boards } from "../db/schema.js";
 import { ApiError } from "../http/errors.js";
@@ -44,6 +44,7 @@ export class BoardService {
   async createBoard(projectId: string, input: BoardCreateInput) {
     const project = this.projectService.getProject(projectId, false);
     const inputColumns = input.columns ?? defaultBoardColumns;
+    this.ensureBoardNameAvailable(project.id, input.name);
 
     const created = this.db.transaction((tx) => {
       const board = tx
@@ -81,6 +82,89 @@ export class BoardService {
     return created;
   }
 
+  getBoardByRef(projectId: string, boardRef: string, includeArchived: boolean) {
+    const byId = includeArchived
+      ? this.db
+          .select()
+          .from(boards)
+          .where(and(eq(boards.id, boardRef), eq(boards.projectId, projectId)))
+          .get()
+      : this.db
+          .select()
+          .from(boards)
+          .where(
+            and(
+              eq(boards.id, boardRef),
+              eq(boards.projectId, projectId),
+              isNull(boards.archivedAt),
+            ),
+          )
+          .get();
+
+    if (byId) {
+      return byId;
+    }
+
+    const byName = includeArchived
+      ? this.db
+          .select()
+          .from(boards)
+          .where(and(eq(boards.name, boardRef), eq(boards.projectId, projectId)))
+          .get()
+      : this.db
+          .select()
+          .from(boards)
+          .where(
+            and(
+              eq(boards.name, boardRef),
+              eq(boards.projectId, projectId),
+              isNull(boards.archivedAt),
+            ),
+          )
+          .get();
+
+    if (!byName) {
+      throw new ApiError(404, "not_found", "Board not found");
+    }
+
+    return byName;
+  }
+
+  getBoardByRefAcrossProjects(boardRef: string, includeArchived: boolean) {
+    const byId = includeArchived
+      ? this.db.select().from(boards).where(eq(boards.id, boardRef)).all()
+      : this.db
+          .select()
+          .from(boards)
+          .where(and(eq(boards.id, boardRef), isNull(boards.archivedAt)))
+          .all();
+
+    if (byId.length === 1) {
+      return byId[0];
+    }
+
+    const byName = includeArchived
+      ? this.db.select().from(boards).where(eq(boards.name, boardRef)).all()
+      : this.db
+          .select()
+          .from(boards)
+          .where(and(eq(boards.name, boardRef), isNull(boards.archivedAt)))
+          .all();
+
+    if (byName.length === 1) {
+      return byName[0];
+    }
+    if (byName.length > 1) {
+      throw new ApiError(
+        400,
+        "invalid_request",
+        "Board name is ambiguous; provide projectId",
+      );
+    }
+
+    throw new ApiError(404, "not_found", "Board not found");
+  }
+
   getBoard(projectId: string, boardId: string, includeArchived: boolean) {
     const board = includeArchived
       ? this.db
@@ -114,6 +198,9 @@ export class BoardService {
   ) {
     this.projectService.getProject(projectId, false);
     this.getBoard(projectId, boardId, false);
+    if (input.name) {
+      this.ensureBoardNameAvailable(projectId, input.name, boardId);
+    }
     const board = this.db
       .update(boards)
       .set(input)
@@ -145,5 +232,33 @@ export class BoardService {
       .where(eq(boardColumns.boardId, boardId))
       .orderBy(asc(boardColumns.position))
       .all();
+  }
+
+  private ensureBoardNameAvailable(
+    projectId: string,
+    name: string,
+    exceptBoardId?: string,
+  ) {
+    const existing = exceptBoardId
+      ? this.db
+          .select({ id: boards.id })
+          .from(boards)
+          .where(
+            and(
+              eq(boards.projectId, projectId),
+              eq(boards.name, name),
+              ne(boards.id, exceptBoardId),
+            ),
+          )
+          .get()
+      : this.db
+          .select({ id: boards.id })
+          .from(boards)
+          .where(and(eq(boards.projectId, projectId), eq(boards.name, name)))
+          .get();
+
+    if (existing) {
+      throw new ApiError(409, "invalid_state", "Board name already exists");
+    }
   }
 }

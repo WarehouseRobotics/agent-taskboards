@@ -112,6 +112,58 @@ button:disabled {
   color: var(--status-blocked);
   font-size: var(--fs-12);
 }
+
+.name-input--valid {
+  border-color: color-mix(in oklch, var(--status-done) 55%, var(--line));
+}
+
+.name-input--invalid {
+  border-color: color-mix(in oklch, var(--status-blocked) 60%, var(--line));
+  background: color-mix(in oklch, var(--status-blocked) 6%, var(--bg-input));
+}
+
+.name-rules {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 20px;
+  color: var(--fg-faint);
+  font-size: var(--fs-11);
+}
+
+.name-rules__status {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--fg-faint);
+  font-family: var(--font-mono);
+  font-size: var(--fs-10);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.name-rules--valid {
+  color: var(--status-done);
+}
+
+.name-rules--valid .name-rules__status {
+  border-color: color-mix(in oklch, var(--status-done) 50%, var(--line));
+  background: color-mix(in oklch, var(--status-done) 10%, var(--bg-surface));
+  color: var(--status-done);
+}
+
+.name-rules--invalid {
+  color: var(--status-blocked);
+}
+
+.name-rules--invalid .name-rules__status {
+  border-color: color-mix(in oklch, var(--status-blocked) 55%, var(--line));
+  background: color-mix(in oklch, var(--status-blocked) 10%, var(--bg-surface));
+  color: var(--status-blocked);
+}
 .segmented {
   display: inline-flex;
   align-items: center;

@@ -20,6 +20,11 @@ The v1 UI should prioritize operational workflows:
 
 The first screen should be the working app, not a marketing landing page.
 
+Project and board name forms should show the URL-safe naming rule while the
+user types. Creating or renaming a project or board should make invalid
+characters visually obvious before submit, using the same rule enforced by the
+API: lowercase letters, numbers, underscores, and hyphens only.
+
 ## Board Experience
 
 The board view should make task state easy to scan and change:

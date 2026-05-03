@@ -55,7 +55,7 @@ describe("database schema", () => {
     const project = db
       .insert(projects)
       .values({
-        name: "Agent Taskboards",
+        name: "agent-taskboards",
         repositoryPath: "/workspace/agent-taskboards",
       })
       .returning()
@@ -65,7 +65,7 @@ describe("database schema", () => {
       .insert(boards)
       .values({
         projectId: project.id,
-        name: "Implementation",
+        name: "implementation",
       })
       .returning()
       .get();
@@ -208,7 +208,7 @@ describe("database schema", () => {
     const project = db
       .insert(projects)
       .values({
-        name: "Before update",
+        name: "before-update",
         createdAt: initialTimestamp,
         updatedAt: initialTimestamp,
       })

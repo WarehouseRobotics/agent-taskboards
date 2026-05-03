@@ -5,6 +5,11 @@ const jsonObjectSchema = z.record(z.unknown());
 const jsonArraySchema = z.array(z.unknown());
 const requiredString = z.string().trim().min(1);
 const nullableString = z.string().trim().min(1).nullable();
+const urlSafeNameMessage =
+  "Names may contain only lowercase letters, numbers, underscores, and hyphens";
+export const urlSafeNameSchema = requiredString.regex(/^[a-z0-9_-]+$/, {
+  message: urlSafeNameMessage,
+});
 
 export const includeArchivedQuerySchema = z.object({
   includeArchived: z
@@ -14,7 +19,7 @@ export const includeArchivedQuerySchema = z.object({
 });
 
 export const projectCreateSchema = z.object({
-  name: requiredString,
+  name: urlSafeNameSchema,
   description: nullableString.optional(),
   repositoryPath: nullableString.optional(),
   defaultBranch: nullableString.optional(),
@@ -31,7 +36,7 @@ const boardColumnInputSchema = z.object({
 
 export const boardCreateSchema = z
   .object({
-    name: requiredString,
+    name: urlSafeNameSchema,
     description: nullableString.optional(),
     metadata: jsonObjectSchema.optional(),
     columns: z.array(boardColumnInputSchema).min(1).optional(),
@@ -56,7 +61,7 @@ export const boardCreateSchema = z
   });
 
 export const boardUpdateSchema = z.object({
-  name: requiredString.optional(),
+  name: urlSafeNameSchema.optional(),
   description: nullableString.optional(),
   metadata: jsonObjectSchema.optional(),
 });

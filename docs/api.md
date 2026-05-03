@@ -88,6 +88,10 @@ Project fields:
 - `createdAt`
 - `updatedAt`
 
+Project `name` values are URL-safe slugs: lowercase letters, numbers,
+underscores, and hyphens only (`^[a-z0-9_-]+$`). Project names are globally
+unique, including archived projects.
+
 ### `GET /api/projects`
 
 Lists projects, excluding archived projects by default.
@@ -108,7 +112,7 @@ Request:
 
 ```json
 {
-  "name": "Agent Taskboards",
+  "name": "agent-taskboards",
   "description": "Local agent work tracking",
   "repositoryPath": "/workspace/agent-taskboards",
   "defaultBranch": "main",
@@ -166,6 +170,9 @@ Board fields:
 - optional `columns`
 - optional `tasks`
 
+Board `name` values use the same URL-safe slug format as project names. Board
+names are unique within a project, including archived boards.
+
 Column fields:
 
 - `id`
@@ -197,7 +204,7 @@ Request:
 
 ```json
 {
-  "name": "Implementation",
+  "name": "implementation",
   "description": "Starter API work",
   "metadata": {},
   "columns": [
