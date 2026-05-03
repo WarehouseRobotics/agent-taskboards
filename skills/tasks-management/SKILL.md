@@ -80,7 +80,7 @@ Keep the returned IDs visible in your prose so handoffs stay traceable.
 Search before create:
 
 ```sh
-taskboards get tasks q="<phrase>" semantic=true boardId=<boardId>
+taskboards get tasks q="<phrase>" semantic=true boardId=<boardNameOrId>
 ```
 
 Read one task with full context (use the `context` shortcut for handoff or
@@ -94,7 +94,7 @@ Create a task (`columnKey` defaults to the board's first column on the server
 side):
 
 ```sh
-taskboards post projects/<projectId>/boards/<boardId>/tasks \
+taskboards post projects/<projectNameOrId>/boards/<boardNameOrId>/tasks \
   --json '{"title":"...","description":"...","columnKey":"ready","priority":"normal","labels":[]}'
 ```
 
@@ -128,10 +128,14 @@ taskboards archive <taskId>
 Semantic search across boards, tasks, and comments:
 
 ```sh
-taskboards get search q="<phrase>" projectId=<projectId> limit=10
+taskboards get search q="<phrase>" projectId=<projectNameOrId> limit=10
 ```
 
 When you do not remember a route, run `taskboards help`.
+
+## Using names instead of IDs
+
+For projects and boards you can use their URL-compliant names instead of IDs. Tasks still require an ID.
 
 ## Response controls (token cost knobs)
 
@@ -159,7 +163,8 @@ section — read and use them instead of guessing.
   durable record, chat is not.
 - Archive instead of deleting; there is no hard-delete endpoint. Confirm with
   the user before archiving anything they did not ask to archive.
-- Keep IDs (`project_…`, `board_…`, `task_…`) visible in your replies.
+- Prefer using names for projects and boards, rather than IDs. Taskboards project and board names can sometimes be found in project instructions.
+- Keep object IDs or names (`project_…`, `board_…`, `task_…`) visible in your replies.
 
 ## Errors
 
