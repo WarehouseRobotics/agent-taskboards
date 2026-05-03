@@ -228,6 +228,9 @@ Agent interoperability must be visible without overwhelming humans.
   uses explicit Save/Cancel controls for title and description edits, supports
   Cmd/Ctrl+Enter to save, rejects blank titles inline, and gives restrained
   success feedback.
+- **Attachments stay compact.** Attachment rows use neutral chrome and preserve
+  dense scanning. Image attachments render as small fixed thumbnails from the
+  uploaded original, not as a gallery or large preview.
 - **Activity vs comments are typed.** Activity entries (status changes, links,
   creates) are single-line. Comments include a quoted body block.
 - **API terminology matches docs.** `authorKind`, `taskMove`, `boardId`, etc.

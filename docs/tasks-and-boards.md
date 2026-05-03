@@ -107,6 +107,7 @@ Task concepts:
 - priority
 - labels
 - external references
+- attachments for supporting files and screenshots
 - open-ended metadata
 - optional completion timestamp
 - active or archived state
@@ -129,6 +130,26 @@ Completing a task and moving a task to a done column are related but distinct:
 - `move` to a non-done column clears `completedAt`.
 
 Tasks are archived instead of hard-deleted by normal user and API flows.
+
+## Attachments
+
+Attachments are durable files associated with a task. They preserve supporting
+context such as screenshots, logs, exported artifacts, and other evidence that
+would be awkward to keep inline in the task description or comments.
+
+Attachment concepts:
+
+- durable ID
+- parent project, board, and task IDs
+- durable relative upload path and UI URL
+- original filename
+- content type
+- file size in bytes
+- creation timestamp
+
+The UI may preview attachments when the content type is useful for direct
+inspection. In particular, `image/*` attachments render as compact thumbnails in
+the task detail panel using the original uploaded file.
 
 ## Comments
 

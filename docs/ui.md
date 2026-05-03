@@ -49,6 +49,7 @@ the active field without clipped outlines.
 Task detail should preserve enough context for humans and agents to coordinate:
 
 - title, description, status, priority, labels, and references
+- attachments, with image attachments shown as compact thumbnails
 - comments for progress notes and handoffs
 - activity entries for important state changes
 - stable task ID visible enough for API or script usage
@@ -61,6 +62,11 @@ title and description are editable in place, saved explicitly with a Save action
 or Cmd/Ctrl+Enter, and cancellable before save. Blank titles should be rejected
 near the field. Successful edits should produce calm in-app feedback and refresh
 the board card and task context from the API.
+
+Attachments are listed in the task detail panel with filename, size, and a link
+to the stored upload. Attachments whose `contentType` starts with `image/`
+should render a small thumbnail from the original uploaded file URL; no separate
+thumbnail-generation flow is required for v1.
 
 Comments should be treated as durable task memory, not disposable chat.
 
