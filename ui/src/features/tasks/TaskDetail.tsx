@@ -154,7 +154,9 @@ export function TaskDetail({
   const taskId = task?.id ?? "";
   const serverTitle = task?.title ?? "";
   const serverDescription = task?.description ?? "";
-  const column = columns.find((item) => item.id === task?.columnId) ?? context?.board.columns?.find((item) => item.id === task?.columnId);
+  const boardColumns = columns.length ? columns : (context?.board.columns ?? []);
+  const column = boardColumns.find((item) => item.id === task?.columnId);
+  const doneColumn = boardColumns.find((item) => item.isDone);
   const entries = useMemo(
     () => mergeTimeline(context?.comments ?? [], showActivity ? context?.activity ?? [] : []),
     [context?.activity, context?.comments, showActivity],
@@ -434,6 +436,15 @@ export function TaskDetail({
     setComment("");
   };
 
+  const markTaskDone = async () => {
+    if (doneColumn && task.columnId !== doneColumn.id) {
+      await onMoveTask(task.id, { columnId: doneColumn.id });
+      return;
+    }
+
+    await onCompleteTask(task.id);
+  };
+
   const uploadAttachmentFiles = async (files: File[]) => {
     if (files.length === 0 || uploadingAttachment) {
       return;
@@ -651,11 +662,11 @@ export function TaskDetail({
           value={task.columnId}
           onChange={(event) => onMoveTask(task.id, { columnId: event.target.value })}
         >
-          {columns.map((item) => (
+          {boardColumns.map((item) => (
             <option key={item.id} value={item.id}>{item.name}</option>
           ))}
         </select>
-        <Button icon={<Icon name="check" />} onClick={() => onCompleteTask(task.id)} variant="outline">Complete</Button>
+        <Button icon={<Icon name="check" />} onClick={markTaskDone} variant="outline">Done</Button>
         <Button icon={<Icon name="archive" />} onClick={() => onArchiveTask(task.id)} variant="danger">Archive</Button>
       </div>
       <section className="detail-section">
