@@ -340,20 +340,36 @@ describe("agent markdown API", () => {
     expect(archive.text).toContain("Comments and activity remain attached.");
   });
 
-  it("exposes task attachment paths to agents without an agent delete endpoint", async () => {
+  it("uploads and exposes task attachment paths to agents without an agent delete endpoint", async () => {
     const { projectId, boardId } = await createProjectAndBoard();
     const taskId = await createTask(projectId, boardId, {
       title: "Inspect uploaded files",
       columnKey: "ready",
     });
 
+    const missingFile = await fetch(
+      `${baseUrl}/api/agents/tasks/${taskId}/attachments?format=json`,
+      { method: "POST", body: new FormData() },
+    );
+    expect(missingFile.status).toBe(400);
+    expect(await missingFile.text()).toContain("invalid_request");
+
     const upload = await uploadFile(
-      `/api/tasks/${taskId}/attachments`,
+      `/api/agents/tasks/${taskId}/attachments?format=json`,
       "trace.txt",
       "agent readable attachment",
       "text/plain",
     );
     expect(upload.status).toBe(201);
+    expect(upload.contentType).toContain("text/markdown");
+    const uploadBlock = jsonBlock(upload.text);
+    const uploadedAttachment = objectProp(uploadBlock, "attachment");
+    expect(stringProp(objectProp(uploadBlock, "task"), "id")).toBe(taskId);
+    expect(stringProp(uploadedAttachment, "path")).toMatch(/^tasks\//);
+    expect(uploadedAttachment.url).toBeUndefined();
+    expect(
+      stringProp(objectProp(uploadBlock, "activity"), "eventType"),
+    ).toBe("attachment.created");
 
     const attachments = await api(
       "GET",
@@ -438,7 +454,8 @@ describe("agent markdown API", () => {
 
     return {
       status: response.status,
-      body: (await response.json()) as unknown,
+      contentType: response.headers.get("content-type") ?? "",
+      text: await response.text(),
     };
   }
 

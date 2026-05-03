@@ -3,10 +3,11 @@
 The API is the main interface for coding agents and scripts. It exposes stable
 JSON operations for managing local task state without driving the UI. The
 implemented starter API covers projects, boards, board columns, tasks, task
-movement, task completion, archival, comments, activity, and task context.
+movement, task completion, archival, comments, activity, task attachments, and
+task context.
 
 Text embedding search is implemented for boards, tasks, and comments. Broader
-maintenance APIs and file attachment APIs are still planned areas.
+maintenance APIs are still planned areas.
 
 ## API Principles
 
@@ -390,6 +391,47 @@ move the task to a done column.
 
 Sets `archivedAt` and appends a `task.archived` activity entry.
 
+## Task Attachments
+
+Attachment fields:
+
+- `id`
+- `projectId`
+- `boardId`
+- `taskId`
+- `relativePath`
+- `url`
+- `originalName`
+- `contentType`
+- `sizeBytes`
+- `createdAt`
+
+### `GET /api/tasks/:taskId/attachments`
+
+Lists attachments for a task in creation order.
+
+### `POST /api/tasks/:taskId/attachments`
+
+Uploads an attachment to an active task and appends an `attachment.created`
+activity entry. The request must be `multipart/form-data` with a required
+`file` field. Uploads are limited to 25 MiB.
+
+Response status: `201`
+
+Response:
+
+```json
+{
+  "attachment": {},
+  "activity": {}
+}
+```
+
+### `DELETE /api/tasks/:taskId/attachments/:attachmentId`
+
+Deletes an attachment record for the task, removes the uploaded file
+best-effort, and appends an `attachment.deleted` activity entry.
+
 ## Comments, Activity, And Context
 
 Comment fields:
@@ -556,4 +598,3 @@ in the starter API yet:
 
 - workflow column editing after board creation
 - hard deletion and purge operations
-- file attachments and upload workflows

@@ -30,6 +30,7 @@ Shortcuts:
   taskboards complete <taskId>             POST /api/agents/tasks/<id>/complete
   taskboards archive <taskId>              POST /api/agents/tasks/<id>/archive
   taskboards comment <taskId> <body...>    POST /api/agents/tasks/<id>/comments
+  taskboards attach <taskId> <filePath>    POST /api/agents/tasks/<id>/attachments
 
 Env:
   TASKBOARDS_HOST_URL    base URL (default http://localhost:8142)
@@ -85,6 +86,7 @@ content_type=""
 shortcut_kind=""
 declare -a query=()
 declare -a curl_data_args=()
+declare -a curl_form_args=()
 
 case "$cmd" in
   get|GET)       verb="GET" ;;
@@ -114,6 +116,12 @@ case "$cmd" in
     [[ $# -ge 1 ]] || die "comment: missing taskId"
     verb="POST"; path="tasks/$1/comments"; shortcut_kind="comment"
     shift ;;
+  attach)
+    [[ $# -ge 2 ]] || die "attach: usage 'attach <taskId> <filePath>'"
+    [[ -f "$2" ]] || die "attach: file not found: $2"
+    verb="POST"; path="tasks/$1/attachments"; shortcut_kind="attach"
+    curl_form_args+=(--form "file=@$2")
+    shift 2 ;;
   *) die "unknown verb or shortcut: $cmd (try --help)" ;;
 esac
 
@@ -153,6 +161,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ "$shortcut_kind" == "attach" && ( -n "$explicit_json" || -n "$explicit_data" ) ]]; then
+  die "attach: use key=value options only; the request body comes from <filePath>"
+fi
+
 # Auto-fill comment body when the caller did not supply --json/--data.
 if [[ "$shortcut_kind" == "comment" && -z "$explicit_json" && -z "$explicit_data" ]]; then
   [[ ${#comment_body_parts[@]} -gt 0 ]] || die "comment: missing body"
@@ -184,6 +196,7 @@ declare -a curl_args=(-sS -X "$verb")
 [[ -n "$content_type" ]] && curl_args+=(-H "Content-Type: $content_type")
 [[ -n "$body" ]]         && curl_args+=(--data-raw "$body")
 [[ ${#curl_data_args[@]} -gt 0 ]] && curl_args+=("${curl_data_args[@]}")
+[[ ${#curl_form_args[@]} -gt 0 ]] && curl_args+=("${curl_form_args[@]}")
 curl_args+=("$url")
 
 rc=0

@@ -42,6 +42,7 @@ import type { MigrationResult } from "../db/migrate.js";
 import type { ApiServices } from "../services/index.js";
 import type { SearchInput } from "../models/request-schemas.js";
 import type { SearchResult } from "../services/search-service.js";
+import { uploadAttachmentFile } from "./attachment-upload.js";
 import {
   agentReadQuerySchema,
   agentSearchQuerySchema,
@@ -87,7 +88,7 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
             title: "What I found",
             lines: [
               "- Read endpoints support `format=toon|yaml|json|none` and `view=brief|normal|full`.",
-              "- Writes accept the same JSON bodies as the canonical `/api` endpoints.",
+              "- Writes accept canonical JSON bodies, except attachment uploads which use multipart `file`.",
               "- Use task context endpoints when you need comments and activity for handoff.",
             ],
           },
@@ -99,6 +100,7 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
             "GET /api/agents/tasks",
             "GET /api/agents/tasks/:taskId/context",
             "GET /api/agents/tasks/:taskId/attachments",
+            "POST /api/agents/tasks/:taskId/attachments",
             "POST /api/agents/projects/:projectId/boards/:boardId/tasks",
             "POST /api/agents/tasks/:taskId/comments",
             "GET /api/agents/search?q=<query>",
@@ -966,6 +968,53 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
   });
 
   app.post(
+    "/api/agents/tasks/:taskId/attachments",
+    uploadAttachmentFile,
+    asyncHandler(async (req, res) => {
+      const query = parseQuery(req, agentReadQuerySchema);
+      if (!req.file) {
+        throw new ApiError(400, "invalid_request", "Attachment file is required");
+      }
+
+      const created = await services.attachments.createTaskAttachment(
+        req.params.taskId,
+        req.file,
+      );
+      const context = loadTaskWithParents(
+        services,
+        created.attachment.taskId,
+        true,
+      );
+
+      sendAgentMarkdown(
+        res,
+        {
+          outcome: `Uploaded attachment \`${created.attachment.id}\` to task \`${context.task.id}\`.`,
+          sections: [
+            {
+              title: "What changed",
+              lines: [
+                `- Stored \`${created.attachment.originalName}\` at \`${created.attachment.relativePath}\`.`,
+                `- Generated activity \`${created.activity.id}\`.`,
+              ],
+            },
+          ],
+          data: {
+            task: { id: context.task.id, title: context.task.title },
+            attachment: serializeAgentAttachment(created.attachment),
+            activity: serializeActivity(created.activity),
+          },
+          nextCalls: [
+            `GET /api/agents/tasks/${context.task.id}/attachments`,
+            `GET /api/agents/tasks/${context.task.id}/context`,
+          ],
+        },
+        { status: 201, format: query.format },
+      );
+    }),
+  );
+
+  app.post(
     "/api/agents/tasks/:taskId/comments",
     asyncHandler(async (req, res) => {
       const query = parseQuery(req, agentReadQuerySchema);
@@ -1730,6 +1779,7 @@ function taskNextCalls(taskId: string) {
   return [
     `GET /api/agents/tasks/${taskId}/context?include=comments,activity`,
     `GET /api/agents/tasks/${taskId}/attachments`,
+    `POST /api/agents/tasks/${taskId}/attachments`,
     `GET /api/agents/tasks/${taskId}/comments`,
     `GET /api/agents/tasks/${taskId}/activity`,
     `POST /api/agents/tasks/${taskId}/move`,

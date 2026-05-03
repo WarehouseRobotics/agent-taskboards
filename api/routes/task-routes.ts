@@ -1,5 +1,4 @@
-import type { Express, RequestHandler } from "express";
-import multer from "multer";
+import type { Express } from "express";
 import { asyncHandler } from "../http/async-handler.js";
 import { ApiError } from "../http/errors.js";
 import {
@@ -22,34 +21,8 @@ import {
   serializeProject,
   serializeTask,
 } from "../models/serializers.js";
-import { maxAttachmentBytes } from "../services/attachment-service.js";
 import type { ApiServices } from "../services/index.js";
-
-const attachmentUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: maxAttachmentBytes },
-});
-
-const uploadAttachmentFile: RequestHandler = (req, res, next) => {
-  attachmentUpload.single("file")(req, res, (error: unknown) => {
-    if (!error) {
-      next();
-      return;
-    }
-
-    if (error instanceof multer.MulterError) {
-      next(
-        new ApiError(400, "invalid_request", "Attachment upload is invalid", {
-          field: error.field,
-          reason: error.code,
-        }),
-      );
-      return;
-    }
-
-    next(error);
-  });
-};
+import { uploadAttachmentFile } from "./attachment-upload.js";
 
 export function registerTaskRoutes(app: Express, services: ApiServices) {
   app.get("/api/projects/:projectId/boards/:boardId/tasks", (req, res) => {

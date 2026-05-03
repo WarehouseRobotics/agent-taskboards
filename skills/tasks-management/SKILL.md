@@ -22,9 +22,10 @@ All calls go through the bash wrapper at:
 ${CLAUDE_SKILL_DIR}/scripts/taskboards
 ```
 
-It absorbs base-URL detection, bearer auth, query-string encoding, and JSON
-body construction for the high-traffic shortcuts. Do not hand-roll `curl`
-unless you need an endpoint or option the wrapper does not cover.
+It absorbs base-URL detection, bearer auth, query-string encoding, JSON body
+construction, and multipart attachment upload for the high-traffic shortcuts.
+Do not hand-roll `curl` unless you need an endpoint or option the wrapper does
+not cover.
 
 Invocation grammar:
 
@@ -61,6 +62,7 @@ Read from the shell; the wrapper handles the rest:
 | `taskboards complete <taskId>`          | `POST /api/agents/tasks/<id>/complete`                                   |
 | `taskboards archive <taskId>`           | `POST /api/agents/tasks/<id>/archive`                                    |
 | `taskboards comment <taskId> <body...>` | `POST /api/agents/tasks/<id>/comments` with auto-filled agent identity   |
+| `taskboards attach <taskId> <filePath>` | `POST /api/agents/tasks/<id>/attachments` with multipart `file` upload   |
 
 The `comment` shortcut auto-fills `authorType=agent`, `authorName`, and
 `authorRef` from env. Pass `--json '{...}'` to override the whole body.
@@ -109,6 +111,12 @@ Comment (identity auto-filled from env):
 
 ```sh
 taskboards comment <taskId> "Implementation started; see commit abc123."
+```
+
+Attach evidence such as a screenshot, log, or trace file:
+
+```sh
+taskboards attach <taskId> ./screenshot.png
 ```
 
 Update fields (`title`, `description`, `priority`, `labels`,

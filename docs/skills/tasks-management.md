@@ -49,12 +49,14 @@ Built-in shortcuts:
   state changes
 - `taskboards comment <taskId> <body...>` to append an agent comment with
   identity auto-filled from env
+- `taskboards attach <taskId> <filePath>` to upload an attachment such as a
+  screenshot, log, or trace file
 
 Responses are passed through verbatim. The agentic API already returns markdown
 with TOON, YAML, JSON, or no structured block depending on `format=`, so agents
 can request the form they want without wrapper-side reshaping. Atomic mutations
-(move, complete, archive, patch, comment-create) still emit a TOON block with
-the new IDs that agents can scan or pipe into other tooling.
+(move, complete, archive, patch, comment-create, attachment-create) still emit
+a TOON block with the new IDs that agents can scan or pipe into other tooling.
 
 Wrapper environment:
 

@@ -24,7 +24,7 @@ the slug name. Resolution is exact and tries ID first, then name.
   response.
 - Avoid context overload when boards, comments, or activity streams are large.
 - Keep write request bodies deterministic JSON even when responses are
-  markdown.
+  markdown, except multipart attachment uploads.
 - Make the response readable by humans while still giving agents parseable
   facts.
 
@@ -366,6 +366,24 @@ mirrors the canonical API and does not change the task column.
 Archives a task. The response should state that comments and activity remain
 attached and searchable when archived content is included.
 
+### `GET /api/agents/tasks/:taskId/attachments`
+
+Lists attachments for a task. Attachment records expose durable upload paths for
+agents, not public UI URLs.
+
+### `POST /api/agents/tasks/:taskId/attachments`
+
+Uploads an attachment to an active task using `multipart/form-data` with a
+required `file` field. This is intended for agent evidence such as screenshots,
+logs, and traces.
+
+The response should include the task ID and title, attachment ID, durable
+`path`, original file name, content type, size, and generated
+`attachment.created` activity ID.
+
+Agent delete is intentionally not exposed; use the canonical JSON API or UI for
+attachment deletion.
+
 ## Comments, Activity, And Context
 
 ### `GET /api/agents/tasks/:taskId/context`
@@ -512,5 +530,7 @@ HTTP status codes should also match the canonical JSON API.
   and fetch exact task context from stable IDs.
 - An agent can create, move, comment on, complete, and archive tasks through
   `/api/agents` while preserving canonical state-transition rules.
+- An agent can upload task attachments through `/api/agents` and receive a
+  durable path suitable for follow-up context.
 - Large boards and chatty tasks return clear truncation notices and exact next
   calls instead of overflowing the response.
