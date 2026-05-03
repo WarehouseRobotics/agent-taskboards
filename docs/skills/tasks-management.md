@@ -1,5 +1,6 @@
 # Task Management Skill
 
+
 This planned skill teaches coding agents how to use Agent Taskboards as local
 task memory and workflow state. It is a design target for the future skill and
 bash control script; it is not yet a final executable skill.
@@ -18,6 +19,8 @@ Agents should use the taskboard API to:
 The skill should make taskboard usage reliable for agents such as Codex and
 Claude Code without requiring them to manually construct every API call.
 
+There should be a concise idiomatic surface for most common tasks, to ensure efficient tool-call token usage.
+
 ## Control Script Contract
 
 The planned skill should ship with a bash control script that wraps the local
@@ -35,8 +38,9 @@ The script should provide commands for:
 - text and semantic search
 - maintenance actions such as embedding reindexing
 
-Commands should return deterministic JSON by default so agents can parse them
-with `jq` or equivalent tooling.
+Task and context fetching commands will usually return formatted Markdown content, ready for use in context.
+Other simpler atomic update commands should return deterministic JSON by default so agents can parse them
+with `jq` or equivalent tooling. 
 
 ## Agent Workflow
 
