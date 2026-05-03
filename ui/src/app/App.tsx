@@ -431,7 +431,6 @@ export function App() {
             setNewBoardOpen(false);
             navigate({ view: "board", projectId: selectedProjectId, boardId: created.id, taskId: null });
             await loadProjects(selectedProjectId, created.id);
-            await loadBoard();
           }}
         />
       )}

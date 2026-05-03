@@ -231,13 +231,24 @@ export function useBoard(
     loadBoard();
   }, [loadBoard]);
 
+  const selectedBoard =
+    board?.projectId === activeProjectId && board.id === activeBoardId ? board : null;
+  const loadingSelectedBoard = Boolean(activeProjectId && activeBoardId && !selectedBoard && !error);
   const columns = useMemo(
-    () => [...(board?.columns ?? [])].sort((a, b) => a.position - b.position),
-    [board?.columns],
+    () => [...(selectedBoard?.columns ?? [])].sort((a, b) => a.position - b.position),
+    [selectedBoard?.columns],
   );
-  const tasks = board?.tasks ?? [];
+  const tasks = selectedBoard?.tasks ?? [];
 
-  return { board, columns, error, loadBoard, loadingBoard, syncError, tasks };
+  return {
+    board: selectedBoard,
+    columns,
+    error,
+    loadBoard,
+    loadingBoard: loadingBoard || loadingSelectedBoard,
+    syncError,
+    tasks,
+  };
 }
 
 export function useTaskContexts(activeTaskId: string | null) {
