@@ -1,6 +1,6 @@
 ---
 name: tasks-management
-description: Manage coding tasks boards: read, create, move, comment on, and search Kanban tasks/boards/projects in coding agent taskboards.
+description: Manage coding tasks boards - read, create, move, comment on, and search Kanban tasks/boards/projects in coding agent taskboards.
 metadata:
   author: WarehouseRobotics
   version: "0.2.0"
