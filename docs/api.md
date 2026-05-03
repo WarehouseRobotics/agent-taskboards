@@ -155,6 +155,12 @@ Mutable fields:
 Archives a project by setting `archivedAt`. It does not hard-delete child
 boards, tasks, comments, or activity.
 
+### `DELETE /api/projects/:projectId`
+
+Hard-deletes a project. This permanently deletes the project and all related
+boards, columns, tasks, comments, activity, attachment records, uploaded
+attachment files, search documents, and search vectors.
+
 ## Boards
 
 Board fields:
@@ -254,6 +260,12 @@ Workflow column editing is not implemented yet.
 
 Archives a board by setting `archivedAt`. It does not hard-delete tasks,
 comments, or activity.
+
+### `DELETE /api/projects/:projectId/boards/:boardId`
+
+Hard-deletes a board. This permanently deletes the board and all related
+columns, tasks, comments, activity, attachment records, uploaded attachment
+files, search documents, and search vectors. The parent project is not deleted.
 
 ## Tasks
 

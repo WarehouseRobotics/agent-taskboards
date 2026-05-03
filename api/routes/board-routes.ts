@@ -94,4 +94,22 @@ export function registerBoardRoutes(app: Express, services: ApiServices) {
       }),
     });
   });
+
+  app.delete(
+    "/api/projects/:projectId/boards/:boardId",
+    asyncHandler(async (req, res) => {
+      const deleted = services.boards.deleteBoard(
+        req.params.projectId,
+        req.params.boardId,
+      );
+      await services.attachments.removeAttachmentFilesBestEffort(
+        deleted.attachmentRelativePaths,
+      );
+
+      res.json({
+        board: serializeBoard(deleted.board),
+        deleted: { attachmentFiles: deleted.attachmentRelativePaths.length },
+      });
+    }),
+  );
 }

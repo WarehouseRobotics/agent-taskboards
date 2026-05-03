@@ -3,11 +3,21 @@ import type { AddressInfo } from "node:net";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./app.js";
 import { createDatabaseClient, type DatabaseClient } from "./db/client.js";
 import { runMigrations } from "./db/migrate.js";
-import { searchDocuments } from "./db/schema.js";
+import {
+  boardColumns,
+  boards,
+  projects,
+  searchDocuments,
+  taskActivity,
+  taskAttachments,
+  taskComments,
+  tasks,
+} from "./db/schema.js";
 import { createFakeEmbeddingModel } from "./testing/fake-embedding-model.js";
 
 describe("starter API", () => {
@@ -434,6 +444,369 @@ describe("starter API", () => {
     expect(archivedRead.status).toBe(200);
   });
 
+  it("hard-deletes boards and projects with related rows, vectors, and attachment files", async () => {
+    const { projectId, boardId } = await createProjectAndBoard();
+    const task = objectProp(
+      (
+        await api(
+          "POST",
+          `/api/projects/${projectId}/boards/${boardId}/tasks`,
+          {
+            title: "Delete the whole board",
+            description: "This task should disappear with the board.",
+          },
+        )
+      ).body,
+      "task",
+    );
+    const taskId = stringProp(task, "id");
+    await api("POST", `/api/tasks/${taskId}/comments`, {
+      authorType: "agent",
+      body: "This comment should cascade away.",
+    });
+
+    const upload = await uploadFile(
+      `/api/tasks/${taskId}/attachments`,
+      "board-notes.txt",
+      "board attachment",
+      "text/plain",
+    );
+    const boardAttachmentPath = stringProp(
+      objectProp(upload.body, "attachment"),
+      "relativePath",
+    );
+    const uploadsPath = process.env.TASKBOARDS_UPLOADS_PATH;
+    if (!uploadsPath) {
+      throw new Error("Expected uploads path for test");
+    }
+    const boardAttachmentFile = join(uploadsPath, boardAttachmentPath);
+    expect(existsSync(boardAttachmentFile)).toBe(true);
+
+    const deletedBoard = await api(
+      "DELETE",
+      `/api/projects/${projectId}/boards/${boardId}`,
+    );
+    expect(deletedBoard.status).toBe(200);
+    expect(stringProp(objectProp(deletedBoard.body, "board"), "id")).toBe(
+      boardId,
+    );
+    expect(
+      numberProp(objectProp(deletedBoard.body, "deleted"), "attachmentFiles"),
+    ).toBe(1);
+    expect(existsSync(boardAttachmentFile)).toBe(false);
+
+    const missingBoard = await api(
+      "GET",
+      `/api/projects/${projectId}/boards/${boardId}?includeArchived=true`,
+    );
+    expect(missingBoard.status).toBe(404);
+    const missingTask = await api(
+      "GET",
+      `/api/tasks/${taskId}?includeArchived=true`,
+    );
+    expect(missingTask.status).toBe(404);
+
+    if (!client) {
+      throw new Error("Expected test database client");
+    }
+    expect(
+      client.db.select().from(projects).where(eq(projects.id, projectId)).all(),
+    ).toHaveLength(1);
+    expect(
+      client.db.select().from(boards).where(eq(boards.id, boardId)).all(),
+    ).toHaveLength(0);
+    expect(
+      client.db
+        .select()
+        .from(boardColumns)
+        .where(eq(boardColumns.boardId, boardId))
+        .all(),
+    ).toHaveLength(0);
+    expect(
+      client.db.select().from(tasks).where(eq(tasks.id, taskId)).all(),
+    ).toHaveLength(0);
+    expect(
+      client.db
+        .select()
+        .from(taskComments)
+        .where(eq(taskComments.taskId, taskId))
+        .all(),
+    ).toHaveLength(0);
+    expect(
+      client.db
+        .select()
+        .from(taskActivity)
+        .where(eq(taskActivity.taskId, taskId))
+        .all(),
+    ).toHaveLength(0);
+    expect(
+      client.db
+        .select()
+        .from(taskAttachments)
+        .where(eq(taskAttachments.taskId, taskId))
+        .all(),
+    ).toHaveLength(0);
+    expect(client.db.select().from(searchDocuments).all()).toHaveLength(0);
+    expect(searchVectorCount()).toBe(0);
+
+    const deletedProject = objectProp(
+      (await api("POST", "/api/projects", { name: "project-delete" })).body,
+      "project",
+    );
+    const deletedProjectId = stringProp(deletedProject, "id");
+    const deletedProjectBoard = objectProp(
+      (
+        await api("POST", `/api/projects/${deletedProjectId}/boards`, {
+          name: "project-delete-board",
+        })
+      ).body,
+      "board",
+    );
+    const deletedProjectBoardId = stringProp(deletedProjectBoard, "id");
+    const deletedProjectTask = objectProp(
+      (
+        await api(
+          "POST",
+          `/api/projects/${deletedProjectId}/boards/${deletedProjectBoardId}/tasks`,
+          { title: "Delete with project" },
+        )
+      ).body,
+      "task",
+    );
+    const deletedProjectTaskId = stringProp(deletedProjectTask, "id");
+    await api("POST", `/api/tasks/${deletedProjectTaskId}/comments`, {
+      authorType: "agent",
+      body: "Project-level delete should remove this too.",
+    });
+    const projectUpload = await uploadFile(
+      `/api/tasks/${deletedProjectTaskId}/attachments`,
+      "project-notes.txt",
+      "project attachment",
+      "text/plain",
+    );
+    const projectAttachmentPath = stringProp(
+      objectProp(projectUpload.body, "attachment"),
+      "relativePath",
+    );
+    const projectAttachmentFile = join(uploadsPath, projectAttachmentPath);
+    expect(existsSync(projectAttachmentFile)).toBe(true);
+
+    const deleted = await api("DELETE", `/api/projects/${deletedProjectId}`);
+    expect(deleted.status).toBe(200);
+    expect(stringProp(objectProp(deleted.body, "project"), "id")).toBe(
+      deletedProjectId,
+    );
+    expect(
+      numberProp(objectProp(deleted.body, "deleted"), "attachmentFiles"),
+    ).toBe(1);
+    expect(existsSync(projectAttachmentFile)).toBe(false);
+
+    expect(
+      client.db
+        .select()
+        .from(projects)
+        .where(eq(projects.id, deletedProjectId))
+        .all(),
+    ).toHaveLength(0);
+    expect(
+      client.db
+        .select()
+        .from(boards)
+        .where(eq(boards.projectId, deletedProjectId))
+        .all(),
+    ).toHaveLength(0);
+    expect(
+      client.db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.projectId, deletedProjectId))
+        .all(),
+    ).toHaveLength(0);
+    expect(
+      client.db
+        .select()
+        .from(taskAttachments)
+        .where(eq(taskAttachments.projectId, deletedProjectId))
+        .all(),
+    ).toHaveLength(0);
+    expect(client.db.select().from(searchDocuments).all()).toHaveLength(0);
+    expect(searchVectorCount()).toBe(0);
+  });
+
+  it("keeps unrelated projects and boards when hard-deleting scoped resources", async () => {
+    const project = objectProp(
+      (await api("POST", "/api/projects", { name: "scoped-delete" })).body,
+      "project",
+    );
+    const projectId = stringProp(project, "id");
+    const targetBoard = objectProp(
+      (
+        await api("POST", `/api/projects/${projectId}/boards`, {
+          name: "target-board",
+        })
+      ).body,
+      "board",
+    );
+    const targetBoardId = stringProp(targetBoard, "id");
+    const siblingBoard = objectProp(
+      (
+        await api("POST", `/api/projects/${projectId}/boards`, {
+          name: "sibling-board",
+        })
+      ).body,
+      "board",
+    );
+    const siblingBoardId = stringProp(siblingBoard, "id");
+
+    const otherProject = objectProp(
+      (await api("POST", "/api/projects", { name: "unrelated-project" })).body,
+      "project",
+    );
+    const otherProjectId = stringProp(otherProject, "id");
+    const otherBoard = objectProp(
+      (
+        await api("POST", `/api/projects/${otherProjectId}/boards`, {
+          name: "unrelated-board",
+        })
+      ).body,
+      "board",
+    );
+    const otherBoardId = stringProp(otherBoard, "id");
+
+    const uploadsPath = process.env.TASKBOARDS_UPLOADS_PATH;
+    if (!uploadsPath) {
+      throw new Error("Expected uploads path for test");
+    }
+
+    const target = await createTaskCommentAndAttachment(
+      projectId,
+      targetBoardId,
+      "Delete only this board",
+      "target.txt",
+    );
+    const sibling = await createTaskCommentAndAttachment(
+      projectId,
+      siblingBoardId,
+      "Keep this sibling board",
+      "sibling.txt",
+    );
+    const other = await createTaskCommentAndAttachment(
+      otherProjectId,
+      otherBoardId,
+      "Keep this other project",
+      "other.txt",
+    );
+
+    const targetAttachmentFile = join(uploadsPath, target.attachmentPath);
+    const siblingAttachmentFile = join(uploadsPath, sibling.attachmentPath);
+    const otherAttachmentFile = join(uploadsPath, other.attachmentPath);
+    expect(existsSync(targetAttachmentFile)).toBe(true);
+    expect(existsSync(siblingAttachmentFile)).toBe(true);
+    expect(existsSync(otherAttachmentFile)).toBe(true);
+
+    const deletedBoard = await api(
+      "DELETE",
+      `/api/projects/${projectId}/boards/${targetBoardId}`,
+    );
+    expect(deletedBoard.status).toBe(200);
+    expect(existsSync(targetAttachmentFile)).toBe(false);
+
+    if (!client) {
+      throw new Error("Expected test database client");
+    }
+
+    expect(
+      client.db.select().from(boards).where(eq(boards.id, siblingBoardId)).all(),
+    ).toHaveLength(1);
+    expect(
+      client.db.select().from(tasks).where(eq(tasks.id, sibling.taskId)).all(),
+    ).toHaveLength(1);
+    expect(
+      client.db
+        .select()
+        .from(taskComments)
+        .where(eq(taskComments.id, sibling.commentId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      client.db.select().from(boards).where(eq(boards.id, otherBoardId)).all(),
+    ).toHaveLength(1);
+    expect(
+      client.db.select().from(tasks).where(eq(tasks.id, other.taskId)).all(),
+    ).toHaveLength(1);
+    expect(
+      client.db
+        .select()
+        .from(searchDocuments)
+        .where(eq(searchDocuments.sourceId, siblingBoardId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      client.db
+        .select()
+        .from(searchDocuments)
+        .where(eq(searchDocuments.sourceId, other.taskId))
+        .all(),
+    ).toHaveLength(1);
+    expect(existsSync(siblingAttachmentFile)).toBe(true);
+    expect(existsSync(otherAttachmentFile)).toBe(true);
+
+    const deletedProject = await api("DELETE", `/api/projects/${projectId}`);
+    expect(deletedProject.status).toBe(200);
+    expect(existsSync(siblingAttachmentFile)).toBe(false);
+
+    expect(
+      client.db
+        .select()
+        .from(projects)
+        .where(eq(projects.id, otherProjectId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      client.db.select().from(boards).where(eq(boards.id, otherBoardId)).all(),
+    ).toHaveLength(1);
+    expect(
+      client.db.select().from(tasks).where(eq(tasks.id, other.taskId)).all(),
+    ).toHaveLength(1);
+    expect(
+      client.db
+        .select()
+        .from(taskComments)
+        .where(eq(taskComments.id, other.commentId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      client.db
+        .select()
+        .from(taskAttachments)
+        .where(eq(taskAttachments.taskId, other.taskId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      client.db
+        .select()
+        .from(searchDocuments)
+        .where(eq(searchDocuments.sourceId, otherBoardId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      client.db
+        .select()
+        .from(searchDocuments)
+        .where(eq(searchDocuments.sourceId, other.taskId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      client.db
+        .select()
+        .from(searchDocuments)
+        .where(eq(searchDocuments.sourceId, other.commentId))
+        .all(),
+    ).toHaveLength(1);
+    expect(searchVectorCount()).toBe(3);
+    expect(existsSync(otherAttachmentFile)).toBe(true);
+  });
+
   it("searches indexed boards, tasks, and comments and respects archived filters", async () => {
     const projectResponse = await api("POST", "/api/projects", {
       name: "search-project",
@@ -671,6 +1044,56 @@ describe("starter API", () => {
       status: response.status,
       body: (await response.json()) as unknown,
     };
+  }
+
+  async function createTaskCommentAndAttachment(
+    projectId: string,
+    boardId: string,
+    title: string,
+    fileName: string,
+  ) {
+    const task = objectProp(
+      (
+        await api("POST", `/api/projects/${projectId}/boards/${boardId}/tasks`, {
+          title,
+        })
+      ).body,
+      "task",
+    );
+    const taskId = stringProp(task, "id");
+    const comment = objectProp(
+      (
+        await api("POST", `/api/tasks/${taskId}/comments`, {
+          authorType: "agent",
+          body: `Comment for ${title}`,
+        })
+      ).body,
+      "comment",
+    );
+    const attachment = objectProp(
+      (
+        await uploadFile(
+          `/api/tasks/${taskId}/attachments`,
+          fileName,
+          `attachment for ${title}`,
+          "text/plain",
+        )
+      ).body,
+      "attachment",
+    );
+
+    return {
+      taskId,
+      commentId: stringProp(comment, "id"),
+      attachmentPath: stringProp(attachment, "relativePath"),
+    };
+  }
+
+  function searchVectorCount() {
+    const row = client?.sqlite
+      .prepare("SELECT count(*) AS count FROM search_document_vectors")
+      .get() as { count: number } | undefined;
+    return row?.count ?? 0;
   }
 });
 

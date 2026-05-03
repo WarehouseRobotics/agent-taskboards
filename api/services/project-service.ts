@@ -1,6 +1,6 @@
 import { and, asc, eq, isNull, ne } from "drizzle-orm";
 import type { DatabaseClient } from "../db/client.js";
-import { projects } from "../db/schema.js";
+import { projects, taskAttachments } from "../db/schema.js";
 import { ApiError } from "../http/errors.js";
 import type {
   ProjectCreateInput,
@@ -105,6 +105,24 @@ export class ProjectService {
       .where(eq(projects.id, projectId))
       .returning()
       .get();
+  }
+
+  deleteProject(projectId: string) {
+    const project = this.getProject(projectId, true);
+    const attachmentRelativePaths = this.db
+      .select({ relativePath: taskAttachments.relativePath })
+      .from(taskAttachments)
+      .where(eq(taskAttachments.projectId, project.id))
+      .all()
+      .map((attachment) => attachment.relativePath);
+
+    const deletedProject = this.db
+      .delete(projects)
+      .where(eq(projects.id, project.id))
+      .returning()
+      .get();
+
+    return { project: deletedProject ?? project, attachmentRelativePaths };
   }
 
   private ensureProjectNameAvailable(name: string, exceptProjectId?: string) {

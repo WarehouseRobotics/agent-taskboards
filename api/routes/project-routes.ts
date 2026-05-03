@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { asyncHandler } from "../http/async-handler.js";
 import { parseBody, parseNonEmptyBody, parseQuery } from "../http/validation.js";
 import {
   includeArchivedQuerySchema,
@@ -40,4 +41,19 @@ export function registerProjectRoutes(app: Express, services: ApiServices) {
     const project = services.projects.archiveProject(req.params.projectId);
     res.json({ project: serializeProject(project) });
   });
+
+  app.delete(
+    "/api/projects/:projectId",
+    asyncHandler(async (req, res) => {
+      const deleted = services.projects.deleteProject(req.params.projectId);
+      await services.attachments.removeAttachmentFilesBestEffort(
+        deleted.attachmentRelativePaths,
+      );
+
+      res.json({
+        project: serializeProject(deleted.project),
+        deleted: { attachmentFiles: deleted.attachmentRelativePaths.length },
+      });
+    }),
+  );
 }

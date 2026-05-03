@@ -36,10 +36,12 @@ Project concepts:
 - active or archived state
 - creation and update timestamps
 
-Projects are archived instead of hard-deleted by normal user and API flows.
-Project names are globally unique and may contain only lowercase letters,
-numbers, underscores, and hyphens (`^[a-z0-9_-]+$`) so agents can safely use
-them in URLs and API calls.
+Projects are archived instead of hard-deleted by normal user flows. The API also
+has an explicit hard-delete endpoint for deliberate cleanup; deleting a project
+permanently deletes its boards, tasks, comments, activity, attachments, and
+search records. Project names are globally unique and may contain only lowercase
+letters, numbers, underscores, and hyphens (`^[a-z0-9_-]+$`) so agents can
+safely use them in URLs and API calls.
 
 ## Boards
 
@@ -57,9 +59,11 @@ Board concepts:
 - active or archived state
 - creation and update timestamps
 
-Boards are archived instead of hard-deleted by normal user and API flows.
-Board names are unique within their parent project and follow the same
-`^[a-z0-9_-]+$` URL-safe format as project names.
+Boards are archived instead of hard-deleted by normal user flows. The API also
+has an explicit hard-delete endpoint for deliberate cleanup; deleting a board
+permanently deletes its columns, tasks, comments, activity, attachments, and
+search records. Board names are unique within their parent project and follow
+the same `^[a-z0-9_-]+$` URL-safe format as project names.
 
 ## Workflow Columns
 

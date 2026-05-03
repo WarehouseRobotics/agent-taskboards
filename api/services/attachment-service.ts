@@ -140,6 +140,18 @@ export class AttachmentService {
     return deleted;
   }
 
+  async removeAttachmentFilesBestEffort(relativePaths: readonly string[]) {
+    await Promise.all(
+      relativePaths.map(async (relativePath) => {
+        try {
+          await removeFileBestEffort(this.absolutePath(relativePath));
+        } catch (error) {
+          console.warn(`Unable to remove attachment file ${relativePath}`, error);
+        }
+      }),
+    );
+  }
+
   absolutePath(relativePath: string) {
     const root = resolve(this.uploadsPath);
     const absolutePath = resolve(root, relativePath);

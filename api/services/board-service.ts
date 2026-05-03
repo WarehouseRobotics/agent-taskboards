@@ -1,6 +1,6 @@
 import { and, asc, eq, isNull, ne } from "drizzle-orm";
 import type { DatabaseClient } from "../db/client.js";
-import { boardColumns, boards } from "../db/schema.js";
+import { boardColumns, boards, taskAttachments } from "../db/schema.js";
 import { ApiError } from "../http/errors.js";
 import { defaultBoardColumns } from "../models/default-columns.js";
 import type {
@@ -223,6 +223,25 @@ export class BoardService {
       .where(eq(boards.id, boardId))
       .returning()
       .get();
+  }
+
+  deleteBoard(projectId: string, boardId: string) {
+    const project = this.projectService.getProject(projectId, true);
+    const board = this.getBoard(project.id, boardId, true);
+    const attachmentRelativePaths = this.db
+      .select({ relativePath: taskAttachments.relativePath })
+      .from(taskAttachments)
+      .where(eq(taskAttachments.boardId, board.id))
+      .all()
+      .map((attachment) => attachment.relativePath);
+
+    const deletedBoard = this.db
+      .delete(boards)
+      .where(eq(boards.id, board.id))
+      .returning()
+      .get();
+
+    return { board: deletedBoard ?? board, attachmentRelativePaths };
   }
 
   listBoardColumns(boardId: string) {
