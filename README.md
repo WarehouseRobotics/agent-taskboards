@@ -62,6 +62,43 @@ TASKBOARDS_DEBUG= docker compose up --build
 In release mode, the container builds the API and UI into `dist/` and serves the
 compiled Express app and static UI from port `8142`.
 
+## Install the Skill for Claude Code
+
+The repo ships a Claude Code skill at `skills/tasks-management/` that teaches
+agents how to drive the taskboards API through the bundled `taskboards` bash
+wrapper. To make Claude Code load it automatically, symlink the skill directory
+into one of Claude Code's skill search paths.
+
+User-global (skill is available in every project):
+
+```sh
+mkdir -p ~/.claude/skills
+ln -s "$PWD/skills/tasks-management" ~/.claude/skills/tasks-management
+```
+
+Project-local (skill is available only inside one repo):
+
+```sh
+mkdir -p /path/to/your/project/.claude/skills
+ln -s "$PWD/skills/tasks-management" \
+  /path/to/your/project/.claude/skills/tasks-management
+```
+
+Optional environment variables (defaults work for the local Docker setup):
+
+- `TASKBOARDS_HOST_URL` — base URL, default `http://localhost:8142`.
+- `TASKBOARDS_API_KEY` — bearer token; only sent when set.
+- `TASKBOARDS_AGENT_NAME` — comment author name, default `Claude Code`.
+- `TASKBOARDS_AGENT_REF` — comment author reference; falls back to
+  `$CLAUDE_SESSION_ID` or `local`.
+
+Verify the install by starting a fresh Claude Code session in a project where
+the skill is installed and asking it to run `taskboards health`. The agent
+should pick the skill up automatically and respond with a healthy status block.
+
+Other agents that follow Claude's `SKILL.md` convention can use the same
+symlink approach into their own skill directory.
+
 ## Runtime Data
 
 Docker Compose bind-mounts local runtime directories from the repository root:

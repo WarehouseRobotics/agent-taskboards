@@ -19,7 +19,7 @@ mentions "taskboard", "the board", "this task".
 All calls go through the bash wrapper at:
 
 ```text
-$CLAUDE_PROJECT_DIR/skills/tasks-management/scripts/taskboards
+${CLAUDE_SKILL_DIR}/scripts/taskboards
 ```
 
 It absorbs base-URL detection, bearer auth, query-string encoding, and JSON
@@ -67,10 +67,10 @@ The `comment` shortcut auto-fills `authorType=agent`, `authorName`, and
 
 ## Orientation flow (do this before substantive work)
 
-1. `taskboards get projects repositoryPath="$PWD"` — find the project. Fall
+1. `taskboards get projects/<projectNameOrId>` — find the project. If name or id is unknown, try using `taskboards get projects repositoryPath="$PWD"`. Fall
    back to `q=<name>` if no match.
-2. `taskboards get projects/<projectId>/boards` — pick the board.
-3. `taskboards get tasks boardId=<boardId> status=pending` — see open work
+2. `taskboards get projects/<projectNameOrId>/boards` — pick the board.
+3. `taskboards get tasks boardId=<boardNameOrId> status=pending` — see open work
    before creating anything.
 
 Keep the returned IDs visible in your prose so handoffs stay traceable.
