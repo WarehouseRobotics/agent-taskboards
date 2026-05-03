@@ -1,6 +1,6 @@
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -15,10 +15,13 @@ describe("starter API", () => {
   let client: DatabaseClient | undefined;
   let server: Server | undefined;
   let baseUrl: string;
+  let previousUploadsPath: string | undefined;
 
   beforeEach(async () => {
     tmpDir = mkdtempSync(join(tmpdir(), "taskboards-api-"));
     const databasePath = join(tmpDir, "test.sqlite");
+    previousUploadsPath = process.env.TASKBOARDS_UPLOADS_PATH;
+    process.env.TASKBOARDS_UPLOADS_PATH = join(tmpDir, "uploads");
     const migrationResult = runMigrations({
       databasePath,
       migrationsDir: resolve(process.cwd(), "drizzle"),
@@ -66,6 +69,13 @@ describe("starter API", () => {
       rmSync(tmpDir, { recursive: true, force: true });
       tmpDir = undefined;
     }
+
+    if (previousUploadsPath === undefined) {
+      delete process.env.TASKBOARDS_UPLOADS_PATH;
+    } else {
+      process.env.TASKBOARDS_UPLOADS_PATH = previousUploadsPath;
+    }
+    previousUploadsPath = undefined;
   });
 
   it("creates projects, boards with default columns, tasks, comments, and context", async () => {
@@ -289,6 +299,97 @@ describe("starter API", () => {
     ).toEqual(["task.created", "task.updated"]);
   });
 
+  it("uploads, serves, lists, and deletes task attachments", async () => {
+    const { projectId, boardId } = await createProjectAndBoard();
+    const task = objectProp(
+      (
+        await api(
+          "POST",
+          `/api/projects/${projectId}/boards/${boardId}/tasks`,
+          {
+            title: "Attach evidence",
+          },
+        )
+      ).body,
+      "task",
+    );
+    const taskId = stringProp(task, "id");
+
+    const missingFile = await fetch(
+      `${baseUrl}/api/tasks/${taskId}/attachments`,
+      { method: "POST", body: new FormData() },
+    );
+    expect(missingFile.status).toBe(400);
+
+    const upload = await uploadFile(
+      `/api/tasks/${taskId}/attachments`,
+      "notes.txt",
+      "hello attachment",
+      "text/plain",
+    );
+    expect(upload.status).toBe(201);
+    const attachment = objectProp(upload.body, "attachment");
+    const attachmentId = stringProp(attachment, "id");
+    const relativePath = stringProp(attachment, "relativePath");
+    expect(stringProp(attachment, "url")).toBe(`/uploads/${relativePath}`);
+    expect(numberProp(attachment, "sizeBytes")).toBe("hello attachment".length);
+
+    const uploadsPath = process.env.TASKBOARDS_UPLOADS_PATH;
+    if (!uploadsPath) {
+      throw new Error("Expected uploads path for test");
+    }
+    const storedPath = join(uploadsPath, relativePath);
+    expect(readFileSync(storedPath, "utf8")).toBe("hello attachment");
+
+    const served = await fetch(`${baseUrl}/uploads/${relativePath}`);
+    expect(served.status).toBe(200);
+    expect(await served.text()).toBe("hello attachment");
+
+    const list = await api("GET", `/api/tasks/${taskId}/attachments`);
+    expect(arrayProp(list.body, "attachments")).toHaveLength(1);
+
+    const context = await api("GET", `/api/tasks/${taskId}/context`);
+    expect(arrayProp(context.body, "attachments")).toHaveLength(1);
+
+    const wrongTask = objectProp(
+      (
+        await api(
+          "POST",
+          `/api/projects/${projectId}/boards/${boardId}/tasks`,
+          {
+            title: "Wrong task",
+          },
+        )
+      ).body,
+      "task",
+    );
+    const wrongDelete = await api(
+      "DELETE",
+      `/api/tasks/${stringProp(wrongTask, "id")}/attachments/${attachmentId}`,
+    );
+    expect(wrongDelete.status).toBe(404);
+
+    const deleted = await api(
+      "DELETE",
+      `/api/tasks/${taskId}/attachments/${attachmentId}`,
+    );
+    expect(deleted.status).toBe(200);
+    expect(
+      stringProp(objectProp(deleted.body, "activity"), "eventType"),
+    ).toBe("attachment.deleted");
+    expect(existsSync(storedPath)).toBe(false);
+
+    const afterDelete = await api("GET", `/api/tasks/${taskId}/attachments`);
+    expect(arrayProp(afterDelete.body, "attachments")).toHaveLength(0);
+
+    const activityResponse = await api("GET", `/api/tasks/${taskId}/activity`);
+    expect(
+      arrayProp(activityResponse.body, "activity").map((item) =>
+        stringProp(asObject(item), "eventType"),
+      ),
+    ).toEqual(["task.created", "attachment.created", "attachment.deleted"]);
+  });
+
   it("archives active resources and hides them unless includeArchived is true", async () => {
     const { projectId, boardId } = await createProjectAndBoard();
     const task = objectProp(
@@ -489,6 +590,25 @@ describe("starter API", () => {
       method,
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
+    });
+
+    return {
+      status: response.status,
+      body: (await response.json()) as unknown,
+    };
+  }
+
+  async function uploadFile(
+    path: string,
+    fileName: string,
+    body: string,
+    contentType: string,
+  ) {
+    const formData = new FormData();
+    formData.set("file", new Blob([body], { type: contentType }), fileName);
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: "POST",
+      body: formData,
     });
 
     return {

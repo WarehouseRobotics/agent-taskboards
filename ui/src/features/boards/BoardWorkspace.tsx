@@ -1,5 +1,5 @@
 import { useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { Board, BoardColumn, Project, Task, TaskContext, TaskPriority } from "../../domain/types";
+import type { Board, BoardColumn, Project, Task, TaskAttachment, TaskContext, TaskPriority } from "../../domain/types";
 import { columnStatus, glyphForName } from "../../lib/task-display";
 import { formatDate } from "../../lib/format";
 import { Button, EmptyState, Icon, InlineError, LabelChip, Mono, PriorityFlag, StatusIcon } from "../../components/ui";
@@ -33,6 +33,7 @@ export function BoardWorkspace({
   onCreateProject,
   onCompleteTask,
   onCreateTask,
+  onDeleteTaskAttachment,
   onMoveTask,
   onOpenCreateTask,
   onOpenTask,
@@ -40,6 +41,7 @@ export function BoardWorkspace({
   onRefresh,
   onTaskDraftChange,
   onUpdateTask,
+  onUploadTaskAttachment,
   syncError,
   tasks,
 }: {
@@ -66,6 +68,7 @@ export function BoardWorkspace({
     priority?: TaskPriority;
     labels?: string[];
   }) => Promise<void>;
+  onDeleteTaskAttachment: (taskId: string, attachmentId: string) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onOpenCreateTask: (columnId: string | null) => void;
   onOpenTask: (taskId: string) => void;
@@ -73,6 +76,7 @@ export function BoardWorkspace({
   onRefresh: (taskId?: string | null) => Promise<void>;
   onTaskDraftChange: (taskId: string, fields: { title?: string; description?: string | null } | null) => void;
   onUpdateTask: (taskId: string, input: { title?: string; description?: string | null }) => Promise<void>;
+  onUploadTaskAttachment: (taskId: string, file: File) => Promise<TaskAttachment>;
   syncError: string | null;
   tasks: Task[];
 }) {
@@ -229,10 +233,12 @@ export function BoardWorkspace({
               onArchiveTask={onArchiveTask}
               onClose={onCloseTask}
               onCompleteTask={onCompleteTask}
+              onDeleteTaskAttachment={onDeleteTaskAttachment}
               onMoveTask={onMoveTask}
               onPostComment={onPostComment}
               onTaskDraftChange={onTaskDraftChange}
               onUpdateTask={onUpdateTask}
+              onUploadTaskAttachment={onUploadTaskAttachment}
             />
           )}
         </div>

@@ -19,6 +19,7 @@ import {
 } from "../models/request-schemas.js";
 import {
   serializeActivity,
+  serializeAgentAttachment,
   serializeBoard,
   serializeBoardColumn,
   serializeComment,
@@ -34,6 +35,7 @@ import type {
   Project,
   Task,
   TaskActivity,
+  TaskAttachment,
   TaskComment,
 } from "../db/schema.js";
 import type { MigrationResult } from "../db/migrate.js";
@@ -64,6 +66,7 @@ type TaskWithParents = {
   task: Task;
   comments: TaskComment[];
   activity: TaskActivity[];
+  attachments: TaskAttachment[];
 };
 
 type TaskDiscoveryRow = TaskWithParents & {
@@ -95,6 +98,7 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
             "GET /api/agents/projects/:projectId/boards",
             "GET /api/agents/tasks",
             "GET /api/agents/tasks/:taskId/context",
+            "GET /api/agents/tasks/:taskId/attachments",
             "POST /api/agents/projects/:projectId/boards/:boardId/tasks",
             "POST /api/agents/tasks/:taskId/comments",
             "GET /api/agents/search?q=<query>",
@@ -809,6 +813,7 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
             lines: [
               ...taskMarkdownIntroLines(context, query.view),
               `- Parent board: \`${context.board.id}\` ${context.board.name}.`,
+              `- Attachments: ${context.attachments.length}.`,
               `- Comments returned: ${includeComments ? commentPage.items.length : 0} of ${context.comments.length}.`,
               `- Activity returned: ${includeActivity ? activityPage.items.length : 0} of ${context.activity.length}.`,
               ...truncationLines(
@@ -836,6 +841,14 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
                 {
                   title: "Activity",
                   lines: markdownActivityLines(activityPage.items),
+                },
+              ]
+            : []),
+          ...(context.attachments.length > 0
+            ? [
+                {
+                  title: "Attachments",
+                  lines: markdownAttachmentLines(context.attachments),
                 },
               ]
             : []),
@@ -889,6 +902,34 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
           `POST /api/agents/tasks/${context.task.id}/comments`,
           `GET /api/agents/tasks/${context.task.id}/context?include=comments,activity`,
         ],
+      },
+      { format: query.format },
+    );
+  });
+
+  app.get("/api/agents/tasks/:taskId/attachments", (req, res) => {
+    const query = parseQuery(req, agentReadQuerySchema);
+    const context = loadTaskWithParents(
+      services,
+      req.params.taskId,
+      query.includeArchived,
+    );
+
+    sendAgentMarkdown(
+      res,
+      {
+        outcome: `Found ${context.attachments.length} attachment${plural(context.attachments.length)} for task \`${context.task.id}\`.`,
+        sections: [
+          {
+            title: "What I found",
+            lines: markdownAttachmentLines(context.attachments),
+          },
+        ],
+        data: {
+          task: { id: context.task.id, title: context.task.title },
+          attachments: context.attachments.map(serializeAgentAttachment),
+        },
+        nextCalls: [`GET /api/agents/tasks/${context.task.id}/context`],
       },
       { format: query.format },
     );
@@ -1173,6 +1214,7 @@ async function discoverTasks(
         const column = columnForTask(columns, task);
         const comments = services.comments.listTaskComments(task.id);
         const activity = services.comments.listTaskActivity(task.id);
+        const attachments = services.attachments.listTaskAttachments(task.id);
         const row: TaskDiscoveryRow = {
           project,
           board,
@@ -1181,6 +1223,7 @@ async function discoverTasks(
           task,
           comments,
           activity,
+          attachments,
           search: semanticOrder.get(task.id)?.result,
         };
 
@@ -1308,7 +1351,8 @@ function loadTaskWithParents(
   const column = columnForTask(columns, task);
   const comments = services.comments.listTaskComments(task.id);
   const activity = services.comments.listTaskActivity(task.id);
-  return { project, board, columns, column, task, comments, activity };
+  const attachments = services.attachments.listTaskAttachments(task.id, true);
+  return { project, board, columns, column, task, comments, activity, attachments };
 }
 
 function columnForTask(columns: BoardColumn[], task: Task) {
@@ -1354,6 +1398,17 @@ function markdownActivityLines(activity: TaskActivity[]) {
   return activity.map(
     (entry) =>
       `- ${entry.createdAt.toISOString()} ${entry.eventType}: ${entry.summary}`,
+  );
+}
+
+function markdownAttachmentLines(attachments: TaskAttachment[]) {
+  if (attachments.length === 0) {
+    return ["No attachments matched this request."];
+  }
+
+  return attachments.map(
+    (attachment) =>
+      `- \`${attachment.relativePath}\` ${attachment.originalName} (${attachment.contentType}, ${attachment.sizeBytes} bytes)`,
   );
 }
 
@@ -1454,6 +1509,7 @@ function taskSummary(
     position: context.task.position,
     comments: context.comments.length,
     activity: context.activity.length,
+    attachments: context.attachments.length,
     externalReferences:
       include.includes("externalReferences") || view === "full"
         ? serialized.externalReferences
@@ -1495,6 +1551,7 @@ function groupTasksByColumn(
             task,
             comments: [],
             activity: [],
+            attachments: [],
           },
           query.view,
           query.include,
@@ -1594,6 +1651,7 @@ function pruneEmpty(value: JsonObject): JsonObject {
 function taskNextCalls(taskId: string) {
   return [
     `GET /api/agents/tasks/${taskId}/context?include=comments,activity`,
+    `GET /api/agents/tasks/${taskId}/attachments`,
     `GET /api/agents/tasks/${taskId}/comments`,
     `GET /api/agents/tasks/${taskId}/activity`,
     `POST /api/agents/tasks/${taskId}/move`,

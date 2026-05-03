@@ -95,6 +95,19 @@ export interface TaskActivity {
   createdAt: string | null;
 }
 
+export interface TaskAttachment {
+  id: string;
+  projectId: string;
+  boardId: string;
+  taskId: string;
+  relativePath: string;
+  url: string;
+  originalName: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string | null;
+}
+
 export interface Health {
   ok: boolean;
   database?: {
@@ -150,4 +163,5 @@ export interface TaskContext {
   task: Task;
   comments: TaskComment[];
   activity: TaskActivity[];
+  attachments: TaskAttachment[];
 }

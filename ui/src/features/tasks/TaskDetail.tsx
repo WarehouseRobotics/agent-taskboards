@@ -1,14 +1,20 @@
-import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, ClipboardEvent as ReactClipboardEvent, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ActorType, BoardColumn, TaskActivity, TaskComment, TaskContext } from "../../domain/types";
+import type { ActorType, BoardColumn, TaskActivity, TaskAttachment, TaskComment, TaskContext } from "../../domain/types";
 import { apiMessage } from "../../lib/errors";
 import { formatDate } from "../../lib/format";
 import { columnStatus } from "../../lib/task-display";
 import { Avatar, Button, EmptyState, Icon, InlineError, LabelChip, Mono, PriorityFlag, StatusIcon } from "../../components/ui";
 import {
+  clampDescriptionHeight,
+  descriptionDefaultHeight,
+  descriptionHeightMax,
+  descriptionHeightMin,
   descriptionSizeTier,
+  persistDescriptionHeight,
   persistDescriptionView,
+  storedDescriptionHeight,
   storedDescriptionView,
   type TaskDescriptionView,
 } from "./task-description-view";
@@ -42,6 +48,51 @@ function isTaskDraftDirty(draft: TaskEditDraft) {
   return draft.current.title !== draft.base.title || draft.current.description !== draft.base.description;
 }
 
+export function appendImageAttachmentMarkdown(description: string, attachment: TaskAttachment) {
+  const prefix = description.trimEnd();
+  const altText = attachment.originalName.replace(/[\[\]\n\r]/g, " ").trim() || "attachment";
+  const markdown = `![${altText}](${attachment.url})`;
+  return prefix ? `${prefix}\n\n${markdown}` : markdown;
+}
+
+export function filesFromClipboardData(
+  clipboardData: Pick<DataTransfer, "files" | "items"> | null,
+) {
+  if (!clipboardData) {
+    return [];
+  }
+
+  const files = new Map<string, File>();
+  const addFile = (file: File | null) => {
+    if (!file) {
+      return;
+    }
+
+    files.set(
+      `${file.name}:${file.size}:${file.type}:${file.lastModified}`,
+      file,
+    );
+  };
+
+  for (const file of Array.from(clipboardData.files ?? [])) {
+    addFile(file);
+  }
+
+  for (const item of Array.from(clipboardData.items ?? [])) {
+    if (item.kind === "file") {
+      addFile(item.getAsFile());
+    }
+  }
+
+  return [...files.values()];
+}
+
+function isInteractivePreviewTarget(target: EventTarget | null) {
+  return target instanceof Element && Boolean(
+    target.closest("a, button, input, textarea, select, summary, [role='button'], [contenteditable='true']"),
+  );
+}
+
 export function TaskDetail({
   columns,
   context,
@@ -49,10 +100,12 @@ export function TaskDetail({
   onArchiveTask,
   onClose,
   onCompleteTask,
+  onDeleteTaskAttachment,
   onMoveTask,
   onPostComment,
   onTaskDraftChange,
   onUpdateTask,
+  onUploadTaskAttachment,
 }: {
   columns: BoardColumn[];
   context?: TaskContext;
@@ -60,25 +113,43 @@ export function TaskDetail({
   onArchiveTask: (taskId: string) => Promise<void>;
   onClose: () => void;
   onCompleteTask: (taskId: string) => Promise<void>;
+  onDeleteTaskAttachment: (taskId: string, attachmentId: string) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onPostComment: (taskId: string, body: string) => Promise<void>;
   onTaskDraftChange: (taskId: string, fields: { title?: string; description?: string | null } | null) => void;
   onUpdateTask: (taskId: string, input: { title?: string; description?: string | null }) => Promise<void>;
+  onUploadTaskAttachment: (taskId: string, file: File) => Promise<TaskAttachment>;
 }) {
   const [comment, setComment] = useState("");
   const [draft, setDraft] = useState<TaskEditDraft>(emptyTaskDraft);
   const [editError, setEditError] = useState<string | null>(null);
   const [detailToast, setDetailToast] = useState<{ message: string; tone: "success" | "warning" } | null>(null);
+  const [dropActive, setDropActive] = useState(false);
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const [descriptionView, setDescriptionView] = useState<TaskDescriptionView>(() => storedDescriptionView());
+  const [descriptionHeight, setDescriptionHeight] = useState<number | null>(() => storedDescriptionHeight());
+  const [resizingDescription, setResizingDescription] = useState(false);
+  const detailRef = useRef<HTMLElement | null>(null);
+  const descriptionInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const descriptionResizeStart = useRef<{ pointerId: number; startHeight: number; startY: number } | null>(null);
+  const detailToastTimeout = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const lastPreviewTap = useRef(0);
 
   const changeDescriptionView = useCallback((mode: TaskDescriptionView) => {
     setDescriptionView(mode);
     persistDescriptionView(mode);
   }, []);
-  const detailRef = useRef<HTMLElement | null>(null);
-  const detailToastTimeout = useRef<number | null>(null);
+  const focusDescriptionInput = useCallback(() => {
+    window.requestAnimationFrame(() => descriptionInputRef.current?.focus());
+  }, []);
+  const switchDescriptionPreviewToEdit = useCallback(() => {
+    changeDescriptionView("edit");
+    focusDescriptionInput();
+  }, [changeDescriptionView, focusDescriptionInput]);
   const task = context?.task;
   const taskId = task?.id ?? "";
   const serverTitle = task?.title ?? "";
@@ -93,6 +164,7 @@ export function TaskDetail({
     : makeTaskDraft(task?.id ?? "", serverTitle, serverDescription);
   const editDirty = task ? isTaskDraftDirty(activeDraft) : false;
   const hasPendingChanges = editDirty || Boolean(comment.trim());
+  const attachments = context?.attachments ?? [];
 
   const showDetailToast = useCallback((message: string, tone: "success" | "warning" = "success") => {
     setDetailToast({ message, tone });
@@ -224,10 +296,100 @@ export function TaskDetail({
   const trimmedDescription = activeDraft.current.description.trim();
   const titleError = editDirty && !trimmedTitle ? "Title is required" : null;
   const canSave = editDirty && Boolean(trimmedTitle) && !saving;
+  const activeDescriptionHeight = descriptionHeight ?? descriptionDefaultHeight(activeDraft.current.description);
+  const descriptionStyle = { "--task-desc-height": `${activeDescriptionHeight}px` } as CSSProperties;
 
   const resetDraft = () => {
     setDraft(makeTaskDraft(task.id, serverTitle, serverDescription));
     setEditError(null);
+  };
+
+  const updateDescriptionHeight = (height: number) => {
+    const nextHeight = clampDescriptionHeight(height);
+    setDescriptionHeight(nextHeight);
+    persistDescriptionHeight(nextHeight);
+  };
+
+  const startDescriptionResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    descriptionResizeStart.current = {
+      pointerId: event.pointerId,
+      startHeight: activeDescriptionHeight,
+      startY: event.clientY,
+    };
+    setResizingDescription(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveDescriptionResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const start = descriptionResizeStart.current;
+    if (!start || start.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    updateDescriptionHeight(start.startHeight + event.clientY - start.startY);
+  };
+
+  const stopDescriptionResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const start = descriptionResizeStart.current;
+    if (!start || start.pointerId !== event.pointerId) {
+      return;
+    }
+
+    descriptionResizeStart.current = null;
+    setResizingDescription(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  const resizeDescriptionWithKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
+    const step = event.shiftKey ? 32 : 8;
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      updateDescriptionHeight(activeDescriptionHeight - step);
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      updateDescriptionHeight(activeDescriptionHeight + step);
+      return;
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      updateDescriptionHeight(descriptionHeightMin);
+      return;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      updateDescriptionHeight(descriptionHeightMax);
+    }
+  };
+
+  const switchPreviewOnDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (isInteractivePreviewTarget(event.target)) {
+      return;
+    }
+
+    switchDescriptionPreviewToEdit();
+  };
+
+  const switchPreviewOnDoubleTap = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" || isInteractivePreviewTarget(event.target)) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastPreviewTap.current <= 320) {
+      event.preventDefault();
+      lastPreviewTap.current = 0;
+      switchDescriptionPreviewToEdit();
+      return;
+    }
+
+    lastPreviewTap.current = now;
   };
 
   const submitTaskEdit = async (event?: FormEvent) => {
@@ -272,8 +434,94 @@ export function TaskDetail({
     setComment("");
   };
 
+  const uploadAttachmentFiles = async (files: File[]) => {
+    if (files.length === 0 || uploadingAttachment) {
+      return;
+    }
+
+    setUploadingAttachment(true);
+    setEditError(null);
+    let uploaded = 0;
+    let images = 0;
+    try {
+      for (const file of files) {
+        const attachment = await onUploadTaskAttachment(task.id, file);
+        uploaded += 1;
+        if (attachment.contentType.startsWith("image/")) {
+          images += 1;
+          setDraft((current) => {
+            const source =
+              current.taskId === task.id
+                ? current
+                : makeTaskDraft(task.id, serverTitle, serverDescription);
+            return {
+              ...source,
+              current: {
+                ...source.current,
+                description: appendImageAttachmentMarkdown(
+                  source.current.description,
+                  attachment,
+                ),
+              },
+              taskId: task.id,
+            };
+          });
+        }
+      }
+
+      if (images > 0) {
+        changeDescriptionView("edit");
+        showDetailToast(
+          images === 1 ? "Image link added to draft" : "Image links added to draft",
+        );
+      } else {
+        showDetailToast(uploaded === 1 ? "Attachment uploaded" : "Attachments uploaded");
+      }
+    } catch (err) {
+      setEditError(apiMessage(err));
+    } finally {
+      setUploadingAttachment(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const selectAttachmentFile = (event: ChangeEvent<HTMLInputElement>) => {
+    void uploadAttachmentFiles(Array.from(event.target.files ?? []));
+  };
+
+  const dropAttachmentFile = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDropActive(false);
+    void uploadAttachmentFiles(Array.from(event.dataTransfer.files ?? []));
+  };
+
+  const pasteAttachmentFile = (event: ReactClipboardEvent<HTMLElement>) => {
+    const files = filesFromClipboardData(event.clipboardData);
+    if (files.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    void uploadAttachmentFiles(files);
+  };
+
+  const deleteAttachment = async (attachmentId: string) => {
+    setDeletingAttachmentId(attachmentId);
+    setEditError(null);
+    try {
+      await onDeleteTaskAttachment(task.id, attachmentId);
+      showDetailToast("Attachment deleted");
+    } catch (err) {
+      setEditError(apiMessage(err));
+    } finally {
+      setDeletingAttachmentId(null);
+    }
+  };
+
   return (
-    <aside className="task-detail" ref={detailRef}>
+    <aside className="task-detail" onPaste={pasteAttachmentFile} ref={detailRef}>
       <div className="task-detail__top">
         <div className="detail-meta">
           <PriorityFlag priority={task.priority} />
@@ -308,6 +556,7 @@ export function TaskDetail({
         />
         <div
           className={`detail-section task-description task-description--${descriptionSizeTier(activeDraft.current.description)}`}
+          style={descriptionStyle}
         >
           <div className="detail-section__heading">
             <h2>Description</h2>
@@ -346,10 +595,16 @@ export function TaskDetail({
               }}
               onKeyDown={saveOnShortcut}
               placeholder="No description yet."
+              ref={descriptionInputRef}
               value={activeDraft.current.description}
             />
           ) : (
-            <div className="task-description-preview" aria-label="Task description preview">
+            <div
+              className="task-description-preview"
+              aria-label="Task description preview"
+              onDoubleClick={switchPreviewOnDoubleClick}
+              onPointerUp={switchPreviewOnDoubleTap}
+            >
               {activeDraft.current.description.trim() ? (
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {activeDraft.current.description}
@@ -359,6 +614,24 @@ export function TaskDetail({
               )}
             </div>
           )}
+          <div
+            aria-label="Resize description"
+            aria-orientation="horizontal"
+            aria-valuemax={descriptionHeightMax}
+            aria-valuemin={descriptionHeightMin}
+            aria-valuenow={activeDescriptionHeight}
+            className={resizingDescription ? "task-description-resize task-description-resize--active" : "task-description-resize"}
+            onKeyDown={resizeDescriptionWithKeyboard}
+            onPointerCancel={stopDescriptionResize}
+            onPointerDown={startDescriptionResize}
+            onPointerMove={moveDescriptionResize}
+            onPointerUp={stopDescriptionResize}
+            role="separator"
+            tabIndex={0}
+            title="Resize description"
+          >
+            <span />
+          </div>
         </div>
         <InlineError message={editError ?? titleError} />
         <div className="form-actions">
@@ -385,6 +658,66 @@ export function TaskDetail({
         <Button icon={<Icon name="check" />} onClick={() => onCompleteTask(task.id)} variant="outline">Complete</Button>
         <Button icon={<Icon name="archive" />} onClick={() => onArchiveTask(task.id)} variant="danger">Archive</Button>
       </div>
+      <section className="detail-section">
+        <div className="detail-section__heading">
+          <h2>Attachments</h2>
+          <Mono faded>{attachments.length} {attachments.length === 1 ? "file" : "files"}</Mono>
+        </div>
+        <div
+          className={dropActive ? "attachment-dropzone attachment-dropzone--active" : "attachment-dropzone"}
+          onDragEnter={(event) => {
+            event.preventDefault();
+            setDropActive(true);
+          }}
+          onDragLeave={(event) => {
+            event.preventDefault();
+            setDropActive(false);
+          }}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={dropAttachmentFile}
+        >
+          <Icon name="upload" size={16} />
+          <span>{uploadingAttachment ? "Uploading" : "Drop or paste a file here"}</span>
+          <Button
+            disabled={uploadingAttachment}
+            icon={<Icon name="plus" />}
+            onClick={() => fileInputRef.current?.click()}
+            type="button"
+            variant="outline"
+          >
+            Select file
+          </Button>
+          <input
+            className="attachment-input"
+            multiple
+            onChange={selectAttachmentFile}
+            ref={fileInputRef}
+            type="file"
+          />
+        </div>
+        {attachments.length > 0 && (
+          <div className="attachment-list">
+            {attachments.map((attachment) => (
+              <div className="attachment-row" key={attachment.id}>
+                <Icon name={attachment.contentType.startsWith("image/") ? "image" : "link"} />
+                <a href={attachment.url} target="_blank" rel="noreferrer">
+                  {attachment.originalName}
+                </a>
+                <Mono faded>{formatBytes(attachment.sizeBytes)}</Mono>
+                <button
+                  className="icon-btn"
+                  disabled={deletingAttachmentId === attachment.id}
+                  onClick={() => void deleteAttachment(attachment.id)}
+                  title="Delete attachment"
+                  type="button"
+                >
+                  <Icon name="trash" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
       <section className="detail-section">
         <h2>Properties</h2>
         <div className="prop-grid">
@@ -481,4 +814,16 @@ function TimelineEntry({ entry }: { entry: TimelineItem }) {
       </div>
     </div>
   );
+}
+
+function formatBytes(value: number) {
+  if (value < 1024) {
+    return `${value} B`;
+  }
+
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }

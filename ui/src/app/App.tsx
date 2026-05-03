@@ -310,6 +310,16 @@ export function App() {
                 taskId: created.task.id,
               });
             }}
+            onDeleteTaskAttachment={async (taskId, attachmentId) => {
+              setMutationError(null);
+              try {
+                await api.deleteTaskAttachment(taskId, attachmentId);
+                await refreshAfterMutation(taskId);
+              } catch (err) {
+                setMutationError(apiMessage(err));
+                throw err;
+              }
+            }}
             onMoveTask={moveTask}
             onOpenCreateTask={(columnId) => setNewTaskColumnId(columnId)}
             onOpenTask={openTask}
@@ -329,6 +339,17 @@ export function App() {
               try {
                 await api.updateTask(taskId, input);
                 await refreshAfterMutation(taskId);
+              } catch (err) {
+                setMutationError(apiMessage(err));
+                throw err;
+              }
+            }}
+            onUploadTaskAttachment={async (taskId, file) => {
+              setMutationError(null);
+              try {
+                const created = await api.uploadTaskAttachment(taskId, file);
+                await refreshAfterMutation(taskId);
+                return created.attachment;
               } catch (err) {
                 setMutationError(apiMessage(err));
                 throw err;

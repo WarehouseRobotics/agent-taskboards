@@ -11,6 +11,7 @@ import {
   projects,
   searchDocuments,
   taskActivity,
+  taskAttachments,
   taskComments,
   tasks,
 } from "./schema.js";
@@ -134,6 +135,20 @@ describe("database schema", () => {
       .returning()
       .get();
 
+    const attachment = db
+      .insert(taskAttachments)
+      .values({
+        projectId: project.id,
+        boardId: board.id,
+        taskId: task.id,
+        relativePath: `tasks/${task.id}/evidence.txt`,
+        originalName: "evidence.txt",
+        contentType: "text/plain",
+        sizeBytes: 12,
+      })
+      .returning()
+      .get();
+
     const searchDocument = db
       .insert(searchDocuments)
       .values({
@@ -172,6 +187,7 @@ describe("database schema", () => {
     expect(orderedTasks.map((item) => item.id)).toEqual([task.id]);
     expect(comment.taskId).toBe(task.id);
     expect(activity.taskId).toBe(task.id);
+    expect(attachment.relativePath).toBe(`tasks/${task.id}/evidence.txt`);
     expect(searchDocument.sourceId).toBe(task.id);
     expect(task.labels).toEqual(["database", "drizzle"]);
   });

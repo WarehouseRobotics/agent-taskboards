@@ -235,6 +235,40 @@ export const taskActivity = sqliteTable(
   }),
 );
 
+export const taskAttachments = sqliteTable(
+  "task_attachments",
+  {
+    id: id(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    boardId: text("board_id")
+      .notNull()
+      .references(() => boards.id, { onDelete: "cascade" }),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    relativePath: text("relative_path").notNull(),
+    originalName: text("original_name").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdAt: timestamp("created_at"),
+  },
+  (table) => ({
+    taskCreatedIdx: index("task_attachments_task_created_idx").on(
+      table.taskId,
+      table.createdAt,
+    ),
+    projectCreatedIdx: index("task_attachments_project_created_idx").on(
+      table.projectId,
+      table.createdAt,
+    ),
+    relativePathUnique: uniqueIndex("task_attachments_relative_path_unique").on(
+      table.relativePath,
+    ),
+  }),
+);
+
 export const searchDocuments = sqliteTable(
   "search_documents",
   {
@@ -288,6 +322,7 @@ export const projectsRelations = relations(projects, ({ many }) => ({
   tasks: many(tasks),
   comments: many(taskComments),
   activity: many(taskActivity),
+  attachments: many(taskAttachments),
   searchDocuments: many(searchDocuments),
 }));
 
@@ -300,6 +335,7 @@ export const boardsRelations = relations(boards, ({ one, many }) => ({
   tasks: many(tasks),
   comments: many(taskComments),
   activity: many(taskActivity),
+  attachments: many(taskAttachments),
   searchDocuments: many(searchDocuments),
 }));
 
@@ -326,6 +362,7 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
   }),
   comments: many(taskComments),
   activity: many(taskActivity),
+  attachments: many(taskAttachments),
   searchDocuments: many(searchDocuments),
 }));
 
@@ -355,6 +392,21 @@ export const taskActivityRelations = relations(taskActivity, ({ one }) => ({
   }),
   task: one(tasks, {
     fields: [taskActivity.taskId],
+    references: [tasks.id],
+  }),
+}));
+
+export const taskAttachmentsRelations = relations(taskAttachments, ({ one }) => ({
+  project: one(projects, {
+    fields: [taskAttachments.projectId],
+    references: [projects.id],
+  }),
+  board: one(boards, {
+    fields: [taskAttachments.boardId],
+    references: [boards.id],
+  }),
+  task: one(tasks, {
+    fields: [taskAttachments.taskId],
     references: [tasks.id],
   }),
 }));
@@ -391,6 +443,9 @@ export type NewTaskComment = typeof taskComments.$inferInsert;
 
 export type TaskActivity = typeof taskActivity.$inferSelect;
 export type NewTaskActivity = typeof taskActivity.$inferInsert;
+
+export type TaskAttachment = typeof taskAttachments.$inferSelect;
+export type NewTaskAttachment = typeof taskAttachments.$inferInsert;
 
 export type SearchDocument = typeof searchDocuments.$inferSelect;
 export type NewSearchDocument = typeof searchDocuments.$inferInsert;

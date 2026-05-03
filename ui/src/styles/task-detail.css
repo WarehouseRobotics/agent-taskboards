@@ -58,6 +58,7 @@
 
 .task-description-input {
   height: var(--task-desc-height);
+  max-height: 640px;
   min-height: 112px;
   line-height: 1.55;
   resize: none;
@@ -65,6 +66,8 @@
 
 .task-description-preview {
   height: var(--task-desc-height);
+  max-height: 640px;
+  min-height: 112px;
   overflow-y: auto;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
@@ -74,6 +77,45 @@
   line-height: 1.55;
   padding: 8px 10px;
   text-wrap: pretty;
+}
+
+.task-description-preview:hover {
+  border-color: var(--line-strong);
+}
+
+.task-description-resize {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 14px;
+  margin-top: -2px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.task-description-resize span {
+  display: block;
+  width: 42px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--line-strong);
+  opacity: 0.65;
+  transition: background var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease), width var(--t-fast) var(--ease);
+}
+
+.task-description-resize:hover span,
+.task-description-resize--active span {
+  width: 54px;
+  background: var(--accent);
+  opacity: 1;
+}
+
+.task-description-resize:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .task-description-preview__placeholder {
@@ -123,6 +165,15 @@
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.task-description-preview img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 0 var(--s-2);
+  border-radius: var(--r-sm);
+  object-fit: contain;
 }
 
 .task-description-preview code {
@@ -271,6 +322,63 @@
   line-height: 1.55;
   padding: 10px 12px;
   text-wrap: pretty;
+}
+
+.attachment-dropzone {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--s-2);
+  align-items: center;
+  min-height: 52px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-input);
+  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  padding: 8px 10px;
+}
+
+.attachment-dropzone--active {
+  border-color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 8%, var(--bg-input));
+  color: var(--fg);
+}
+
+.attachment-input {
+  display: none;
+}
+
+.attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attachment-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: var(--s-2);
+  align-items: center;
+  border: 1px solid var(--line-faint);
+  border-radius: var(--r-md);
+  background: var(--bg-input);
+  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  padding: 6px 8px;
+}
+
+.attachment-row a {
+  overflow: hidden;
+  color: var(--fg);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-row a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .prop-grid {

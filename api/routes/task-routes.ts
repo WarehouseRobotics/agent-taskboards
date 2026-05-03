@@ -1,5 +1,7 @@
-import type { Express } from "express";
+import type { Express, RequestHandler } from "express";
+import multer from "multer";
 import { asyncHandler } from "../http/async-handler.js";
+import { ApiError } from "../http/errors.js";
 import {
   parseBody,
   parseNonEmptyBody,
@@ -13,13 +15,41 @@ import {
   taskUpdateSchema,
 } from "../models/request-schemas.js";
 import {
+  serializeAttachment,
   serializeActivity,
   serializeBoard,
   serializeComment,
   serializeProject,
   serializeTask,
 } from "../models/serializers.js";
+import { maxAttachmentBytes } from "../services/attachment-service.js";
 import type { ApiServices } from "../services/index.js";
+
+const attachmentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: maxAttachmentBytes },
+});
+
+const uploadAttachmentFile: RequestHandler = (req, res, next) => {
+  attachmentUpload.single("file")(req, res, (error: unknown) => {
+    if (!error) {
+      next();
+      return;
+    }
+
+    if (error instanceof multer.MulterError) {
+      next(
+        new ApiError(400, "invalid_request", "Attachment upload is invalid", {
+          field: error.field,
+          reason: error.code,
+        }),
+      );
+      return;
+    }
+
+    next(error);
+  });
+};
 
 export function registerTaskRoutes(app: Express, services: ApiServices) {
   app.get("/api/projects/:projectId/boards/:boardId/tasks", (req, res) => {
@@ -123,8 +153,54 @@ export function registerTaskRoutes(app: Express, services: ApiServices) {
     res.json({ activity: activity.map(serializeActivity) });
   });
 
+  app.get("/api/tasks/:taskId/attachments", (req, res) => {
+    const attachments = services.attachments.listTaskAttachments(
+      req.params.taskId,
+    );
+    res.json({ attachments: attachments.map(serializeAttachment) });
+  });
+
+  app.post(
+    "/api/tasks/:taskId/attachments",
+    uploadAttachmentFile,
+    asyncHandler(async (req, res) => {
+      if (!req.file) {
+        throw new ApiError(400, "invalid_request", "Attachment file is required");
+      }
+
+      const created = await services.attachments.createTaskAttachment(
+        req.params.taskId,
+        req.file,
+      );
+
+      res.status(201).json({
+        attachment: serializeAttachment(created.attachment),
+        activity: serializeActivity(created.activity),
+      });
+    }),
+  );
+
+  app.delete(
+    "/api/tasks/:taskId/attachments/:attachmentId",
+    asyncHandler(async (req, res) => {
+      const { attachment, activity } =
+        await services.attachments.deleteTaskAttachment(
+          req.params.taskId,
+          req.params.attachmentId,
+        );
+
+      res.json({
+        attachment: serializeAttachment(attachment),
+        activity: serializeActivity(activity),
+      });
+    }),
+  );
+
   app.get("/api/tasks/:taskId/context", (req, res) => {
     const context = services.comments.getTaskContext(req.params.taskId);
+    const attachments = services.attachments.listTaskAttachments(
+      req.params.taskId,
+    );
 
     res.json({
       project: serializeProject(context.project),
@@ -132,6 +208,7 @@ export function registerTaskRoutes(app: Express, services: ApiServices) {
       task: serializeTask(context.task),
       comments: context.comments.map(serializeComment),
       activity: context.activity.map(serializeActivity),
+      attachments: attachments.map(serializeAttachment),
     });
   });
 }

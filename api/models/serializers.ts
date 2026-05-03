@@ -5,6 +5,7 @@ import type {
   Project,
   Task,
   TaskActivity,
+  TaskAttachment,
   TaskComment,
 } from "../db/schema.js";
 
@@ -103,6 +104,33 @@ export function serializeActivity(activity: TaskActivity) {
     summary: activity.summary,
     data: activity.data,
     createdAt: serializeDate(activity.createdAt),
+  };
+}
+
+export function serializeAttachment(attachment: TaskAttachment) {
+  return {
+    id: attachment.id,
+    projectId: attachment.projectId,
+    boardId: attachment.boardId,
+    taskId: attachment.taskId,
+    relativePath: attachment.relativePath,
+    url: `/uploads/${attachment.relativePath}`,
+    originalName: attachment.originalName,
+    contentType: attachment.contentType,
+    sizeBytes: attachment.sizeBytes,
+    createdAt: serializeDate(attachment.createdAt),
+  };
+}
+
+export function serializeAgentAttachment(attachment: TaskAttachment) {
+  return {
+    id: attachment.id,
+    taskId: attachment.taskId,
+    path: attachment.relativePath,
+    originalName: attachment.originalName,
+    contentType: attachment.contentType,
+    sizeBytes: attachment.sizeBytes,
+    createdAt: serializeDate(attachment.createdAt),
   };
 }
 

@@ -7,6 +7,7 @@ import type {
   SearchResponse,
   Task,
   TaskActivity,
+  TaskAttachment,
   TaskComment,
   TaskContext,
   TaskPriority,
@@ -28,7 +29,11 @@ export class ApiClientError extends Error {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
-  if (init?.body && !headers.has("content-type")) {
+  if (
+    init?.body &&
+    !(init.body instanceof FormData) &&
+    !headers.has("content-type")
+  ) {
     headers.set("content-type", "application/json");
   }
 
@@ -175,6 +180,32 @@ export const api = {
 
   getTaskContext: async (taskId: string) =>
     request<TaskContext>(`/api/tasks/${encodeURIComponent(taskId)}/context`),
+
+  uploadTaskAttachment: async (taskId: string, file: File) => {
+    const formData = new FormData();
+    formData.set("file", file);
+    const body = await request<{
+      attachment: TaskAttachment;
+      activity: TaskActivity;
+    }>(`/api/tasks/${encodeURIComponent(taskId)}/attachments`, {
+      method: "POST",
+      body: formData,
+    });
+    return body;
+  },
+
+  deleteTaskAttachment: async (taskId: string, attachmentId: string) => {
+    const body = await request<{
+      attachment: TaskAttachment;
+      activity: TaskActivity;
+    }>(
+      `/api/tasks/${encodeURIComponent(taskId)}/attachments/${encodeURIComponent(
+        attachmentId,
+      )}`,
+      { method: "DELETE" },
+    );
+    return body;
+  },
 
   search: (input: SearchInput) =>
     request<SearchResponse>("/api/search", {

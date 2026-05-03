@@ -14,10 +14,13 @@ describe("agent markdown API", () => {
   let client: DatabaseClient | undefined;
   let server: Server | undefined;
   let baseUrl: string;
+  let previousUploadsPath: string | undefined;
 
   beforeEach(async () => {
     tmpDir = mkdtempSync(join(tmpdir(), "taskboards-agent-api-"));
     const databasePath = join(tmpDir, "test.sqlite");
+    previousUploadsPath = process.env.TASKBOARDS_UPLOADS_PATH;
+    process.env.TASKBOARDS_UPLOADS_PATH = join(tmpDir, "uploads");
     const migrationResult = runMigrations({
       databasePath,
       migrationsDir: resolve(process.cwd(), "drizzle"),
@@ -65,6 +68,13 @@ describe("agent markdown API", () => {
       rmSync(tmpDir, { recursive: true, force: true });
       tmpDir = undefined;
     }
+
+    if (previousUploadsPath === undefined) {
+      delete process.env.TASKBOARDS_UPLOADS_PATH;
+    } else {
+      process.env.TASKBOARDS_UPLOADS_PATH = previousUploadsPath;
+    }
+    previousUploadsPath = undefined;
   });
 
   it("serves markdown help with format controls and markdown errors", async () => {
@@ -315,6 +325,45 @@ describe("agent markdown API", () => {
     expect(archive.text).toContain("Comments and activity remain attached.");
   });
 
+  it("exposes task attachment paths to agents without an agent delete endpoint", async () => {
+    const { projectId, boardId } = await createProjectAndBoard();
+    const taskId = await createTask(projectId, boardId, {
+      title: "Inspect uploaded files",
+      columnKey: "ready",
+    });
+
+    const upload = await uploadFile(
+      `/api/tasks/${taskId}/attachments`,
+      "trace.txt",
+      "agent readable attachment",
+      "text/plain",
+    );
+    expect(upload.status).toBe(201);
+
+    const attachments = await api(
+      "GET",
+      `/api/agents/tasks/${taskId}/attachments?format=json`,
+    );
+    const attachment = asObject(
+      arrayProp(jsonBlock(attachments.text), "attachments")[0],
+    );
+    expect(stringProp(attachment, "path")).toMatch(/^tasks\//);
+    expect(attachment.url).toBeUndefined();
+
+    const context = await api(
+      "GET",
+      `/api/agents/tasks/${taskId}/context?format=json`,
+    );
+    expect(context.text).toContain("## Attachments");
+    expect(context.text).toContain("trace.txt");
+
+    const deleteAttempt = await api(
+      "DELETE",
+      `/api/agents/tasks/${taskId}/attachments/${stringProp(attachment, "id")}`,
+    );
+    expect(deleteAttempt.status).toBe(404);
+  });
+
   async function createProjectAndBoard() {
     const project = objectProp(
       jsonBlock(
@@ -357,6 +406,25 @@ describe("agent markdown API", () => {
       body,
     );
     return stringProp(objectProp(jsonBlock(response.text), "task"), "id");
+  }
+
+  async function uploadFile(
+    path: string,
+    fileName: string,
+    body: string,
+    contentType: string,
+  ) {
+    const formData = new FormData();
+    formData.set("file", new Blob([body], { type: contentType }), fileName);
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: "POST",
+      body: formData,
+    });
+
+    return {
+      status: response.status,
+      body: (await response.json()) as unknown,
+    };
   }
 
   async function api(
