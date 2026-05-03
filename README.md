@@ -110,7 +110,20 @@ The local embedding model is expected at:
 models-gguf/bge-small-en-v1.5-f32.gguf
 ```
 
-The model directory is ignored by git so model weights stay local.
+The model directory is ignored by git so model weights stay local. To download
+the expected GGUF file from Hugging Face:
+
+```sh
+mkdir -p models-gguf
+curl -L \
+  -o models-gguf/bge-small-en-v1.5-f32.gguf \
+  https://huggingface.co/CompendiumLabs/bge-small-en-v1.5-gguf/resolve/main/bge-small-en-v1.5-f32.gguf
+```
+
+GGUF is the model file format used by `llama.cpp` and `node-llama-cpp`. The
+`f32` file is the unquantized version expected by this repo's default settings;
+smaller quantized files exist, but use the exact filename above unless you also
+set `TASKBOARDS_EMBEDDING_MODEL_PATH` to point at a different model file.
 
 ## Typical Workflows
 
