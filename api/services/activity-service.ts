@@ -6,7 +6,6 @@ import {
   inArray,
   isNull,
   ne,
-  sql,
   type SQL,
 } from "drizzle-orm";
 import type { DatabaseClient } from "../db/client.js";
@@ -175,10 +174,6 @@ function baseConditions(input: ActivityQuery, projectIds: string[]) {
     conditions.push(isNull(projects.archivedAt));
     conditions.push(isNull(boards.archivedAt));
     conditions.push(isNull(tasks.archivedAt));
-  }
-
-  if (conditions.length === 0) {
-    conditions.push(sql`1 = 1`);
   }
 
   return conditions;

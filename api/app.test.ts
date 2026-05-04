@@ -322,6 +322,12 @@ describe("starter API", () => {
         .map(asObject)
         .map((item) => stringProp(item, "id")),
     ).toContain(archivedActivityId);
+
+    const oversizedOffset = await api("GET", "/api/activity?offset=10001");
+    expect(oversizedOffset.status).toBe(400);
+    expect(stringProp(objectProp(oversizedOffset.body, "error"), "code")).toBe(
+      "invalid_request",
+    );
   });
 
   it("moves tasks by column key, reorders positions, and updates completion state", async () => {

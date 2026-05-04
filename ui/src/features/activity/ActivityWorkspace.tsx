@@ -1,6 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Topbar } from "../../components/layout";
 import { Avatar, Button, EmptyState, Icon, InlineError, Mono, SkeletonRows } from "../../components/ui";
 import type { ActivitySort, ProjectActivityItem, ProjectTreeItem } from "../../domain/types";
@@ -9,6 +7,7 @@ import { apiMessage } from "../../lib/errors";
 import { formatDate } from "../../lib/format";
 import { glyphForName } from "../../lib/task-display";
 import { normalizeProjectSelection, toggleProjectSelection } from "./activity-filters";
+import { activityCommentPreviewText } from "./activity-preview";
 
 const ACTIVITY_PAGE_SIZE = 50;
 
@@ -209,12 +208,24 @@ function ActivityFeedItem({
   const actorType = item.type === "comment" ? item.authorType : item.actorType;
   const actorName = item.type === "comment" ? item.authorName : item.actorName;
   const title = item.type === "comment" ? "Comment was added" : item.summary;
+  const openTask = () => onOpenTask(item.project.id, item.board.id, item.task.id);
+  const openTaskWithKeyboard = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key === "Enter") {
+      openTask();
+    }
+    if (event.key === " ") {
+      event.preventDefault();
+      openTask();
+    }
+  };
 
   return (
-    <button
+    <article
       className={`activity-entry activity-entry--${item.type}`}
-      onClick={() => onOpenTask(item.project.id, item.board.id, item.task.id)}
-      type="button"
+      onClick={openTask}
+      onKeyDown={openTaskWithKeyboard}
+      role="button"
+      tabIndex={0}
     >
       <Avatar kind={actorType} name={actorName} size={22} />
       <div className="activity-entry__body">
@@ -228,9 +239,7 @@ function ActivityFeedItem({
         <div className="activity-entry__title">{title}</div>
         {item.type === "comment" && (
           <div className="activity-entry__comment">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {previewMarkdown(item.body)}
-            </ReactMarkdown>
+            {activityCommentPreviewText(item.body)}
           </div>
         )}
         <div className="activity-entry__context">
@@ -240,14 +249,6 @@ function ActivityFeedItem({
           {item.task.archivedAt && <span className="activity-entry__archived">Archived</span>}
         </div>
       </div>
-    </button>
+    </article>
   );
-}
-
-function previewMarkdown(value: string) {
-  const trimmed = value.trim();
-  if (trimmed.length <= 600) {
-    return trimmed;
-  }
-  return `${trimmed.slice(0, 600).trimEnd()}...`;
 }

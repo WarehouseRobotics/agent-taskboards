@@ -99,6 +99,11 @@
   background: var(--bg-hover);
 }
 
+.activity-entry:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .activity-entry__body {
   display: flex;
   flex-direction: column;

@@ -40,7 +40,7 @@ export const activityQuerySchema = z.object({
   limit: queryInteger(50, 100).refine((value) => value > 0, {
     message: "Limit must be greater than 0",
   }),
-  offset: queryInteger(0, Number.MAX_SAFE_INTEGER),
+  offset: queryInteger(0, 10_000),
   sort: z.enum(["asc", "desc"]).optional().default("desc"),
   includeArchived: z
     .enum(["true", "false"])
