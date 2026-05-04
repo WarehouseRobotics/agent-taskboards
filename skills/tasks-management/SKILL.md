@@ -9,10 +9,9 @@ metadata:
 ## When to use
 
 Use this skill whenever the user wants you to track work, look up existing
-tasks, leave handoff notes, or query historical project context in Agent
-Taskboards. Signals: the working repo contains `docs/taskboards.md`, the
-host responds on `$TASKBOARDS_HOST_URL/api/agents/health`, or the user
-mentions "taskboard", "the board", "this task".
+tasks, leave handoff notes, or query historical project context in Agent Taskboards. 
+Strong signals: the user mentions "taskboard", "the board", "this task" 
+or if the tasks management skill and taskboards are mentioned in project instructions.
 
 ## The `taskboards` wrapper
 
