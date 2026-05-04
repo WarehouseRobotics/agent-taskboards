@@ -90,3 +90,12 @@ Check the docs for scope-specific context before implementing features:
 - `docs/design.md`: design rules
 - `docs/text-embedding.md`: text embeddings and vector search
 - `docs/ui.md`: UI architecture and principles
+
+## Project Task Management
+
+Use the task-management skill for tracking project tasks. When performing tasks, you should check taskboard context and track tasks' states using the taskboards skill. This project data:
+
+- taskboards project: `agent-taskboards`
+- two boards: `api` and `ui`
+
+Keep up with the task boards: **check and update taskboard tasks often!**
