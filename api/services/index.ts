@@ -1,4 +1,5 @@
 import { AttachmentService } from "./attachment-service.js";
+import { ActivityService } from "./activity-service.js";
 import type { DatabaseClient } from "../db/client.js";
 import { BoardService } from "./board-service.js";
 import { CommentService } from "./comment-service.js";
@@ -12,6 +13,7 @@ export interface ApiServices {
   tasks: TaskService;
   comments: CommentService;
   attachments: AttachmentService;
+  activity: ActivityService;
   search: SearchService;
 }
 
@@ -28,6 +30,7 @@ export function createServices(
   const boards = new BoardService(databaseClient, projects, search);
   const tasks = new TaskService(databaseClient, projects, boards, search);
   const attachments = new AttachmentService(databaseClient, tasks);
+  const activity = new ActivityService(databaseClient, projects);
   const comments = new CommentService(
     databaseClient,
     projects,
@@ -36,5 +39,5 @@ export function createServices(
     search,
   );
 
-  return { projects, boards, tasks, comments, attachments, search };
+  return { projects, boards, tasks, comments, attachments, activity, search };
 }

@@ -1,8 +1,10 @@
 import type {
   ApiErrorBody,
+  ActivitySort,
   Board,
   Health,
   Project,
+  ProjectActivityResponse,
   SearchInput,
   SearchResponse,
   Task,
@@ -108,6 +110,26 @@ export const api = {
     await request<unknown>(`/api/projects/${encodeURIComponent(projectId)}`, {
       method: "DELETE",
     });
+  },
+
+  listActivity: async (input: {
+    projectIds?: string[];
+    limit?: number;
+    offset?: number;
+    sort?: ActivitySort;
+    includeArchived?: boolean;
+  } = {}) => {
+    const params = new URLSearchParams();
+    for (const projectId of input.projectIds ?? []) {
+      params.append("projectId", projectId);
+    }
+    if (input.limit !== undefined) params.set("limit", String(input.limit));
+    if (input.offset !== undefined) params.set("offset", String(input.offset));
+    if (input.sort) params.set("sort", input.sort);
+    if (input.includeArchived) params.set("includeArchived", "true");
+
+    const query = params.toString();
+    return request<ProjectActivityResponse>(`/api/activity${query ? `?${query}` : ""}`);
   },
 
   listBoards: async (projectId: string) => {

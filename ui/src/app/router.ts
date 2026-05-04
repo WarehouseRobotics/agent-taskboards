@@ -1,6 +1,7 @@
 export const defaultSettingsSection = "general";
 
 export type AppRoute =
+  | { view: "activity"; projectIds: string[]; sort: "asc" | "desc" }
   | { view: "board"; projectId: string | null; boardId: string | null; taskId: string | null }
   | { view: "projects"; projectId: string | null }
   | { view: "search"; query: string | null }
@@ -29,6 +30,12 @@ export function parseRoute(
     return { view: "settings", section: parts[1] ?? defaultSettingsSection };
   }
 
+  if (parts[0] === "activity") {
+    const params = new URLSearchParams(search);
+    const sort = params.get("sort") === "asc" ? "asc" : "desc";
+    return { view: "activity", projectIds: params.getAll("projectId"), sort };
+  }
+
   if (parts[0] === "search") {
     const query = new URLSearchParams(search).get("q");
     const trimmed = query?.trim();
@@ -43,6 +50,17 @@ export function parseRoute(
 }
 
 export function routePath(route: AppRoute) {
+  if (route.view === "activity") {
+    const params = new URLSearchParams();
+    for (const projectId of route.projectIds) {
+      params.append("projectId", projectId);
+    }
+    if (route.sort !== "desc") {
+      params.set("sort", route.sort);
+    }
+    const query = params.toString();
+    return query ? `/activity?${query}` : "/activity";
+  }
   if (route.view === "projects") {
     return route.projectId ? `/projects/${encodeURIComponent(route.projectId)}` : "/projects";
   }

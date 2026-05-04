@@ -171,6 +171,7 @@ section — read and use them instead of guessing.
 - Archive instead of deleting; there is no hard-delete endpoint. Confirm with
   the user before archiving anything they did not ask to archive.
 - Prefer using names for projects and boards, rather than IDs. Taskboards project and board names can sometimes be found in project instructions.
+- When mentioning tasks, mention at least the name and ID (not just the ID alone)
 - Keep object IDs or names (`project_…`, `board_…`, `task_…`) visible in your replies.
 
 ## Errors

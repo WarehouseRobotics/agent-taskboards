@@ -15,6 +15,8 @@ The v1 UI should prioritize operational workflows:
 - board list for a project
 - Kanban board view with columns and ordered tasks
 - task detail panel or route with description, metadata, comments, and activity
+- project activity view for recent changes and comments across one or more
+  projects
 - search view for text and semantic search across tasks and comments
 - maintenance view for reindexing, cleanup, and storage health
 
@@ -69,6 +71,18 @@ should render a small thumbnail from the original uploaded file URL; no separate
 thumbnail-generation flow is required for v1.
 
 Comments should be treated as durable task memory, not disposable chat.
+
+## Activity Experience
+
+The Activity view shows a merged chronological stream of task changes and
+comments. It defaults to all active projects, newest first, and lets users
+filter down to one or more projects. Board headers should link to the same view
+with the current project selected.
+
+Activity rows stay dense: task-change events are single-line summaries with
+event type and parent context, while comments show compact inline previews so
+handoffs and decisions can be scanned without opening every task. Opening a row
+navigates to the task detail route.
 
 ## Search Experience
 

@@ -8,6 +8,7 @@ import type {
   TaskAttachment,
   TaskComment,
 } from "../db/schema.js";
+import type { ProjectActivityFeedItem } from "../services/activity-service.js";
 
 export function serializeProject(project: Project) {
   return {
@@ -104,6 +105,50 @@ export function serializeActivity(activity: TaskActivity) {
     summary: activity.summary,
     data: activity.data,
     createdAt: serializeDate(activity.createdAt),
+  };
+}
+
+export function serializeActivityFeedItem(item: ProjectActivityFeedItem) {
+  const base = {
+    id: item.id,
+    type: item.type,
+    createdAt: serializeDate(item.createdAt),
+    project: {
+      id: item.project.id,
+      name: item.project.name,
+    },
+    board: {
+      id: item.board.id,
+      name: item.board.name,
+    },
+    task: {
+      id: item.task.id,
+      title: item.task.title,
+      priority: item.task.priority,
+      archivedAt: serializeDate(item.task.archivedAt),
+    },
+  };
+
+  if (item.type === "comment") {
+    return {
+      ...base,
+      authorType: item.comment.authorType,
+      authorName: item.comment.authorName,
+      authorRef: item.comment.authorRef,
+      body: item.comment.body,
+      commentId: item.comment.id,
+    };
+  }
+
+  return {
+    ...base,
+    actorType: item.activity.actorType,
+    actorName: item.activity.actorName,
+    actorRef: item.activity.actorRef,
+    eventType: item.activity.eventType,
+    summary: item.activity.summary,
+    data: item.activity.data,
+    activityId: item.activity.id,
   };
 }
 

@@ -190,6 +190,140 @@ describe("starter API", () => {
     ).toBe(true);
   });
 
+  it("lists a merged project activity feed with filters, pagination, and archive visibility", async () => {
+    const alpha = await createNamedProjectAndBoard("activity-alpha", "alpha-board");
+    const beta = await createNamedProjectAndBoard("activity-beta", "beta-board");
+
+    const alphaTaskResponse = await api(
+      "POST",
+      `/api/projects/${alpha.projectId}/boards/${alpha.boardId}/tasks`,
+      { title: "Alpha task" },
+    );
+    const alphaTask = objectProp(alphaTaskResponse.body, "task");
+    const alphaTaskId = stringProp(alphaTask, "id");
+    const alphaCreateActivityId = stringProp(
+      objectProp(alphaTaskResponse.body, "activity"),
+      "id",
+    );
+
+    const alphaCommentResponse = await api(
+      "POST",
+      `/api/tasks/${alphaTaskId}/comments`,
+      {
+        authorType: "agent",
+        authorName: "Codex",
+        body: "Alpha handoff note.",
+      },
+    );
+    const alphaCommentId = stringProp(
+      objectProp(alphaCommentResponse.body, "comment"),
+      "id",
+    );
+    const alphaCommentActivityId = stringProp(
+      objectProp(alphaCommentResponse.body, "activity"),
+      "id",
+    );
+
+    const betaTaskResponse = await api(
+      "POST",
+      `/api/projects/${beta.projectId}/boards/${beta.boardId}/tasks`,
+      { title: "Beta task" },
+    );
+    const betaTaskId = stringProp(objectProp(betaTaskResponse.body, "task"), "id");
+    const betaCreateActivityId = stringProp(
+      objectProp(betaTaskResponse.body, "activity"),
+      "id",
+    );
+    const betaUpdateResponse = await api("PATCH", `/api/tasks/${betaTaskId}`, {
+      title: "Beta task updated",
+    });
+    const betaUpdateActivityId = stringProp(
+      objectProp(betaUpdateResponse.body, "activity"),
+      "id",
+    );
+
+    const archivedTaskResponse = await api(
+      "POST",
+      `/api/projects/${alpha.projectId}/boards/${alpha.boardId}/tasks`,
+      { title: "Archived task" },
+    );
+    const archivedTaskId = stringProp(
+      objectProp(archivedTaskResponse.body, "task"),
+      "id",
+    );
+    const archivedCreateActivityId = stringProp(
+      objectProp(archivedTaskResponse.body, "activity"),
+      "id",
+    );
+    const archivedResponse = await api("POST", `/api/tasks/${archivedTaskId}/archive`);
+    const archivedActivityId = stringProp(
+      objectProp(archivedResponse.body, "activity"),
+      "id",
+    );
+
+    setActivityCreatedAt(alphaCreateActivityId, "2026-01-01T00:00:00.000Z");
+    setCommentCreatedAt(alphaCommentId, "2026-01-02T00:00:00.000Z");
+    setActivityCreatedAt(alphaCommentActivityId, "2026-01-02T00:00:00.000Z");
+    setActivityCreatedAt(betaCreateActivityId, "2026-01-01T12:00:00.000Z");
+    setActivityCreatedAt(betaUpdateActivityId, "2026-01-03T00:00:00.000Z");
+    setActivityCreatedAt(archivedCreateActivityId, "2026-01-04T00:00:00.000Z");
+    setActivityCreatedAt(archivedActivityId, "2026-01-05T00:00:00.000Z");
+
+    const feed = await api("GET", "/api/activity?limit=10");
+    expect(feed.status).toBe(200);
+    const items = arrayProp(feed.body, "items").map(asObject);
+    expect(items.map((item) => stringProp(item, "id"))).toEqual([
+      betaUpdateActivityId,
+      alphaCommentId,
+      betaCreateActivityId,
+      alphaCreateActivityId,
+    ]);
+    expect(items.map((item) => stringProp(item, "type"))).toEqual([
+      "activity",
+      "comment",
+      "activity",
+      "activity",
+    ]);
+    expect(items.map((item) => item.eventType)).not.toContain("comment.created");
+    expect(stringProp(items[1], "body")).toBe("Alpha handoff note.");
+    expect(stringProp(objectProp(items[1], "project"), "name")).toBe(
+      "activity-alpha",
+    );
+    expect(stringProp(objectProp(items[2], "project"), "name")).toBe(
+      "activity-beta",
+    );
+
+    const alphaOnly = await api(
+      "GET",
+      `/api/activity?projectId=${alpha.projectId}&limit=10`,
+    );
+    expect(
+      arrayProp(alphaOnly.body, "items")
+        .map(asObject)
+        .every((item) => stringProp(objectProp(item, "project"), "id") === alpha.projectId),
+    ).toBe(true);
+
+    const pageOne = await api("GET", "/api/activity?limit=2&offset=0");
+    expect(arrayProp(pageOne.body, "items")).toHaveLength(2);
+    expect(booleanProp(pageOne.body, "hasMore")).toBe(true);
+    expect(numberProp(pageOne.body, "limit")).toBe(2);
+    expect(numberProp(pageOne.body, "offset")).toBe(0);
+
+    const pageTwo = await api("GET", "/api/activity?limit=2&offset=2");
+    expect(arrayProp(pageTwo.body, "items")).toHaveLength(2);
+    expect(booleanProp(pageTwo.body, "hasMore")).toBe(false);
+
+    const withArchived = await api(
+      "GET",
+      `/api/activity?projectId=${alpha.projectId}&includeArchived=true&limit=10`,
+    );
+    expect(
+      arrayProp(withArchived.body, "items")
+        .map(asObject)
+        .map((item) => stringProp(item, "id")),
+    ).toContain(archivedActivityId);
+  });
+
   it("moves tasks by column key, reorders positions, and updates completion state", async () => {
     const { projectId, boardId } = await createProjectAndBoard();
 
@@ -1010,6 +1144,27 @@ describe("starter API", () => {
     };
   }
 
+  async function createNamedProjectAndBoard(projectName: string, boardName: string) {
+    const project = objectProp(
+      (await api("POST", "/api/projects", { name: projectName })).body,
+      "project",
+    );
+    const projectId = stringProp(project, "id");
+    const board = objectProp(
+      (
+        await api("POST", `/api/projects/${projectId}/boards`, {
+          name: boardName,
+        })
+      ).body,
+      "board",
+    );
+
+    return {
+      projectId,
+      boardId: stringProp(board, "id"),
+    };
+  }
+
   async function api(
     method: string,
     path: string,
@@ -1094,6 +1249,28 @@ describe("starter API", () => {
       .prepare("SELECT count(*) AS count FROM search_document_vectors")
       .get() as { count: number } | undefined;
     return row?.count ?? 0;
+  }
+
+  function setActivityCreatedAt(activityId: string, value: string) {
+    if (!client) {
+      throw new Error("Expected test database client");
+    }
+    client.db
+      .update(taskActivity)
+      .set({ createdAt: new Date(value) })
+      .where(eq(taskActivity.id, activityId))
+      .run();
+  }
+
+  function setCommentCreatedAt(commentId: string, value: string) {
+    if (!client) {
+      throw new Error("Expected test database client");
+    }
+    client.db
+      .update(taskComments)
+      .set({ createdAt: new Date(value) })
+      .where(eq(taskComments.id, commentId))
+      .run();
   }
 });
 

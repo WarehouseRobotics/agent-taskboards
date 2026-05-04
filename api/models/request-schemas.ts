@@ -18,6 +18,36 @@ export const includeArchivedQuerySchema = z.object({
     .transform((value) => value === "true"),
 });
 
+const repeatedStringQuery = z
+  .union([requiredString, z.array(requiredString)])
+  .optional()
+  .transform((value) => {
+    if (!value) {
+      return [];
+    }
+    return Array.isArray(value) ? value : [value];
+  });
+
+const queryInteger = (defaultValue: number, max: number) =>
+  z
+    .string()
+    .optional()
+    .transform((value) => (value === undefined ? defaultValue : Number(value)))
+    .pipe(z.number().int().min(0).max(max));
+
+export const activityQuerySchema = z.object({
+  projectId: repeatedStringQuery,
+  limit: queryInteger(50, 100).refine((value) => value > 0, {
+    message: "Limit must be greater than 0",
+  }),
+  offset: queryInteger(0, Number.MAX_SAFE_INTEGER),
+  sort: z.enum(["asc", "desc"]).optional().default("desc"),
+  includeArchived: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((value) => value === "true"),
+});
+
 export const projectCreateSchema = z.object({
   name: urlSafeNameSchema,
   description: nullableString.optional(),
@@ -134,4 +164,5 @@ export type TaskCreateInput = z.infer<typeof taskCreateSchema>;
 export type TaskUpdateInput = z.infer<typeof taskUpdateSchema>;
 export type TaskMoveInput = z.infer<typeof taskMoveSchema>;
 export type CommentCreateInput = z.infer<typeof commentCreateSchema>;
+export type ActivityQuery = z.infer<typeof activityQuerySchema>;
 export type SearchInput = z.infer<typeof searchSchema>;

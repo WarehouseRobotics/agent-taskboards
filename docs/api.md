@@ -534,6 +534,42 @@ Response:
 
 The `board` object includes ordered columns.
 
+## Activity Feed
+
+`GET /api/activity`
+
+Lists a merged chronological feed of task activity and comments for one or more
+projects. The endpoint is intended for the human UI's project activity view.
+
+Query parameters:
+
+- `projectId`: optional; may be repeated to include multiple projects. When
+  omitted, the feed covers all active projects.
+- `limit`: default `50`, maximum `100`.
+- `offset`: default `0`.
+- `sort`: `desc` by default; accepts `desc` or `asc`.
+- `includeArchived`: default `false`.
+
+The feed includes:
+
+- `activity` items for task changes from `task_activity`, excluding
+  `comment.created` so comments do not appear twice
+- `comment` items from `task_comments`, including the comment body for inline
+  preview
+- compact parent context for each item: project, board, and task id/title data
+
+Response:
+
+```json
+{
+  "items": [],
+  "hasMore": false,
+  "limit": 50,
+  "offset": 0,
+  "sort": "desc"
+}
+```
+
 ## Search
 
 `POST /api/search`

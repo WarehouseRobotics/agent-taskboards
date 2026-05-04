@@ -8,6 +8,7 @@ import { apiMessage } from "../lib/errors";
 import { backgroundSyncIntervalMs, type TaskDraftsById } from "./sync";
 import { persistTheme, storedTheme } from "../lib/theme";
 import type { SearchResult, Theme, View } from "../domain/types";
+import { ActivityWorkspace } from "../features/activity";
 import { BoardWorkspace } from "../features/boards";
 import { ProjectsWorkspace } from "../features/projects";
 import { SearchWorkspace } from "../features/search";
@@ -57,7 +58,12 @@ export function App() {
   }, [applyRoute]);
 
   const view = route.view;
-  const activeProjectId = route.view === "board" || route.view === "projects" ? route.projectId : null;
+  const activeProjectId =
+    route.view === "board" || route.view === "projects"
+      ? route.projectId
+      : route.view === "activity" && route.projectIds.length === 1
+        ? route.projectIds[0]
+        : null;
   const activeBoardId = route.view === "board" ? route.boardId : null;
   const activeTaskId = route.view === "board" ? route.taskId : null;
   const health = useHealth();
@@ -202,6 +208,10 @@ export function App() {
       navigate({ view: "settings", section: defaultSettingsSection });
       return;
     }
+    if (nextView === "activity") {
+      navigate({ view: "activity", projectIds: [], sort: "desc" });
+      return;
+    }
     if (nextView === "search") {
       navigate({ view: "search", query: null });
       return;
@@ -326,6 +336,13 @@ export function App() {
             }}
             onMoveTask={moveTask}
             onOpenCreateTask={(columnId) => setNewTaskColumnId(columnId)}
+            onOpenProjectActivity={() =>
+              navigate({
+                view: "activity",
+                projectIds: selectedProjectId ? [selectedProjectId] : [],
+                sort: "desc",
+              })
+            }
             onOpenTask={openTask}
             onPostComment={async (taskId, body) => {
               setMutationError(null);
@@ -390,6 +407,19 @@ export function App() {
             initialQuery={route.view === "search" ? route.query : null}
             onOpenResult={openSearchResult}
             onQueryChange={handleSearchQueryChange}
+            projectTree={displayedProjectTree}
+          />
+        )}
+        {view === "activity" && (
+          <ActivityWorkspace
+            initialProjectIds={route.view === "activity" ? route.projectIds : []}
+            initialSort={route.view === "activity" ? route.sort : "desc"}
+            onFiltersChange={(projectIds, sort) =>
+              navigate({ view: "activity", projectIds, sort }, "replace")
+            }
+            onOpenTask={(projectId, boardId, taskId) =>
+              navigate({ view: "board", projectId, boardId, taskId })
+            }
             projectTree={displayedProjectTree}
           />
         )}

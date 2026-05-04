@@ -36,6 +36,7 @@ export function BoardWorkspace({
   onDeleteTaskAttachment,
   onMoveTask,
   onOpenCreateTask,
+  onOpenProjectActivity,
   onOpenSettings,
   onOpenTask,
   onPostComment,
@@ -72,6 +73,7 @@ export function BoardWorkspace({
   onDeleteTaskAttachment: (taskId: string, attachmentId: string) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onOpenCreateTask: (columnId: string | null) => void;
+  onOpenProjectActivity: () => void;
   onOpenSettings: () => void;
   onOpenTask: (taskId: string) => void;
   onPostComment: (taskId: string, body: string) => Promise<void>;
@@ -133,6 +135,9 @@ export function BoardWorkspace({
           <>
             <Button icon={<Icon name="settings" />} onClick={onOpenSettings} variant="ghost">
               Settings
+            </Button>
+            <Button icon={<Icon name="activity" />} onClick={onOpenProjectActivity} variant="ghost">
+              Activity
             </Button>
             <Button icon={<Icon name="refresh" />} onClick={() => onRefresh(activeTaskId)} variant="ghost">
               Sync

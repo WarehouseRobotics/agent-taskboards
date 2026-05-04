@@ -1,6 +1,6 @@
 export type Theme = "dark" | "light";
 
-export type View = "board" | "projects" | "search" | "maintenance" | "settings";
+export type View = "activity" | "board" | "projects" | "search" | "maintenance" | "settings";
 
 export type TaskPriority = "low" | "normal" | "high" | "urgent";
 
@@ -164,4 +164,44 @@ export interface TaskContext {
   comments: TaskComment[];
   activity: TaskActivity[];
   attachments: TaskAttachment[];
+}
+
+export type ActivitySort = "asc" | "desc";
+
+interface ActivityParentContext {
+  project: Pick<Project, "id" | "name">;
+  board: Pick<Board, "id" | "name">;
+  task: Pick<Task, "id" | "title" | "priority" | "archivedAt">;
+}
+
+export type ProjectActivityItem =
+  | (ActivityParentContext & {
+      id: string;
+      type: "activity";
+      activityId: string;
+      actorType: ActorType;
+      actorName: string | null;
+      actorRef: string | null;
+      eventType: string;
+      summary: string;
+      data: Record<string, unknown>;
+      createdAt: string | null;
+    })
+  | (ActivityParentContext & {
+      id: string;
+      type: "comment";
+      commentId: string;
+      authorType: ActorType;
+      authorName: string | null;
+      authorRef: string | null;
+      body: string;
+      createdAt: string | null;
+    });
+
+export interface ProjectActivityResponse {
+  items: ProjectActivityItem[];
+  hasMore: boolean;
+  limit: number;
+  offset: number;
+  sort: ActivitySort;
 }
