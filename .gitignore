@@ -14,3 +14,4 @@ tmp/*
 !.env.example
 npm-debug.log*
 models-gguf/
+.claude/
