@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 import type { TaskAttachment } from "../../domain/types";
-import { appendImageAttachmentMarkdown, filesFromClipboardData, isImageAttachment } from "./TaskDetail";
+import { appendImageAttachmentMarkdown, buildTaskReferenceText, filesFromClipboardData, isImageAttachment } from "./TaskDetail";
+
+describe("task reference helpers", () => {
+  it("formats the visible task title and ID for copying", () => {
+    expect(buildTaskReferenceText("  Fix clipboard copy  ", "Saved title", "task_123")).toBe(
+      "Fix clipboard copy ( id=task_123 )",
+    );
+  });
+
+  it("falls back to the saved title when the visible draft title is blank", () => {
+    expect(buildTaskReferenceText("  ", "Saved title", "task_123")).toBe(
+      "Saved title ( id=task_123 )",
+    );
+  });
+});
 
 describe("task attachment helpers", () => {
   it("appends image markdown links without saving the task description", () => {

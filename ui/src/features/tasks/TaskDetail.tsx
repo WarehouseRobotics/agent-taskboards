@@ -48,6 +48,11 @@ function isTaskDraftDirty(draft: TaskEditDraft) {
   return draft.current.title !== draft.base.title || draft.current.description !== draft.base.description;
 }
 
+export function buildTaskReferenceText(visibleTitle: string, fallbackTitle: string, taskId: string) {
+  const title = visibleTitle.trim() || fallbackTitle.trim();
+  return `${title} ( id=${taskId} )`;
+}
+
 export function appendImageAttachmentMarkdown(description: string, attachment: TaskAttachment) {
   const prefix = description.trimEnd();
   const altText = attachment.originalName.replace(/[\[\]\n\r]/g, " ").trim() || "attachment";
@@ -97,6 +102,56 @@ function isInteractivePreviewTarget(target: EventTarget | null) {
   );
 }
 
+async function copyTextToClipboard(text: string) {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // The fallback still works in older browsers and stricter contexts.
+    }
+  }
+
+  return copyTextWithInput(text);
+}
+
+function copyTextWithInput(text: string) {
+  const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const selection = document.getSelection();
+  const ranges = selection ? Array.from({ length: selection.rangeCount }, (_, index) => selection.getRangeAt(index).cloneRange()) : [];
+  const input = document.createElement("input");
+
+  input.type = "text";
+  input.value = text;
+  input.readOnly = true;
+  input.style.position = "fixed";
+  input.style.left = "-1000px";
+  input.style.top = "-1000px";
+  input.style.opacity = "0";
+  document.body.append(input);
+  input.focus({ preventScroll: true });
+  input.select();
+  input.setSelectionRange(0, text.length);
+
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } catch {
+    copied = false;
+  } finally {
+    input.remove();
+    activeElement?.focus({ preventScroll: true });
+    if (selection && ranges.length > 0) {
+      selection.removeAllRanges();
+      for (const range of ranges) {
+        selection.addRange(range);
+      }
+    }
+  }
+
+  return copied;
+}
+
 export function TaskDetail({
   columns,
   context,
@@ -133,6 +188,7 @@ export function TaskDetail({
   const [saving, setSaving] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
+  const [taskIdCopyBlink, setTaskIdCopyBlink] = useState(false);
   const [descriptionView, setDescriptionView] = useState<TaskDescriptionView>(() => storedDescriptionView());
   const [descriptionHeight, setDescriptionHeight] = useState<number | null>(() => storedDescriptionHeight());
   const [resizingDescription, setResizingDescription] = useState(false);
@@ -141,6 +197,7 @@ export function TaskDetail({
   const descriptionResizeStart = useRef<{ pointerId: number; startHeight: number; startY: number } | null>(null);
   const detailToastTimeout = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const taskIdCopyBlinkTimeout = useRef<number | null>(null);
   const lastPreviewTap = useRef(0);
 
   const changeDescriptionView = useCallback((mode: TaskDescriptionView) => {
@@ -180,6 +237,18 @@ export function TaskDetail({
     detailToastTimeout.current = window.setTimeout(() => setDetailToast(null), 2400);
   }, []);
 
+  const flashTaskIdCopy = useCallback(() => {
+    if (taskIdCopyBlinkTimeout.current) {
+      window.clearTimeout(taskIdCopyBlinkTimeout.current);
+    }
+
+    setTaskIdCopyBlink(false);
+    window.requestAnimationFrame(() => {
+      setTaskIdCopyBlink(true);
+      taskIdCopyBlinkTimeout.current = window.setTimeout(() => setTaskIdCopyBlink(false), 850);
+    });
+  }, []);
+
   const requestClose = useCallback(() => {
     if (hasPendingChanges) {
       showDetailToast("Changes pending", "warning");
@@ -209,6 +278,7 @@ export function TaskDetail({
     setComment("");
     setDetailToast(null);
     setShowActivity(false);
+    setTaskIdCopyBlink(false);
   }, [taskId]);
 
   useEffect(() => {
@@ -248,6 +318,9 @@ export function TaskDetail({
     return () => {
       if (detailToastTimeout.current) {
         window.clearTimeout(detailToastTimeout.current);
+      }
+      if (taskIdCopyBlinkTimeout.current) {
+        window.clearTimeout(taskIdCopyBlinkTimeout.current);
       }
     };
   }, []);
@@ -535,12 +608,30 @@ export function TaskDetail({
     }
   };
 
+  const copyTaskReference = async () => {
+    const referenceText = buildTaskReferenceText(activeDraft.current.title, serverTitle, task.id);
+    if (await copyTextToClipboard(referenceText)) {
+      flashTaskIdCopy();
+      return;
+    }
+
+    showDetailToast("Unable to copy task reference", "warning");
+  };
+
   return (
     <aside className="task-detail" onPaste={pasteAttachmentFile} ref={detailRef}>
       <div className="task-detail__top">
         <div className="detail-meta">
           <PriorityFlag priority={task.priority} />
-          <Mono>{task.id}</Mono>
+          <button
+            aria-label={`Copy reference for task ${task.id}`}
+            className={taskIdCopyBlink ? "task-id-copy task-id-copy--copied mono" : "task-id-copy mono"}
+            onClick={() => void copyTaskReference()}
+            title="Copy task reference"
+            type="button"
+          >
+            {task.id}
+          </button>
           <span>created {formatDate(task.createdAt)}</span>
           <span>updated {formatDate(task.updatedAt)}</span>
         </div>

@@ -26,6 +26,45 @@
   font-size: var(--fs-11);
 }
 
+.task-id-copy {
+  height: 20px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.task-id-copy:hover {
+  border-color: var(--line);
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.task-id-copy:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.task-id-copy--copied {
+  animation: task-id-copy-blink 850ms var(--ease);
+}
+
+@keyframes task-id-copy-blink {
+  0%,
+  100% {
+    background: transparent;
+    color: var(--fg-subtle);
+  }
+
+  35%,
+  70% {
+    background: color-mix(in oklch, var(--accent) 14%, transparent);
+    color: var(--accent);
+  }
+}
+
 .task-edit-form {
   display: flex;
   flex-direction: column;
