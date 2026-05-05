@@ -6,6 +6,7 @@ import { CommentService } from "./comment-service.js";
 import { ProjectService } from "./project-service.js";
 import { SearchService, type EmbeddingModel } from "./search-service.js";
 import { TaskService } from "./task-service.js";
+import type { TaskIdSuffixGenerator } from "./task-id.js";
 
 export interface ApiServices {
   projects: ProjectService;
@@ -19,6 +20,7 @@ export interface ApiServices {
 
 export type CreateServicesOptions = {
   embeddingModel?: EmbeddingModel;
+  taskIdSuffixGenerator?: TaskIdSuffixGenerator;
 };
 
 export function createServices(
@@ -28,7 +30,9 @@ export function createServices(
   const search = new SearchService(databaseClient, options.embeddingModel);
   const projects = new ProjectService(databaseClient);
   const boards = new BoardService(databaseClient, projects, search);
-  const tasks = new TaskService(databaseClient, projects, boards, search);
+  const tasks = new TaskService(databaseClient, projects, boards, search, {
+    taskIdSuffixGenerator: options.taskIdSuffixGenerator,
+  });
   const attachments = new AttachmentService(databaseClient, tasks);
   const activity = new ActivityService(databaseClient, projects);
   const comments = new CommentService(

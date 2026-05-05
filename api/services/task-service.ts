@@ -16,17 +16,31 @@ import { runBestEffortIndex } from "./best-effort-index.js";
 import type { BoardService } from "./board-service.js";
 import type { ProjectService } from "./project-service.js";
 import type { SearchService } from "./search-service.js";
+import {
+  createHumanizedTaskId,
+  generateTaskIdSuffix,
+  TASK_ID_RETRY_LIMIT,
+  type TaskIdSuffixGenerator,
+} from "./task-id.js";
+
+export type TaskServiceOptions = {
+  taskIdSuffixGenerator?: TaskIdSuffixGenerator;
+};
 
 export class TaskService {
   private readonly db: DatabaseClient["db"];
+  private readonly taskIdSuffixGenerator: TaskIdSuffixGenerator;
 
   constructor(
     databaseClient: DatabaseClient,
     private readonly projectService: ProjectService,
     private readonly boardService: BoardService,
     private readonly searchService: SearchService,
+    options: TaskServiceOptions = {},
   ) {
     this.db = databaseClient.db;
+    this.taskIdSuffixGenerator =
+      options.taskIdSuffixGenerator ?? generateTaskIdSuffix;
   }
 
   listBoardTasks(projectId: string, boardId: string, includeArchived: boolean) {
@@ -71,11 +85,13 @@ export class TaskService {
     });
     const position = this.nextTaskPosition(board.id, column.id);
     const now = new Date();
+    const taskId = this.createUniqueTaskId(input.title);
 
     const created = this.db.transaction((tx) => {
       const task = tx
         .insert(tasks)
         .values({
+          id: taskId,
           projectId: project.id,
           boardId: board.id,
           columnId: column.id,
@@ -404,5 +420,26 @@ export class TaskService {
         ),
       )
       .all().length;
+  }
+
+  private createUniqueTaskId(title: string) {
+    for (let attempt = 0; attempt < TASK_ID_RETRY_LIMIT; attempt += 1) {
+      const taskId = createHumanizedTaskId(title, this.taskIdSuffixGenerator);
+      const existing = this.db
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(eq(tasks.id, taskId))
+        .get();
+
+      if (!existing) {
+        return taskId;
+      }
+    }
+
+    throw new ApiError(
+      500,
+      "internal_error",
+      "Unable to generate unique task ID",
+    );
   }
 }
