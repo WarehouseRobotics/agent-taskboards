@@ -41,7 +41,8 @@ alphanumeric suffix. The task prefix uses crude dependency-free transliteration:
 extended Latin diacritics are folded with Unicode normalization and Cyrillic
 characters are mapped to approximate Latin equivalents. Latin letters that do
 not decompose cleanly, such as `ß`, `œ`, `ø`, `đ`, and `ł`, use a small explicit
-map.
+map. Task IDs are generated only when the task is created; later title changes
+do not rename the task or any child records.
 
 Resources with stable IDs include:
 

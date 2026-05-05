@@ -16,6 +16,12 @@ Project and board names are URL-safe slugs (`^[a-z0-9_-]+$`). Agentic path and
 query parameters named `projectId` or `boardId` accept either the durable ID or
 the slug name. Resolution is exact and tries ID first, then name.
 
+Task IDs are durable API identifiers. New task IDs are human-readable,
+title-derived slugs with a short random suffix, using dependency-free
+transliteration for common extended Latin and Cyrillic characters. Agents may
+cite these IDs in transcripts and follow-up calls, but must treat them as opaque
+canonical IDs instead of recomputing them from task titles.
+
 ## Design Goals
 
 - Help agents orient themselves quickly across projects, boards, and pending
