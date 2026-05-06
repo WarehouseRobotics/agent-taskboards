@@ -121,6 +121,18 @@ export function registerTaskRoutes(app: Express, services: ApiServices) {
     }),
   );
 
+  app.delete("/api/tasks/:taskId/comments/:commentId", (req, res) => {
+    const { comment, activity } = services.comments.deleteComment(
+      req.params.taskId,
+      req.params.commentId,
+    );
+
+    res.json({
+      comment: serializeComment(comment),
+      activity: serializeActivity(activity),
+    });
+  });
+
   app.get("/api/tasks/:taskId/activity", (req, res) => {
     const activity = services.comments.listTaskActivity(req.params.taskId);
     res.json({ activity: activity.map(serializeActivity) });

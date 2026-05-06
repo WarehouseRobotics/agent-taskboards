@@ -503,6 +503,21 @@ Response:
 }
 ```
 
+### `DELETE /api/tasks/:taskId/comments/:commentId`
+
+Hard-deletes one comment from an active task, removes its search index
+documents, and appends a `comment.deleted` activity entry. The comment must
+belong to the task in the path.
+
+Response:
+
+```json
+{
+  "comment": {},
+  "activity": {}
+}
+```
+
 ### `GET /api/tasks/:taskId/activity`
 
 Lists task activity entries in creation order.
@@ -515,6 +530,7 @@ Current generated event types:
 - `task.completed`
 - `task.archived`
 - `comment.created`
+- `comment.deleted`
 
 ### `GET /api/tasks/:taskId/context`
 

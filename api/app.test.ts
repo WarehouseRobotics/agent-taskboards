@@ -190,6 +190,95 @@ describe("starter API", () => {
     ).toBe(true);
   });
 
+  it("deletes individual task comments with audit activity and search cleanup", async () => {
+    const { projectId, boardId } = await createProjectAndBoard();
+    const taskResponse = await api(
+      "POST",
+      `/api/projects/${projectId}/boards/${boardId}/tasks`,
+      {
+        title: "Delete stale comment",
+      },
+    );
+    const taskId = stringProp(objectProp(taskResponse.body, "task"), "id");
+    const commentResponse = await api("POST", `/api/tasks/${taskId}/comments`, {
+      authorType: "agent",
+      authorName: "Codex",
+      authorRef: "local-session",
+      body: "This note should be deleted.",
+    });
+    const commentId = stringProp(
+      objectProp(commentResponse.body, "comment"),
+      "id",
+    );
+
+    if (!client) {
+      throw new Error("Expected test database client");
+    }
+
+    expect(
+      client.db
+        .select()
+        .from(searchDocuments)
+        .where(eq(searchDocuments.sourceId, commentId))
+        .all(),
+    ).toHaveLength(1);
+    expect(searchVectorCount()).toBe(3);
+
+    const wrongTaskResponse = await api(
+      "POST",
+      `/api/projects/${projectId}/boards/${boardId}/tasks`,
+      {
+        title: "Wrong task",
+      },
+    );
+    const wrongTaskId = stringProp(
+      objectProp(wrongTaskResponse.body, "task"),
+      "id",
+    );
+    const wrongDelete = await api(
+      "DELETE",
+      `/api/tasks/${wrongTaskId}/comments/${commentId}`,
+    );
+    expect(wrongDelete.status).toBe(404);
+
+    const deleted = await api(
+      "DELETE",
+      `/api/tasks/${taskId}/comments/${commentId}`,
+    );
+    expect(deleted.status).toBe(200);
+    expect(stringProp(objectProp(deleted.body, "comment"), "id")).toBe(
+      commentId,
+    );
+    expect(
+      stringProp(objectProp(deleted.body, "activity"), "eventType"),
+    ).toBe("comment.deleted");
+
+    const afterDeleteComments = await api("GET", `/api/tasks/${taskId}/comments`);
+    expect(arrayProp(afterDeleteComments.body, "comments")).toHaveLength(0);
+
+    const activityResponse = await api("GET", `/api/tasks/${taskId}/activity`);
+    expect(
+      arrayProp(activityResponse.body, "activity").map((item) =>
+        stringProp(asObject(item), "eventType"),
+      ),
+    ).toEqual(["task.created", "comment.created", "comment.deleted"]);
+    const deleteActivity = objectProp(deleted.body, "activity");
+    const activityData = objectProp(deleteActivity, "data");
+    expect(stringProp(activityData, "commentId")).toBe(commentId);
+    expect(stringProp(activityData, "authorType")).toBe("agent");
+    expect(stringProp(activityData, "authorName")).toBe("Codex");
+    expect(activityData).not.toHaveProperty("body");
+
+    expect(
+      client.db
+        .select()
+        .from(searchDocuments)
+        .where(eq(searchDocuments.sourceId, commentId))
+        .all(),
+    ).toHaveLength(0);
+    expect(searchVectorCount()).toBe(3);
+  });
+
   it("lists a merged project activity feed with filters, pagination, and archive visibility", async () => {
     const alpha = await createNamedProjectAndBoard("activity-alpha", "alpha-board");
     const beta = await createNamedProjectAndBoard("activity-beta", "beta-board");

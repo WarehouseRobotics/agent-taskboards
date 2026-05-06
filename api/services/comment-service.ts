@@ -1,6 +1,7 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type { DatabaseClient } from "../db/client.js";
-import { taskActivity, taskComments } from "../db/schema.js";
+import { searchDocuments, taskActivity, taskComments } from "../db/schema.js";
+import { ApiError } from "../http/errors.js";
 import type { CommentCreateInput } from "../models/request-schemas.js";
 import { runBestEffortIndex } from "./best-effort-index.js";
 import type { BoardService } from "./board-service.js";
@@ -74,6 +75,54 @@ export class CommentService {
       () => this.searchService.indexComment(created.comment),
     );
     return created;
+  }
+
+  deleteComment(taskId: string, commentId: string) {
+    const task = this.taskService.getTask(taskId, false);
+    const comment = this.db
+      .select()
+      .from(taskComments)
+      .where(
+        and(eq(taskComments.id, commentId), eq(taskComments.taskId, task.id)),
+      )
+      .get();
+
+    if (!comment) {
+      throw new ApiError(404, "not_found", "Comment not found");
+    }
+
+    return this.db.transaction((tx) => {
+      tx.delete(taskComments).where(eq(taskComments.id, comment.id)).run();
+
+      tx.delete(searchDocuments)
+        .where(
+          and(
+            eq(searchDocuments.sourceType, "comment"),
+            eq(searchDocuments.sourceId, comment.id),
+          ),
+        )
+        .run();
+
+      const activity = tx
+        .insert(taskActivity)
+        .values({
+          projectId: task.projectId,
+          boardId: task.boardId,
+          taskId: task.id,
+          eventType: "comment.deleted",
+          summary: "Comment was deleted",
+          data: {
+            commentId: comment.id,
+            authorType: comment.authorType,
+            authorName: comment.authorName,
+            authorRef: comment.authorRef,
+          },
+        })
+        .returning()
+        .get();
+
+      return { comment, activity };
+    });
   }
 
   listTaskActivity(taskId: string) {

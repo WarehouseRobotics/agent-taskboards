@@ -173,8 +173,9 @@ Supported author types are:
 human, agent, system
 ```
 
-Comments are append-oriented. The current API creates and lists comments; it
-does not edit or delete them.
+Comments are primarily append-oriented. The regular API creates and lists
+comments, and can individually hard-delete comments when deliberate cleanup is
+needed. It does not edit comments.
 
 ## Activity
 
