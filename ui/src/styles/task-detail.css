@@ -486,6 +486,9 @@
 }
 
 .timeline-entry__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
   font-size: var(--fs-12);
 }
 
@@ -516,6 +519,30 @@
 .kind-chip--system {
   background: color-mix(in oklch, var(--system-tint) 14%, transparent);
   color: var(--system-tint);
+}
+
+.timeline-entry__delete {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.timeline-entry:hover .timeline-entry__delete,
+.timeline-entry:focus-within .timeline-entry__delete {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.timeline-entry__delete:hover:not(:disabled),
+.timeline-entry__delete:focus-visible {
+  color: var(--status-blocked);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .timeline-entry__delete {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .timeline-entry__comment {

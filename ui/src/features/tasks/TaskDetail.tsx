@@ -5,6 +5,7 @@ import type { ActorType, BoardColumn, TaskActivity, TaskAttachment, TaskComment,
 import { apiMessage } from "../../lib/errors";
 import { formatDate } from "../../lib/format";
 import { columnStatus } from "../../lib/task-display";
+import { ConfirmDialog } from "../../components/layout";
 import { Avatar, Button, EmptyState, Icon, InlineError, LabelChip, Mono, PriorityFlag, StatusIcon } from "../../components/ui";
 import {
   clampDescriptionHeight,
@@ -159,6 +160,7 @@ export function TaskDetail({
   onArchiveTask,
   onClose,
   onCompleteTask,
+  onDeleteComment,
   onDeleteTaskAttachment,
   onMoveTask,
   onPostComment,
@@ -172,6 +174,7 @@ export function TaskDetail({
   onArchiveTask: (taskId: string) => Promise<void>;
   onClose: () => void;
   onCompleteTask: (taskId: string) => Promise<void>;
+  onDeleteComment: (taskId: string, commentId: string) => Promise<void>;
   onDeleteTaskAttachment: (taskId: string, attachmentId: string) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onPostComment: (taskId: string, body: string) => Promise<void>;
@@ -185,6 +188,7 @@ export function TaskDetail({
   const [detailToast, setDetailToast] = useState<{ message: string; tone: "success" | "warning" } | null>(null);
   const [dropActive, setDropActive] = useState(false);
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
+  const [pendingDeleteComment, setPendingDeleteComment] = useState<CommentTimelineItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
@@ -277,6 +281,7 @@ export function TaskDetail({
   useEffect(() => {
     setComment("");
     setDetailToast(null);
+    setPendingDeleteComment(null);
     setShowActivity(false);
     setTaskIdCopyBlink(false);
   }, [taskId]);
@@ -336,6 +341,9 @@ export function TaskDetail({
       if (!panel || !(target instanceof Node) || panel.contains(target)) {
         return;
       }
+      if (pendingDeleteComment) {
+        return;
+      }
 
       if (hasPendingChanges) {
         event.preventDefault();
@@ -349,7 +357,7 @@ export function TaskDetail({
 
     document.addEventListener("pointerdown", handleOutsidePointerDown, true);
     return () => document.removeEventListener("pointerdown", handleOutsidePointerDown, true);
-  }, [hasPendingChanges, onClose, showDetailToast, taskId]);
+  }, [hasPendingChanges, onClose, pendingDeleteComment, showDetailToast, taskId]);
 
   if (loading && !context) {
     return (
@@ -608,6 +616,16 @@ export function TaskDetail({
     }
   };
 
+  const confirmDeleteComment = async () => {
+    if (!pendingDeleteComment) {
+      return;
+    }
+
+    await onDeleteComment(task.id, pendingDeleteComment.id);
+    setPendingDeleteComment(null);
+    showDetailToast("Comment deleted");
+  };
+
   const copyTaskReference = async () => {
     const referenceText = buildTaskReferenceText(activeDraft.current.title, serverTitle, task.id);
     if (await copyTextToClipboard(referenceText)) {
@@ -619,6 +637,7 @@ export function TaskDetail({
   };
 
   return (
+    <>
     <aside className="task-detail" onPaste={pasteAttachmentFile} ref={detailRef}>
       <div className="task-detail__top">
         <div className="detail-meta">
@@ -862,7 +881,11 @@ export function TaskDetail({
         </div>
         <div className="timeline">
           {entries.map((entry) => (
-            <TimelineEntry entry={entry} key={`${entry.kind}-${entry.id}`} />
+            <TimelineEntry
+              entry={entry}
+              key={`${entry.kind}-${entry.id}`}
+              onRequestDeleteComment={setPendingDeleteComment}
+            />
           ))}
         </div>
         <form className="comment-form" onSubmit={submitComment}>
@@ -881,12 +904,25 @@ export function TaskDetail({
         </form>
       </section>
     </aside>
+    {pendingDeleteComment && (
+      <ConfirmDialog
+        confirmLabel="Delete"
+        danger
+        message={<p>This permanently deletes the comment from this task.</p>}
+        onCancel={() => setPendingDeleteComment(null)}
+        onConfirm={confirmDeleteComment}
+        title="Delete comment?"
+      />
+    )}
+    </>
   );
 }
 
 type TimelineItem =
   | { kind: "comment"; id: string; at: string | null; authorType: ActorType; authorName: string | null; body: string }
   | { kind: "activity"; id: string; at: string | null; actorType: ActorType; actorName: string | null; summary: string; eventType: string };
+
+type CommentTimelineItem = Extract<TimelineItem, { kind: "comment" }>;
 
 function mergeTimeline(comments: TaskComment[], activity: TaskActivity[]): TimelineItem[] {
   return [
@@ -910,7 +946,13 @@ function mergeTimeline(comments: TaskComment[], activity: TaskActivity[]): Timel
   ].sort((a, b) => new Date(a.at ?? 0).getTime() - new Date(b.at ?? 0).getTime());
 }
 
-function TimelineEntry({ entry }: { entry: TimelineItem }) {
+function TimelineEntry({
+  entry,
+  onRequestDeleteComment,
+}: {
+  entry: TimelineItem;
+  onRequestDeleteComment: (entry: CommentTimelineItem) => void;
+}) {
   const kind = entry.kind === "comment" ? entry.authorType : entry.actorType;
   const name = entry.kind === "comment" ? entry.authorName : entry.actorName;
   return (
@@ -922,6 +964,17 @@ function TimelineEntry({ entry }: { entry: TimelineItem }) {
           <span className={`kind-chip kind-chip--${kind}`}>{kind}</span>
           {entry.kind === "activity" && <Mono faded>{entry.eventType}</Mono>}
           <span className="timeline-entry__spacer" />
+          {entry.kind === "comment" && (
+            <button
+              aria-label="Delete comment"
+              className="icon-btn timeline-entry__delete"
+              onClick={() => onRequestDeleteComment(entry)}
+              title="Delete comment"
+              type="button"
+            >
+              <Icon name="trash" />
+            </button>
+          )}
           <Mono faded>{formatDate(entry.at)}</Mono>
         </div>
         <div className={entry.kind === "comment" ? "timeline-entry__comment" : "timeline-entry__summary"}>

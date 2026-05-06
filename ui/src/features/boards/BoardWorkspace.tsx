@@ -33,6 +33,7 @@ export function BoardWorkspace({
   onCreateProject,
   onCompleteTask,
   onCreateTask,
+  onDeleteComment,
   onDeleteTaskAttachment,
   onMoveTask,
   onOpenCreateTask,
@@ -70,6 +71,7 @@ export function BoardWorkspace({
     priority?: TaskPriority;
     labels?: string[];
   }) => Promise<void>;
+  onDeleteComment: (taskId: string, commentId: string) => Promise<void>;
   onDeleteTaskAttachment: (taskId: string, attachmentId: string) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onOpenCreateTask: (columnId: string | null) => void;
@@ -243,6 +245,7 @@ export function BoardWorkspace({
               onArchiveTask={onArchiveTask}
               onClose={onCloseTask}
               onCompleteTask={onCompleteTask}
+              onDeleteComment={onDeleteComment}
               onDeleteTaskAttachment={onDeleteTaskAttachment}
               onMoveTask={onMoveTask}
               onPostComment={onPostComment}

@@ -334,6 +334,16 @@ export function App() {
                 throw err;
               }
             }}
+            onDeleteComment={async (taskId, commentId) => {
+              setMutationError(null);
+              try {
+                await api.deleteComment(taskId, commentId);
+                await refreshAfterMutation(taskId);
+              } catch (err) {
+                setMutationError(apiMessage(err));
+                throw err;
+              }
+            }}
             onMoveTask={moveTask}
             onOpenCreateTask={(columnId) => setNewTaskColumnId(columnId)}
             onOpenProjectActivity={() =>

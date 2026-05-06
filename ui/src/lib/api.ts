@@ -297,6 +297,16 @@ export const api = {
     return body;
   },
 
+  deleteComment: async (taskId: string, commentId: string) => {
+    const body = await request<{ comment: TaskComment; activity: TaskActivity }>(
+      `/api/tasks/${encodeURIComponent(taskId)}/comments/${encodeURIComponent(
+        commentId,
+      )}`,
+      { method: "DELETE" },
+    );
+    return body;
+  },
+
   search: (input: SearchInput) =>
     request<SearchResponse>("/api/search", {
       method: "POST",
