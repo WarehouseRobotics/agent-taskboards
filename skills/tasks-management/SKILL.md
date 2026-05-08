@@ -29,13 +29,14 @@ not cover.
 Invocation grammar:
 
 ```text
-taskboards <verb> <path-or-shortcut> [key=value ...] [--json BODY | --data @FILE]
+taskboards <verb> <path-or-shortcut> [key=value ...] [--json BODY | --data FILE]
 ```
 
 - `<verb>` is `get`, `post`, `patch`, `delete`, or one of the shortcuts below.
 - `<path>` is API-relative (the wrapper prepends `/api/agents/`).
 - Bare `key=value` args become URL-encoded query parameters.
 - `--json '<body>'` sets a JSON request body inline.
+- `--data FILE` reads a JSON request body from a local file.
 
 Responses are returned verbatim — markdown narrative plus a fenced TOON block
 by default. Add `format=yaml|json|none` as a `key=value` arg to switch.

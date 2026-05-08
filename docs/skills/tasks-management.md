@@ -31,14 +31,14 @@ wrapper does not cover.
 Invocation grammar:
 
 ```text
-taskboards <verb> <path-or-shortcut> [key=value ...] [--json BODY | --data @FILE]
+taskboards <verb> <path-or-shortcut> [key=value ...] [--json BODY | --data FILE]
 ```
 
 `<verb>` is one of `get`, `post`, `patch`, `delete`, or one of the shortcuts
 below. `<path>` is API-relative (the wrapper prepends
 `$TASKBOARDS_HOST_URL/api/agents/`). Bare `key=value` arguments become
 URL-encoded query string entries. `--json` sets a JSON body inline; `--data`
-forwards a curl-style `@file` body.
+reads a JSON body from a local file.
 
 Built-in shortcuts:
 

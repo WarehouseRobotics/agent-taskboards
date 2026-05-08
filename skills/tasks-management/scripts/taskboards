@@ -14,7 +14,7 @@ AGENT_REF="${TASKBOARDS_AGENT_REF:-${CLAUDE_SESSION_ID:-local}}"
 
 usage() {
   cat <<'EOF'
-Usage: taskboards <verb> <path-or-shortcut> [key=value ...] [--json BODY | --data @FILE]
+Usage: taskboards <verb> <path-or-shortcut> [key=value ...] [--json BODY | --data FILE]
 
 Passthrough verbs: get, post, patch, delete
   taskboards get projects repositoryPath="$PWD"
@@ -85,7 +85,6 @@ body=""
 content_type=""
 shortcut_kind=""
 declare -a query=()
-declare -a curl_data_args=()
 declare -a curl_form_args=()
 
 case "$cmd" in
@@ -181,7 +180,13 @@ if [[ -n "$explicit_json" ]]; then
   content_type="application/json"
 fi
 if [[ -n "$explicit_data" ]]; then
-  curl_data_args+=(--data "$explicit_data")
+  data_file="${explicit_data#@}"
+  [[ "$data_file" == "$explicit_data" ]] || die "--data: pass a file path without a leading @"
+  [[ -f "$data_file" ]] || die "--data: file not found: $data_file"
+  [[ -r "$data_file" ]] || die "--data: file is not readable: $data_file"
+  body="$(<"$data_file")"
+  [[ -n "$body" ]] || die "--data: file is empty: $data_file"
+  content_type="application/json"
 fi
 
 url="$HOST/api/agents/$path"
@@ -195,7 +200,6 @@ declare -a curl_args=(-sS -X "$verb")
 [[ -n "$API_KEY" ]]      && curl_args+=(-H "Authorization: Bearer $API_KEY")
 [[ -n "$content_type" ]] && curl_args+=(-H "Content-Type: $content_type")
 [[ -n "$body" ]]         && curl_args+=(--data-raw "$body")
-[[ ${#curl_data_args[@]} -gt 0 ]] && curl_args+=("${curl_data_args[@]}")
 [[ ${#curl_form_args[@]} -gt 0 ]] && curl_args+=("${curl_form_args[@]}")
 curl_args+=("$url")
 
