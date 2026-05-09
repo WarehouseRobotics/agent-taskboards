@@ -85,8 +85,13 @@
 
 .settings-sheet {
   display: flex;
+  flex: 1;
+  min-height: 0;
   flex-direction: column;
   gap: var(--s-5);
+  overflow-y: auto;
+  padding-inline: var(--s-1);
+  scrollbar-gutter: stable;
 }
 
 .settings-sheet__section {
@@ -129,6 +134,99 @@
   flex-wrap: wrap;
   gap: var(--s-2);
   justify-content: flex-end;
+}
+
+.checkpoint-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.checkpoint-list__empty {
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+  color: var(--fg-faint);
+  font-size: var(--fs-12);
+  padding: var(--s-3);
+}
+
+.checkpoint-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s-3);
+  border: 1px solid var(--line-faint);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+  padding: var(--s-3);
+}
+
+.checkpoint-row__main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.checkpoint-row__title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.checkpoint-row__title strong {
+  overflow: hidden;
+  color: var(--fg);
+  font-size: var(--fs-13);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkpoint-row__description {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  text-wrap: pretty;
+}
+
+.checkpoint-row__meta,
+.checkpoint-row__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  color: var(--fg-faint);
+  font-size: var(--fs-11);
+}
+
+.checkpoint-row__summary span {
+  border: 1px solid var(--line-faint);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface-2);
+  padding: 2px 5px;
+}
+
+.checkpoint-row__actions {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+}
+
+.checkpoint-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  border: 1px solid color-mix(in oklch, var(--status-done) 35%, var(--line));
+  border-radius: var(--r-md);
+  background: color-mix(in oklch, var(--status-done) 8%, var(--bg-surface));
+  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  padding: var(--s-3);
+}
+
+.checkpoint-result ul {
+  margin: 0;
+  padding-left: var(--s-4);
 }
 
 .confirm-dialog {

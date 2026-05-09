@@ -337,18 +337,23 @@
 }
 
 .sheet {
+  box-sizing: border-box;
   display: flex;
   width: 360px;
+  max-height: 100dvh;
+  min-height: 0;
   flex-direction: column;
   gap: var(--s-4);
   border-left: 1px solid var(--line);
   background: var(--bg-surface);
   box-shadow: var(--shadow-pop);
+  overflow: hidden;
   padding: var(--s-4);
 }
 
 .sheet__header {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
 }

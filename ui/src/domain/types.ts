@@ -50,6 +50,47 @@ export interface Board {
   tasks?: Task[];
 }
 
+export interface BoardCheckpointSummary {
+  columns?: number;
+  tasks?: number;
+  archivedTasks?: number;
+  comments?: number;
+  activity?: number;
+  attachments?: number;
+  [key: string]: unknown;
+}
+
+export interface BoardCheckpoint {
+  id: string;
+  projectId: string;
+  boardId: string;
+  name: string;
+  description: string | null;
+  snapshotVersion: number;
+  summary: BoardCheckpointSummary;
+  creatorType: ActorType;
+  creatorName: string | null;
+  creatorRef: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string | null;
+  snapshot?: unknown;
+}
+
+export interface BoardCheckpointWarning {
+  type: string;
+  message: string;
+  [key: string]: unknown;
+}
+
+export type BoardCheckpointIdMappings = Record<string, Record<string, string>>;
+
+export interface BoardCheckpointRestoreResponse {
+  checkpoint: BoardCheckpoint;
+  board: Board;
+  warnings: BoardCheckpointWarning[];
+  idMappings: BoardCheckpointIdMappings;
+}
+
 export interface Task {
   id: string;
   projectId: string;

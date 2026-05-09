@@ -2,6 +2,8 @@ import type {
   ApiErrorBody,
   ActivitySort,
   Board,
+  BoardCheckpoint,
+  BoardCheckpointRestoreResponse,
   Health,
   Project,
   ProjectActivityResponse,
@@ -193,6 +195,58 @@ export const api = {
       )}?includeTasks=true`,
     );
     return body.board;
+  },
+
+  listBoardCheckpoints: async (projectId: string, boardId: string) => {
+    const body = await request<{ checkpoints: BoardCheckpoint[] }>(
+      `/api/projects/${encodeURIComponent(projectId)}/boards/${encodeURIComponent(
+        boardId,
+      )}/checkpoints`,
+    );
+    return body.checkpoints;
+  },
+
+  createBoardCheckpoint: async (
+    projectId: string,
+    boardId: string,
+    input: { name?: string; description?: string | null },
+  ) => {
+    const body = await request<{ checkpoint: BoardCheckpoint }>(
+      `/api/projects/${encodeURIComponent(projectId)}/boards/${encodeURIComponent(
+        boardId,
+      )}/checkpoints`,
+      {
+        method: "POST",
+        body: jsonBody(input),
+      },
+    );
+    return body.checkpoint;
+  },
+
+  restoreBoardCheckpoint: async (
+    projectId: string,
+    boardId: string,
+    checkpointId: string,
+  ) =>
+    request<BoardCheckpointRestoreResponse>(
+      `/api/projects/${encodeURIComponent(projectId)}/boards/${encodeURIComponent(
+        boardId,
+      )}/checkpoints/${encodeURIComponent(checkpointId)}/restore`,
+      { method: "POST" },
+    ),
+
+  deleteBoardCheckpoint: async (
+    projectId: string,
+    boardId: string,
+    checkpointId: string,
+  ) => {
+    const body = await request<{ checkpoint: BoardCheckpoint }>(
+      `/api/projects/${encodeURIComponent(projectId)}/boards/${encodeURIComponent(
+        boardId,
+      )}/checkpoints/${encodeURIComponent(checkpointId)}`,
+      { method: "DELETE" },
+    );
+    return body.checkpoint;
   },
 
   createTask: async (

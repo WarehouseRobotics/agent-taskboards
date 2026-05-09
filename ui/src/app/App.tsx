@@ -503,6 +503,42 @@ export function App() {
             navigate({ view: "projects", projectId: null });
             await loadProjects(null, null);
           }}
+          onRestoreCheckpoint={async (checkpointId) => {
+            if (!activeBoard) {
+              throw new Error("Select a board before restoring a checkpoint.");
+            }
+            setMutationError(null);
+            const restored = await api.restoreBoardCheckpoint(
+              activeProject.id,
+              activeBoard.id,
+              checkpointId,
+            );
+            setTaskDrafts({});
+            const restoredTaskIds = new Set(
+              (restored.board.tasks ?? []).map((task) => task.id),
+            );
+            const activeTaskStillExists =
+              activeTaskId ? restoredTaskIds.has(activeTaskId) : false;
+            if (activeTaskId && !activeTaskStillExists) {
+              navigate(
+                {
+                  view: "board",
+                  projectId: activeProject.id,
+                  boardId: activeBoard.id,
+                  taskId: null,
+                },
+                "replace",
+              );
+            }
+            await Promise.all([
+              loadProjects(activeProject.id, activeBoard.id),
+              loadBoard({ ignoreDrafts: true }),
+            ]);
+            if (activeTaskId && activeTaskStillExists) {
+              await loadTaskContext(activeTaskId);
+            }
+            return restored;
+          }}
           onUpdateBoard={async (input) => {
             if (!activeBoard) {
               return;

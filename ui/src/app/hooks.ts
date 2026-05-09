@@ -8,6 +8,7 @@ import { mergeBoard, mergeProjectTree, type TaskDraftsById } from "./sync";
 const maxTaskContextCacheSize = 25;
 
 interface LoadOptions {
+  ignoreDrafts?: boolean;
   normalizeRoute?: boolean;
   quiet?: boolean;
 }
@@ -202,7 +203,13 @@ export function useBoard(
       if (activeProjectIdRef.current !== activeProjectId || activeBoardIdRef.current !== activeBoardId) {
         return;
       }
-      setBoard((current) => mergeBoard(current, nextBoard, taskDraftsRef.current));
+      setBoard((current) =>
+        mergeBoard(
+          current,
+          nextBoard,
+          options.ignoreDrafts ? {} : taskDraftsRef.current,
+        ),
+      );
       setError(null);
       setSyncError(null);
     })();

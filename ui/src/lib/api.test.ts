@@ -52,4 +52,55 @@ describe("api client", () => {
     );
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "DELETE" });
   });
+
+  it("manages board checkpoints through encoded board endpoints", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ checkpoints: [] }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ checkpoint: { id: "checkpoint 1" } }), {
+          status: 201,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            checkpoint: { id: "checkpoint 1" },
+            board: { id: "board 1" },
+            warnings: [],
+            idMappings: {},
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ checkpoint: { id: "checkpoint 1" } }), {
+          status: 200,
+        }),
+      );
+
+    await api.listBoardCheckpoints("project 1", "board 1");
+    await api.createBoardCheckpoint("project 1", "board 1", {
+      name: "Before edits",
+      description: null,
+    });
+    await api.restoreBoardCheckpoint("project 1", "board 1", "checkpoint 1");
+    await api.deleteBoardCheckpoint("project 1", "board 1", "checkpoint 1");
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "/api/projects/project%201/boards/board%201/checkpoints",
+      "/api/projects/project%201/boards/board%201/checkpoints",
+      "/api/projects/project%201/boards/board%201/checkpoints/checkpoint%201/restore",
+      "/api/projects/project%201/boards/board%201/checkpoints/checkpoint%201",
+    ]);
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBeUndefined();
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "POST" });
+    expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: "POST" });
+    expect(fetchMock.mock.calls[3]?.[1]).toMatchObject({ method: "DELETE" });
+    expect(fetchMock.mock.calls[1]?.[1]?.body).toBe(
+      JSON.stringify({ name: "Before edits", description: null }),
+    );
+  });
 });
