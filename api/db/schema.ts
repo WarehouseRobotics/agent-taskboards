@@ -108,6 +108,36 @@ export const boards = sqliteTable(
   }),
 );
 
+export const boardCheckpoints = sqliteTable(
+  "board_checkpoints",
+  {
+    id: id(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    boardId: text("board_id")
+      .notNull()
+      .references(() => boards.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    snapshotVersion: integer("snapshot_version").notNull(),
+    snapshot: jsonObject("snapshot"),
+    summary: jsonObject("summary"),
+    creatorType: text("creator_type").$type<ActorType>().notNull(),
+    creatorName: text("creator_name"),
+    creatorRef: text("creator_ref"),
+    metadata: jsonObject("metadata"),
+    createdAt: timestamp("created_at"),
+  },
+  (table) => ({
+    projectIdx: index("board_checkpoints_project_idx").on(table.projectId),
+    boardCreatedIdx: index("board_checkpoints_board_created_idx").on(
+      table.boardId,
+      table.createdAt,
+    ),
+  }),
+);
+
 export const boardColumns = sqliteTable(
   "board_columns",
   {
@@ -324,6 +354,7 @@ export const searchDocuments = sqliteTable(
 
 export const projectsRelations = relations(projects, ({ many }) => ({
   boards: many(boards),
+  checkpoints: many(boardCheckpoints),
   tasks: many(tasks),
   comments: many(taskComments),
   activity: many(taskActivity),
@@ -336,6 +367,7 @@ export const boardsRelations = relations(boards, ({ one, many }) => ({
     fields: [boards.projectId],
     references: [projects.id],
   }),
+  checkpoints: many(boardCheckpoints),
   columns: many(boardColumns),
   tasks: many(tasks),
   comments: many(taskComments),
@@ -343,6 +375,20 @@ export const boardsRelations = relations(boards, ({ one, many }) => ({
   attachments: many(taskAttachments),
   searchDocuments: many(searchDocuments),
 }));
+
+export const boardCheckpointsRelations = relations(
+  boardCheckpoints,
+  ({ one }) => ({
+    project: one(projects, {
+      fields: [boardCheckpoints.projectId],
+      references: [projects.id],
+    }),
+    board: one(boards, {
+      fields: [boardCheckpoints.boardId],
+      references: [boards.id],
+    }),
+  }),
+);
 
 export const boardColumnsRelations = relations(boardColumns, ({ one, many }) => ({
   board: one(boards, {
@@ -436,6 +482,9 @@ export type NewProject = typeof projects.$inferInsert;
 
 export type Board = typeof boards.$inferSelect;
 export type NewBoard = typeof boards.$inferInsert;
+
+export type BoardCheckpoint = typeof boardCheckpoints.$inferSelect;
+export type NewBoardCheckpoint = typeof boardCheckpoints.$inferInsert;
 
 export type BoardColumn = typeof boardColumns.$inferSelect;
 export type NewBoardColumn = typeof boardColumns.$inferInsert;

@@ -261,6 +261,20 @@ column editing remains out of scope until the canonical API supports it.
 
 Archives a board without hard-deleting tasks, comments, or activity.
 
+### Board Checkpoint Routes
+
+Board checkpoint operations mirror the planned JSON API routes and use the same
+project and board ID-or-name resolution as other agentic board routes:
+
+- `GET /api/agents/projects/:projectId/boards/:boardId/checkpoints`
+- `POST /api/agents/projects/:projectId/boards/:boardId/checkpoints`
+- `GET /api/agents/projects/:projectId/boards/:boardId/checkpoints/:checkpointId`
+- `POST /api/agents/projects/:projectId/boards/:boardId/checkpoints/:checkpointId/restore`
+- `DELETE /api/agents/projects/:projectId/boards/:boardId/checkpoints/:checkpointId`
+
+See `docs/checkpoints.md` for response expectations, restore warnings, and ID
+mapping behavior.
+
 ## Tasks
 
 Task list responses should never include every comment or every activity entry

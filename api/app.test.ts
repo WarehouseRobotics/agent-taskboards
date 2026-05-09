@@ -10,6 +10,7 @@ import { createDatabaseClient, type DatabaseClient } from "./db/client.js";
 import { runMigrations } from "./db/migrate.js";
 import {
   boardColumns,
+  boardCheckpoints,
   boards,
   projects,
   searchDocuments,
@@ -1034,6 +1035,341 @@ describe("starter API", () => {
     ).toHaveLength(1);
     expect(searchVectorCount()).toBe(3);
     expect(existsSync(otherAttachmentFile)).toBe(true);
+  });
+
+  it("creates, lists, reads, and deletes board checkpoints", async () => {
+    const { projectId, boardId } = await createProjectAndBoard();
+    const taskResponse = await api(
+      "POST",
+      `/api/projects/${projectId}/boards/${boardId}/tasks`,
+      {
+        title: "Snapshot this task",
+      },
+    );
+    const taskId = stringProp(objectProp(taskResponse.body, "task"), "id");
+    await api("POST", `/api/tasks/${taskId}/comments`, {
+      authorType: "agent",
+      body: "Checkpoint-worthy note.",
+    });
+    await uploadFile(
+      `/api/tasks/${taskId}/attachments`,
+      "checkpoint.txt",
+      "checkpoint evidence",
+      "text/plain",
+    );
+
+    const createResponse = await api(
+      "POST",
+      `/api/projects/${projectId}/boards/${boardId}/checkpoints`,
+      {
+        name: "Before agent refactor",
+        description: "Saved before broad API edits.",
+        creatorType: "human",
+        creatorName: "Denis",
+        metadata: { reason: "test" },
+      },
+    );
+    expect(createResponse.status).toBe(201);
+    const created = objectProp(createResponse.body, "checkpoint");
+    const checkpointId = stringProp(created, "id");
+    expect(stringProp(created, "name")).toBe("Before agent refactor");
+    expect(created).not.toHaveProperty("snapshot");
+    expect(numberProp(objectProp(created, "summary"), "tasks")).toBe(1);
+    expect(numberProp(objectProp(created, "summary"), "attachments")).toBe(1);
+
+    const listResponse = await api(
+      "GET",
+      `/api/projects/${projectId}/boards/${boardId}/checkpoints`,
+    );
+    expect(listResponse.status).toBe(200);
+    const listed = arrayProp(listResponse.body, "checkpoints").map(asObject);
+    expect(listed).toHaveLength(1);
+    expect(stringProp(listed[0], "id")).toBe(checkpointId);
+    expect(listed[0]).not.toHaveProperty("snapshot");
+
+    const readResponse = await api(
+      "GET",
+      `/api/projects/${projectId}/boards/${boardId}/checkpoints/${checkpointId}`,
+    );
+    expect(readResponse.status).toBe(200);
+    const readCheckpoint = objectProp(readResponse.body, "checkpoint");
+    const snapshot = objectProp(readCheckpoint, "snapshot");
+    expect(numberProp(snapshot, "version")).toBe(1);
+    expect(arrayProp(snapshot, "columns")).toHaveLength(6);
+    expect(arrayProp(snapshot, "tasks")).toHaveLength(1);
+    expect(arrayProp(snapshot, "comments")).toHaveLength(1);
+    expect(arrayProp(snapshot, "attachments")).toHaveLength(1);
+
+    const deleteResponse = await api(
+      "DELETE",
+      `/api/projects/${projectId}/boards/${boardId}/checkpoints/${checkpointId}`,
+    );
+    expect(deleteResponse.status).toBe(200);
+    expect(
+      arrayProp(
+        (
+          await api(
+            "GET",
+            `/api/projects/${projectId}/boards/${boardId}/checkpoints`,
+          )
+        ).body,
+        "checkpoints",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("restores checkpointed board state and reports missing attachments", async () => {
+    const { projectId, boardId } = await createProjectAndBoard();
+    const upload = await createTaskCommentAndAttachment(
+      projectId,
+      boardId,
+      "Restore archived task",
+      "restore.txt",
+    );
+    await api("POST", `/api/tasks/${upload.taskId}/archive`);
+
+    const createResponse = await api(
+      "POST",
+      `/api/projects/${projectId}/boards/${boardId}/checkpoints`,
+      {
+        name: "Before destructive changes",
+      },
+    );
+    const checkpointId = stringProp(
+      objectProp(createResponse.body, "checkpoint"),
+      "id",
+    );
+
+    const uploadsPath = process.env.TASKBOARDS_UPLOADS_PATH;
+    if (!uploadsPath) {
+      throw new Error("Expected uploads path for test");
+    }
+    rmSync(join(uploadsPath, upload.attachmentPath), { force: true });
+
+    await api("PATCH", `/api/projects/${projectId}/boards/${boardId}`, {
+      description: "Changed after checkpoint",
+    });
+    const extraTask = objectProp(
+      (
+        await api("POST", `/api/projects/${projectId}/boards/${boardId}/tasks`, {
+          title: "This task should disappear",
+        })
+      ).body,
+      "task",
+    );
+    const extraTaskId = stringProp(extraTask, "id");
+    await api("POST", `/api/tasks/${extraTaskId}/comments`, {
+      authorType: "agent",
+      body: "This comment should disappear too.",
+    });
+
+    const restoreResponse = await api(
+      "POST",
+      `/api/projects/${projectId}/boards/${boardId}/checkpoints/${checkpointId}/restore`,
+    );
+    expect(restoreResponse.status).toBe(200);
+    expect(objectProp(restoreResponse.body, "idMappings")).toEqual({});
+    const warnings = arrayProp(restoreResponse.body, "warnings").map(asObject);
+    expect(warnings).toHaveLength(1);
+    expect(stringProp(warnings[0], "type")).toBe("attachment.missing_file");
+
+    const restoredBoardResponse = await api(
+      "GET",
+      `/api/projects/${projectId}/boards/${boardId}?includeTasks=true&includeArchived=true`,
+    );
+    const restoredBoard = objectProp(restoredBoardResponse.body, "board");
+    expect(restoredBoard["description"]).toBe(null);
+    const restoredTasks = arrayProp(restoredBoard, "tasks").map(asObject);
+    expect(restoredTasks.map((task) => stringProp(task, "id"))).toEqual([
+      upload.taskId,
+    ]);
+    expect(restoredTasks[0]["archivedAt"]).not.toBeNull();
+
+    const commentsResponse = await api(
+      "GET",
+      `/api/tasks/${upload.taskId}/comments`,
+    );
+    expect(arrayProp(commentsResponse.body, "comments")).toHaveLength(1);
+    const activityResponse = await api(
+      "GET",
+      `/api/tasks/${upload.taskId}/activity`,
+    );
+    expect(
+      arrayProp(activityResponse.body, "activity").map((item) =>
+        stringProp(asObject(item), "eventType"),
+      ),
+    ).toEqual([
+      "task.created",
+      "comment.created",
+      "attachment.created",
+      "task.archived",
+    ]);
+    expect(
+      arrayProp(
+        (await api("GET", `/api/tasks/${upload.taskId}/attachments`)).body,
+        "attachments",
+      ),
+    ).toHaveLength(0);
+
+    if (!client) {
+      throw new Error("Expected test database client");
+    }
+    expect(
+      client.db.select().from(tasks).where(eq(tasks.id, extraTaskId)).all(),
+    ).toHaveLength(0);
+    expect(
+      client.db.select().from(searchDocuments).where(eq(searchDocuments.boardId, boardId)).all(),
+    ).toHaveLength(3);
+    expect(searchVectorCount()).toBe(3);
+  });
+
+  it("remaps restored task IDs when unrelated data already uses a snapshot ID", async () => {
+    const { projectId, boardId } = await createProjectAndBoard();
+    const taskResponse = await api(
+      "POST",
+      `/api/projects/${projectId}/boards/${boardId}/tasks`,
+      {
+        title: "Task ID should be remapped",
+      },
+    );
+    const taskId = stringProp(objectProp(taskResponse.body, "task"), "id");
+    const commentResponse = await api("POST", `/api/tasks/${taskId}/comments`, {
+      authorType: "agent",
+      body: "This comment should follow the remapped task.",
+    });
+    const commentId = stringProp(
+      objectProp(commentResponse.body, "comment"),
+      "id",
+    );
+    const checkpointId = stringProp(
+      objectProp(
+        (
+          await api(
+            "POST",
+            `/api/projects/${projectId}/boards/${boardId}/checkpoints`,
+            { name: "Before task collision" },
+          )
+        ).body,
+        "checkpoint",
+      ),
+      "id",
+    );
+
+    const otherBoard = objectProp(
+      (
+        await api("POST", `/api/projects/${projectId}/boards`, {
+          name: "collision-board",
+        })
+      ).body,
+      "board",
+    );
+    const otherBoardId = stringProp(otherBoard, "id");
+    const otherColumnId = stringProp(
+      asObject(arrayProp(otherBoard, "columns")[0]),
+      "id",
+    );
+
+    if (!client) {
+      throw new Error("Expected test database client");
+    }
+    client.db.delete(tasks).where(eq(tasks.id, taskId)).run();
+    client.db
+      .insert(tasks)
+      .values({
+        id: taskId,
+        projectId,
+        boardId: otherBoardId,
+        columnId: otherColumnId,
+        title: "Unrelated colliding task",
+        position: 0,
+      })
+      .run();
+
+    const restoreResponse = await api(
+      "POST",
+      `/api/projects/${projectId}/boards/${boardId}/checkpoints/${checkpointId}/restore`,
+    );
+    expect(restoreResponse.status).toBe(200);
+    const taskMappings = objectProp(
+      objectProp(restoreResponse.body, "idMappings"),
+      "tasks",
+    );
+    const remappedTaskId = stringProp(taskMappings, taskId);
+    expect(remappedTaskId).not.toBe(taskId);
+
+    const commentsResponse = await api(
+      "GET",
+      `/api/tasks/${remappedTaskId}/comments`,
+    );
+    const comments = arrayProp(commentsResponse.body, "comments").map(asObject);
+    expect(comments).toHaveLength(1);
+    expect(stringProp(comments[0], "id")).toBe(commentId);
+    expect(stringProp(comments[0], "taskId")).toBe(remappedTaskId);
+    expect(
+      stringProp(
+        client.db.select().from(tasks).where(eq(tasks.id, taskId)).get(),
+        "boardId",
+      ),
+    ).toBe(otherBoardId);
+  });
+
+  it("rejects corrupt checkpoint snapshots before mutating board state", async () => {
+    const { projectId, boardId } = await createProjectAndBoard();
+    await api("POST", `/api/projects/${projectId}/boards/${boardId}/tasks`, {
+      title: "Keep me intact",
+    });
+    const checkpointId = stringProp(
+      objectProp(
+        (
+          await api(
+            "POST",
+            `/api/projects/${projectId}/boards/${boardId}/checkpoints`,
+            { name: "Corrupt me" },
+          )
+        ).body,
+        "checkpoint",
+      ),
+      "id",
+    );
+    const markerTaskId = stringProp(
+      objectProp(
+        (
+          await api("POST", `/api/projects/${projectId}/boards/${boardId}/tasks`, {
+            title: "Still here after failed restore",
+          })
+        ).body,
+        "task",
+      ),
+      "id",
+    );
+
+    if (!client) {
+      throw new Error("Expected test database client");
+    }
+    const checkpoint = client.db
+      .select()
+      .from(boardCheckpoints)
+      .where(eq(boardCheckpoints.id, checkpointId))
+      .get();
+    if (!checkpoint) {
+      throw new Error("Expected checkpoint row");
+    }
+    const snapshot = asObject(checkpoint.snapshot);
+    const columns = arrayProp(snapshot, "columns");
+    client.db
+      .update(boardCheckpoints)
+      .set({ snapshot: { ...snapshot, columns: [...columns, columns[0]] } })
+      .where(eq(boardCheckpoints.id, checkpointId))
+      .run();
+
+    const restoreResponse = await api(
+      "POST",
+      `/api/projects/${projectId}/boards/${boardId}/checkpoints/${checkpointId}/restore`,
+    );
+    expect(restoreResponse.status).toBe(409);
+    expect(
+      client.db.select().from(tasks).where(eq(tasks.id, markerTaskId)).all(),
+    ).toHaveLength(1);
   });
 
   it("searches indexed boards, tasks, and comments and respects archived filters", async () => {

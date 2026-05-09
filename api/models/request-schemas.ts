@@ -96,6 +96,15 @@ export const boardUpdateSchema = z.object({
   metadata: jsonObjectSchema.optional(),
 });
 
+export const checkpointCreateSchema = z.object({
+  name: requiredString.optional(),
+  description: nullableString.optional(),
+  creatorType: z.enum(actorTypes).optional().default("human"),
+  creatorName: nullableString.optional(),
+  creatorRef: nullableString.optional(),
+  metadata: jsonObjectSchema.optional(),
+});
+
 export const taskCreateSchema = z
   .object({
     title: requiredString,
@@ -160,6 +169,7 @@ export type ProjectCreateInput = z.infer<typeof projectCreateSchema>;
 export type ProjectUpdateInput = z.infer<typeof projectUpdateSchema>;
 export type BoardCreateInput = z.infer<typeof boardCreateSchema>;
 export type BoardUpdateInput = z.infer<typeof boardUpdateSchema>;
+export type CheckpointCreateInput = z.infer<typeof checkpointCreateSchema>;
 export type TaskCreateInput = z.infer<typeof taskCreateSchema>;
 export type TaskUpdateInput = z.infer<typeof taskUpdateSchema>;
 export type TaskMoveInput = z.infer<typeof taskMoveSchema>;

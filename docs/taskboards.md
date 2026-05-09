@@ -48,6 +48,8 @@ project -> board -> task -> comments/activity
 - Projects represent repositories, products, or workstreams.
 - Boards organize tasks for a project. A project may have multiple boards for
   different scopes such as backlog, active sprint, bug triage, or release work.
+- Boards can have manually saved checkpoints, also called revisions, that
+  snapshot and restore complete board task state. See `docs/checkpoints.md`.
 - Tasks are the primary unit of work. They have titles, descriptions, state,
   ordering, optional metadata, and durable identifiers.
 - Comments and activity provide append-only context for task decisions, agent
@@ -132,6 +134,7 @@ should stay local and ignored.
 ## Supporting Docs
 
 - `docs/tasks-and-boards.md`: domain model and ownership rules
+- `docs/checkpoints.md`: board checkpoint and restore semantics
 - `docs/api.md`: implemented starter API contract and planned API areas
 - `docs/agent-api.md`: planned markdown-first API contract for coding agents
 - `docs/data.md`: storage, timestamps, JSON fields, and low-level data details

@@ -38,10 +38,10 @@ Project concepts:
 
 Projects are archived instead of hard-deleted by normal user flows. The API also
 has an explicit hard-delete endpoint for deliberate cleanup; deleting a project
-permanently deletes its boards, tasks, comments, activity, attachments, and
-search records. Project names are globally unique and may contain only lowercase
-letters, numbers, underscores, and hyphens (`^[a-z0-9_-]+$`) so agents can
-safely use them in URLs and API calls.
+permanently deletes its boards, tasks, comments, activity, attachments, board
+checkpoints, and search records. Project names are globally unique and may
+contain only lowercase letters, numbers, underscores, and hyphens
+(`^[a-z0-9_-]+$`) so agents can safely use them in URLs and API calls.
 
 ## Boards
 
@@ -61,9 +61,15 @@ Board concepts:
 
 Boards are archived instead of hard-deleted by normal user flows. The API also
 has an explicit hard-delete endpoint for deliberate cleanup; deleting a board
-permanently deletes its columns, tasks, comments, activity, attachments, and
-search records. Board names are unique within their parent project and follow
-the same `^[a-z0-9_-]+$` URL-safe format as project names.
+permanently deletes its columns, tasks, comments, activity, attachments,
+checkpoints, and search records. Board names are unique within their parent
+project and follow the same `^[a-z0-9_-]+$` URL-safe format as project names.
+
+Boards may also have manually saved checkpoints, also called revisions. A board
+checkpoint captures the board's complete task state and can later restore it,
+including columns, tasks, comments, activity, attachment records, and original
+object IDs where possible. Checkpoints are scoped to one board, not the whole
+project. Detailed checkpoint semantics live in `docs/checkpoints.md`.
 
 ## Workflow Columns
 
@@ -210,7 +216,10 @@ Supported actor types are:
 human, agent, system
 ```
 
-Activity is append-oriented and system-generated in the starter API.
+Activity is append-oriented and system-generated in the starter API. Checkpoint
+restore is the special exception: restoring a board checkpoint replaces the
+board's activity entries with the checkpointed activity and does not append a
+restore activity entry.
 
 ## Archival And Deletion
 

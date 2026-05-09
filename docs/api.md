@@ -160,7 +160,8 @@ boards, tasks, comments, or activity.
 
 Hard-deletes a project. This permanently deletes the project and all related
 boards, columns, tasks, comments, activity, attachment records, uploaded
-attachment files, search documents, and search vectors.
+attachment files, board checkpoint rows and snapshots, search documents, and
+search vectors.
 
 ## Boards
 
@@ -266,7 +267,25 @@ comments, or activity.
 
 Hard-deletes a board. This permanently deletes the board and all related
 columns, tasks, comments, activity, attachment records, uploaded attachment
-files, search documents, and search vectors. The parent project is not deleted.
+files, checkpoint rows and snapshots, search documents, and search vectors. The
+parent project is not deleted.
+
+## Board Checkpoints
+
+Board checkpoints, also called revisions, are manual snapshots of one
+board's task state. They are scoped to a board and can save, read, restore, and
+delete checkpoint rows without making checkpoints project-wide resources.
+
+JSON API routes:
+
+- `GET /api/projects/:projectId/boards/:boardId/checkpoints`
+- `POST /api/projects/:projectId/boards/:boardId/checkpoints`
+- `GET /api/projects/:projectId/boards/:boardId/checkpoints/:checkpointId`
+- `POST /api/projects/:projectId/boards/:boardId/checkpoints/:checkpointId/restore`
+- `DELETE /api/projects/:projectId/boards/:boardId/checkpoints/:checkpointId`
+
+See `docs/checkpoints.md` for snapshot scope, restore behavior, ID collision
+handling, attachment record semantics, and UI expectations.
 
 ## Tasks
 

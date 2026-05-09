@@ -5,6 +5,7 @@ import type { ApiServices } from "../services/index.js";
 import { registerActivityRoutes } from "./activity-routes.js";
 import { registerAgentRoutes } from "./agent-routes.js";
 import { registerBoardRoutes } from "./board-routes.js";
+import { registerCheckpointRoutes } from "./checkpoint-routes.js";
 import { registerHealthRoutes } from "./health-routes.js";
 import { registerProjectRoutes } from "./project-routes.js";
 import { registerSearchRoutes } from "./search-routes.js";
@@ -20,6 +21,7 @@ export function registerRoutes(app: Express, options: RegisterRoutesOptions) {
   registerHealthRoutes(app, options.databaseClient, options.migrationResult);
   registerProjectRoutes(app, options.services);
   registerBoardRoutes(app, options.services);
+  registerCheckpointRoutes(app, options.services);
   registerTaskRoutes(app, options.services);
   registerActivityRoutes(app, options.services);
   registerSearchRoutes(app, options.services);

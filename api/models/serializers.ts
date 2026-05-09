@@ -1,5 +1,6 @@
 import type {
   Board,
+  BoardCheckpoint,
   BoardColumn,
   JsonArray,
   Project,
@@ -54,6 +55,27 @@ export function serializeBoardColumn(column: BoardColumn) {
     isDone: column.isDone,
     createdAt: serializeDate(column.createdAt),
     updatedAt: serializeDate(column.updatedAt),
+  };
+}
+
+export function serializeCheckpoint(
+  checkpoint: BoardCheckpoint,
+  options: { includeSnapshot?: boolean } = {},
+) {
+  return {
+    id: checkpoint.id,
+    projectId: checkpoint.projectId,
+    boardId: checkpoint.boardId,
+    name: checkpoint.name,
+    description: checkpoint.description,
+    snapshotVersion: checkpoint.snapshotVersion,
+    summary: checkpoint.summary,
+    creatorType: checkpoint.creatorType,
+    creatorName: checkpoint.creatorName,
+    creatorRef: checkpoint.creatorRef,
+    metadata: checkpoint.metadata,
+    createdAt: serializeDate(checkpoint.createdAt),
+    ...(options.includeSnapshot ? { snapshot: checkpoint.snapshot } : {}),
   };
 }
 

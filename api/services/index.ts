@@ -2,6 +2,7 @@ import { AttachmentService } from "./attachment-service.js";
 import { ActivityService } from "./activity-service.js";
 import type { DatabaseClient } from "../db/client.js";
 import { BoardService } from "./board-service.js";
+import { CheckpointService } from "./checkpoint-service.js";
 import { CommentService } from "./comment-service.js";
 import { ProjectService } from "./project-service.js";
 import { SearchService, type EmbeddingModel } from "./search-service.js";
@@ -11,6 +12,7 @@ import type { TaskIdSuffixGenerator } from "./task-id.js";
 export interface ApiServices {
   projects: ProjectService;
   boards: BoardService;
+  checkpoints: CheckpointService;
   tasks: TaskService;
   comments: CommentService;
   attachments: AttachmentService;
@@ -34,6 +36,12 @@ export function createServices(
     taskIdSuffixGenerator: options.taskIdSuffixGenerator,
   });
   const attachments = new AttachmentService(databaseClient, tasks);
+  const checkpoints = new CheckpointService(
+    databaseClient,
+    projects,
+    boards,
+    search,
+  );
   const activity = new ActivityService(databaseClient, projects);
   const comments = new CommentService(
     databaseClient,
@@ -43,5 +51,14 @@ export function createServices(
     search,
   );
 
-  return { projects, boards, tasks, comments, attachments, activity, search };
+  return {
+    projects,
+    boards,
+    checkpoints,
+    tasks,
+    comments,
+    attachments,
+    activity,
+    search,
+  };
 }

@@ -7,6 +7,7 @@ import { createDatabaseClient, type DatabaseClient } from "./client.js";
 import { runMigrations } from "./migrate.js";
 import {
   boardColumns,
+  boardCheckpoints,
   boards,
   projects,
   searchDocuments,
@@ -66,6 +67,20 @@ describe("database schema", () => {
       .values({
         projectId: project.id,
         name: "implementation",
+      })
+      .returning()
+      .get();
+
+    const checkpoint = db
+      .insert(boardCheckpoints)
+      .values({
+        projectId: project.id,
+        boardId: board.id,
+        name: "Before restore test",
+        snapshotVersion: 1,
+        snapshot: { version: 1, boardId: board.id },
+        summary: { tasks: 1 },
+        creatorType: "human",
       })
       .returning()
       .get();
@@ -185,6 +200,8 @@ describe("database schema", () => {
       doneColumn.id,
     ]);
     expect(orderedTasks.map((item) => item.id)).toEqual([task.id]);
+    expect(checkpoint.boardId).toBe(board.id);
+    expect(checkpoint.summary).toEqual({ tasks: 1 });
     expect(comment.taskId).toBe(task.id);
     expect(activity.taskId).toBe(task.id);
     expect(attachment.relativePath).toBe(`tasks/${task.id}/evidence.txt`);
