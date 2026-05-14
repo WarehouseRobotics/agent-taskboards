@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BoardColumn, Task } from "../../domain/types";
-import { sortBoardTasks } from "./board-view-state";
+import { normalizeColumnScrollTop, sortBoardTasks } from "./board-view-state";
 
 describe("board task sorting", () => {
   const columns = [
@@ -63,6 +63,25 @@ describe("board task sorting", () => {
 
     expect(sortBoardTasks(tasks, columns, "createdAt").map((task) => task.id)).toEqual(["new", "old", "missing"]);
     expect(sortBoardTasks(tasks, columns, "updatedAt").map((task) => task.id)).toEqual(["new", "old", "missing"]);
+  });
+});
+
+describe("column scroll normalization", () => {
+  it("keeps a saved scroll position that still fits", () => {
+    expect(normalizeColumnScrollTop(80, 300, 100)).toBe(80);
+  });
+
+  it("clamps a saved scroll position when content becomes shorter", () => {
+    expect(normalizeColumnScrollTop(240, 300, 100)).toBe(200);
+  });
+
+  it("returns zero when a column no longer scrolls", () => {
+    expect(normalizeColumnScrollTop(80, 100, 140)).toBe(0);
+  });
+
+  it("returns zero for negative or invalid saved scroll positions", () => {
+    expect(normalizeColumnScrollTop(-10, 300, 100)).toBe(0);
+    expect(normalizeColumnScrollTop(Number.NaN, 300, 100)).toBe(0);
   });
 });
 

@@ -50,6 +50,15 @@ export function sortBoardTasks(tasks: Task[], columns: BoardColumn[], sortKey: B
   return [...tasks].sort((a, b) => compareTasks(a, b, columnPositions, sortKey));
 }
 
+export function normalizeColumnScrollTop(savedScrollTop: number, scrollHeight: number, clientHeight: number) {
+  if (!Number.isFinite(savedScrollTop) || savedScrollTop <= 0) {
+    return 0;
+  }
+
+  const maxScrollTop = Math.max(0, scrollHeight - clientHeight);
+  return Math.min(savedScrollTop, maxScrollTop);
+}
+
 function compareTasks(
   a: Task,
   b: Task,

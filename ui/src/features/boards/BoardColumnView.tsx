@@ -13,6 +13,7 @@ export function BoardColumnView({
   onMoveTask,
   onOpenCreateTask,
   onOpenTask,
+  onTaskScrollerMount,
   tasks,
   totalColumns,
 }: {
@@ -24,6 +25,7 @@ export function BoardColumnView({
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onOpenCreateTask: (columnId: string | null) => void;
   onOpenTask: (taskId: string) => void;
+  onTaskScrollerMount?: (columnId: string, element: HTMLDivElement | null) => void;
   tasks: Task[];
   totalColumns: BoardColumn[];
 }) {
@@ -49,7 +51,7 @@ export function BoardColumnView({
           <Icon name="plus" />
         </button>
       </header>
-      <div className="board-column__tasks">
+      <div className="board-column__tasks" ref={(element) => onTaskScrollerMount?.(column.id, element)}>
         {tasks.map((task, index) => (
           <TaskCard
             active={task.id === activeTaskId}

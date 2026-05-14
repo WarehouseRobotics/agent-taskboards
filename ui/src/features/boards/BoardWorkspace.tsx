@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Board, BoardColumn, Project, Task, TaskAttachment, TaskContext, TaskPriority } from "../../domain/types";
 import { columnStatus, glyphForName } from "../../lib/task-display";
 import { formatDate } from "../../lib/format";
@@ -8,6 +8,7 @@ import { TaskDetail } from "../tasks";
 import { BoardColumnView } from "./BoardColumnView";
 import {
   boardSortOptions,
+  normalizeColumnScrollTop,
   persistBoardDisplayMode,
   sortBoardTasks,
   storedBoardDisplayMode,
@@ -88,6 +89,9 @@ export function BoardWorkspace({
 }) {
   const [displayMode, setDisplayMode] = useState<BoardDisplayMode>(storedBoardDisplayMode);
   const [sortKey, setSortKey] = useState<BoardSortKey>("position");
+  const activeBoardId = activeBoard?.id ?? null;
+  const columnScrollerElements = useRef(new Map<string, HTMLDivElement>());
+  const capturedColumnScroll = useRef<{ boardId: string; positions: Map<string, number> } | null>(null);
   const sortedTasks = useMemo(() => sortBoardTasks(tasks, columns, sortKey), [columns, sortKey, tasks]);
   const columnsById = useMemo(() => new Map(columns.map((column) => [column.id, column])), [columns]);
   const tasksByColumn = useMemo(() => {
@@ -106,6 +110,59 @@ export function BoardWorkspace({
     setDisplayMode(mode);
     persistBoardDisplayMode(mode);
   };
+  const registerTaskScroller = useCallback((columnId: string, element: HTMLDivElement | null) => {
+    if (element) {
+      columnScrollerElements.current.set(columnId, element);
+      return;
+    }
+    columnScrollerElements.current.delete(columnId);
+  }, []);
+  const captureColumnScroll = useCallback(() => {
+    if (!activeBoardId) {
+      capturedColumnScroll.current = null;
+      return;
+    }
+
+    const scrollPositions = new Map<string, number>();
+    for (const [columnId, element] of columnScrollerElements.current) {
+      scrollPositions.set(columnId, element.scrollTop);
+    }
+    capturedColumnScroll.current = { boardId: activeBoardId, positions: scrollPositions };
+  }, [activeBoardId]);
+  const moveTaskPreservingScroll = useCallback(
+    async (taskId: string, input: { columnId?: string; position?: number }) => {
+      if (activeBoardId && displayMode === "board") {
+        captureColumnScroll();
+      }
+      await onMoveTask(taskId, input);
+    },
+    [activeBoardId, captureColumnScroll, displayMode, onMoveTask],
+  );
+
+  useEffect(() => {
+    if (!activeBoardId || displayMode !== "board") {
+      capturedColumnScroll.current = null;
+    }
+  }, [activeBoardId, displayMode]);
+
+  useLayoutEffect(() => {
+    const capturedScroll = capturedColumnScroll.current;
+    if (!capturedScroll || loadingWorkspace || !activeBoardId || displayMode !== "board") {
+      return;
+    }
+    if (capturedScroll.boardId !== activeBoardId) {
+      capturedColumnScroll.current = null;
+      return;
+    }
+
+    for (const [columnId, savedScrollTop] of capturedScroll.positions) {
+      const element = columnScrollerElements.current.get(columnId);
+      if (element) {
+        element.scrollTop = normalizeColumnScrollTop(savedScrollTop, element.scrollHeight, element.clientHeight);
+      }
+    }
+    capturedColumnScroll.current = null;
+  }, [activeBoardId, columns, displayMode, loadingWorkspace, tasks]);
 
   if (!activeProject) {
     return (
@@ -227,9 +284,10 @@ export function BoardWorkspace({
                     key={column.id}
                     onArchiveTask={onArchiveTask}
                     onCreateTask={onCreateTask}
-                    onMoveTask={onMoveTask}
+                    onMoveTask={moveTaskPreservingScroll}
                     onOpenCreateTask={onOpenCreateTask}
                     onOpenTask={onOpenTask}
+                    onTaskScrollerMount={registerTaskScroller}
                     tasks={tasksByColumn.get(column.id) ?? []}
                     totalColumns={columns}
                   />
@@ -247,7 +305,7 @@ export function BoardWorkspace({
               onCompleteTask={onCompleteTask}
               onDeleteComment={onDeleteComment}
               onDeleteTaskAttachment={onDeleteTaskAttachment}
-              onMoveTask={onMoveTask}
+              onMoveTask={moveTaskPreservingScroll}
               onPostComment={onPostComment}
               onTaskDraftChange={onTaskDraftChange}
               onUpdateTask={onUpdateTask}
