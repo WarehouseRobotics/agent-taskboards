@@ -16,6 +16,7 @@ import {
   urlSafeNameError,
 } from "../../components/ui/NameField";
 import { ConfirmDialog, Sheet } from "../../components/layout";
+import { formatCheckpointDefaultName } from "./checkpoint-default-name";
 
 type ProjectInput = {
   name?: string;
@@ -183,9 +184,8 @@ function CheckpointsSection({
     | { kind: "delete"; checkpoint: BoardCheckpoint }
     | null
   >(null);
-  const initialName = "";
   const initialDescription = "";
-  const [name, setName] = useState(initialName);
+  const [name, setName] = useState(() => formatCheckpointDefaultName());
   const [description, setDescription] = useState(initialDescription);
   const projectId = activeProject.id;
   const boardId = activeBoard.id;
@@ -211,6 +211,8 @@ function CheckpointsSection({
     let cancelled = false;
     setLoading(true);
     setResult(null);
+    setName(formatCheckpointDefaultName());
+    setDescription(initialDescription);
     void api
       .listBoardCheckpoints(projectId, boardId)
       .then((next) => {
@@ -248,7 +250,7 @@ function CheckpointsSection({
     }
 
     await api.createBoardCheckpoint(projectId, boardId, input);
-    setName(initialName);
+    setName(formatCheckpointDefaultName());
     setDescription(initialDescription);
     setResult(null);
     await loadCheckpoints(true);
@@ -261,7 +263,7 @@ function CheckpointsSection({
       <form className="sheet-form" onSubmit={submit}>
         <Field label="Name">
           <input
-            placeholder="Server default"
+            placeholder="YYYYMMDD-HHMMSS"
             value={name}
             onChange={(event) => {
               setName(event.target.value);
