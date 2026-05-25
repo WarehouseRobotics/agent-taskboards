@@ -10,6 +10,7 @@ import { persistTheme, storedTheme } from "../lib/theme";
 import type { SearchResult, Task, Theme, View } from "../domain/types";
 import { ActivityWorkspace } from "../features/activity";
 import { BoardWorkspace } from "../features/boards";
+import type { TaskMovePlan } from "../features/boards/board-selection";
 import { ProjectsWorkspace } from "../features/projects";
 import { SearchWorkspace } from "../features/search";
 import { BoardSettingsPanel, SettingsWorkspace } from "../features/settings";
@@ -185,6 +186,31 @@ export function App() {
     },
     [activeTaskId, refreshAfterMutation],
   );
+  const moveTasks = useCallback(
+    async (moves: TaskMovePlan[]) => {
+      if (moves.length === 0) {
+        return true;
+      }
+
+      setMutationError(null);
+      let activeTaskMoved = false;
+      try {
+        for (const move of moves) {
+          await api.moveTask(move.taskId, move.input);
+          if (move.taskId === activeTaskId) {
+            activeTaskMoved = true;
+          }
+        }
+        await refreshAfterMutation(activeTaskMoved ? activeTaskId : null);
+        return true;
+      } catch (err) {
+        setMutationError(apiMessage(err));
+        await refreshAfterMutation(activeTaskMoved ? activeTaskId : null);
+        return false;
+      }
+    },
+    [activeTaskId, refreshAfterMutation],
+  );
 
   const openTask = (taskId: string) => {
     navigate({
@@ -345,6 +371,7 @@ export function App() {
               }
             }}
             onMoveTask={moveTask}
+            onMoveTasks={moveTasks}
             onOpenCreateTask={(columnId) => setNewTaskColumnId(columnId)}
             onOpenProjectActivity={() =>
               navigate({

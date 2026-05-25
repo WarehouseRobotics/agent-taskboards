@@ -10,10 +10,13 @@ export function BoardColumnView({
   isCreating,
   onArchiveTask,
   onCreateTask,
+  onDropTask,
   onMoveTask,
   onOpenCreateTask,
   onOpenTask,
+  onSelectTask,
   onTaskScrollerMount,
+  selectedTaskIds,
   tasks,
   totalColumns,
 }: {
@@ -22,10 +25,13 @@ export function BoardColumnView({
   isCreating: boolean;
   onArchiveTask: (taskId: string) => Promise<void>;
   onCreateTask: (input: { title: string; description?: string | null; columnId?: string; priority?: TaskPriority; labels?: string[] }) => Promise<void>;
+  onDropTask: (taskId: string, columnId: string, position?: number) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onOpenCreateTask: (columnId: string | null) => void;
   onOpenTask: (taskId: string) => void;
+  onSelectTask: (taskId: string, columnId: string, range: boolean) => void;
   onTaskScrollerMount?: (columnId: string, element: HTMLDivElement | null) => void;
+  selectedTaskIds: Set<string>;
   tasks: Task[];
   totalColumns: BoardColumn[];
 }) {
@@ -38,7 +44,7 @@ export function BoardColumnView({
         event.preventDefault();
         const taskId = event.dataTransfer.getData("text/task-id");
         if (taskId) {
-          onMoveTask(taskId, { columnId: column.id });
+          void onDropTask(taskId, column.id);
         }
       }}
     >
@@ -60,8 +66,11 @@ export function BoardColumnView({
             index={index}
             key={task.id}
             onArchiveTask={onArchiveTask}
+            onDropTask={onDropTask}
             onMoveTask={onMoveTask}
             onOpenTask={onOpenTask}
+            onSelectTask={onSelectTask}
+            selected={selectedTaskIds.has(task.id)}
             task={task}
           />
         ))}

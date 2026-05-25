@@ -1,4 +1,10 @@
-import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { BoardColumn, Task } from "../../domain/types";
 import { columnStatus } from "../../lib/task-display";
 import { Icon, LabelChip, Mono, PriorityFlag, StatusIcon } from "../../components/ui";
@@ -9,8 +15,11 @@ export function TaskCard({
   columns,
   index,
   onArchiveTask,
+  onDropTask,
   onMoveTask,
   onOpenTask,
+  onSelectTask,
+  selected,
   task,
 }: {
   active: boolean;
@@ -18,8 +27,11 @@ export function TaskCard({
   columns: BoardColumn[];
   index: number;
   onArchiveTask: (taskId: string) => Promise<void>;
+  onDropTask: (taskId: string, columnId: string, position?: number) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onOpenTask: (taskId: string) => void;
+  onSelectTask: (taskId: string, columnId: string, range: boolean) => void;
+  selected: boolean;
   task: Task;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -63,9 +75,23 @@ export function TaskCard({
     setMenuOpen(false);
     void action();
   };
+  const selectFromGesture = (event: ReactMouseEvent<HTMLElement | HTMLInputElement>) => {
+    onSelectTask(task.id, column.id, event.shiftKey);
+  };
+  const clickOpensTask = (event: ReactMouseEvent<HTMLElement>) => {
+    if (event.defaultPrevented) {
+      return;
+    }
+    if (event.metaKey || event.ctrlKey || event.shiftKey) {
+      selectFromGesture(event);
+      return;
+    }
+    onOpenTask(task.id);
+  };
   const cardClassName = [
     "task-card",
     active ? "task-card--active" : null,
+    selected ? "task-card--selected" : null,
     menuOpen ? "task-card--menu-open" : null,
   ]
     .filter(Boolean)
@@ -94,9 +120,13 @@ export function TaskCard({
       ref={cardRef}
       onContextMenu={(event) => {
         event.preventDefault();
+        if (event.ctrlKey || event.metaKey || event.shiftKey) {
+          selectFromGesture(event);
+          return;
+        }
         setMenuOpen((current) => !current);
       }}
-      onClick={() => onOpenTask(task.id)}
+      onClick={clickOpensTask}
       onDragStart={(event) => {
         event.dataTransfer.setData("text/task-id", task.id);
         event.dataTransfer.effectAllowed = "move";
@@ -107,7 +137,7 @@ export function TaskCard({
         event.stopPropagation();
         const taskId = event.dataTransfer.getData("text/task-id");
         if (taskId && taskId !== task.id) {
-          onMoveTask(taskId, { columnId: column.id, position: index });
+          void onDropTask(taskId, column.id, index);
         }
       }}
       onKeyDown={onKeyDown}
@@ -122,6 +152,19 @@ export function TaskCard({
           </span>
         )}
         <span className="task-card__spacer" />
+        <input
+          aria-label={`Select ${task.title}`}
+          checked={selected}
+          className="task-card__select"
+          onClick={(event) => {
+            event.stopPropagation();
+            selectFromGesture(event);
+          }}
+          onChange={() => {
+            // Selection is handled on click so Shift-click can use the native mouse event.
+          }}
+          type="checkbox"
+        />
         <button
           aria-controls={menuOpen ? menuId : undefined}
           aria-expanded={menuOpen}

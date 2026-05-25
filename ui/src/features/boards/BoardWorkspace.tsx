@@ -5,6 +5,13 @@ import { formatDate } from "../../lib/format";
 import { Button, EmptyState, Icon, InlineError, LabelChip, Mono, PriorityFlag, StatusIcon } from "../../components/ui";
 import { Topbar } from "../../components/layout";
 import { TaskDetail } from "../tasks";
+import {
+  nextRangeSelectionAnchor,
+  planTaskDrop,
+  selectTaskRange,
+  toggleTaskSelection,
+  type TaskMovePlan,
+} from "./board-selection";
 import { BoardColumnView } from "./BoardColumnView";
 import {
   boardSortOptions,
@@ -37,6 +44,7 @@ export function BoardWorkspace({
   onDeleteComment,
   onDeleteTaskAttachment,
   onMoveTask,
+  onMoveTasks,
   onOpenCreateTask,
   onOpenProjectActivity,
   onOpenSettings,
@@ -75,6 +83,7 @@ export function BoardWorkspace({
   onDeleteComment: (taskId: string, commentId: string) => Promise<void>;
   onDeleteTaskAttachment: (taskId: string, attachmentId: string) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
+  onMoveTasks: (moves: TaskMovePlan[]) => Promise<boolean>;
   onOpenCreateTask: (columnId: string | null) => void;
   onOpenProjectActivity: () => void;
   onOpenSettings: () => void;
@@ -89,6 +98,8 @@ export function BoardWorkspace({
 }) {
   const [displayMode, setDisplayMode] = useState<BoardDisplayMode>(storedBoardDisplayMode);
   const [sortKey, setSortKey] = useState<BoardSortKey>("position");
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(() => new Set());
+  const [rangeSelectionAnchors, setRangeSelectionAnchors] = useState<Map<string, string>>(() => new Map());
   const activeBoardId = activeBoard?.id ?? null;
   const columnScrollerElements = useRef(new Map<string, HTMLDivElement>());
   const capturedColumnScroll = useRef<{ boardId: string; positions: Map<string, number> } | null>(null);
@@ -110,6 +121,17 @@ export function BoardWorkspace({
     setDisplayMode(mode);
     persistBoardDisplayMode(mode);
   };
+  const clearTaskSelection = useCallback(() => {
+    setSelectedTaskIds(new Set());
+    setRangeSelectionAnchors(new Map());
+  }, []);
+  const openTaskAndClearSelection = useCallback(
+    (taskId: string) => {
+      clearTaskSelection();
+      onOpenTask(taskId);
+    },
+    [clearTaskSelection, onOpenTask],
+  );
   const registerTaskScroller = useCallback((columnId: string, element: HTMLDivElement | null) => {
     if (element) {
       columnScrollerElements.current.set(columnId, element);
@@ -138,6 +160,96 @@ export function BoardWorkspace({
     },
     [activeBoardId, captureColumnScroll, displayMode, onMoveTask],
   );
+  const moveTaskBatchPreservingScroll = useCallback(
+    async (moves: TaskMovePlan[]) => {
+      if (moves.length === 0) {
+        return true;
+      }
+      if (activeBoardId && displayMode === "board") {
+        captureColumnScroll();
+      }
+      return onMoveTasks(moves);
+    },
+    [activeBoardId, captureColumnScroll, displayMode, onMoveTasks],
+  );
+  const selectTask = useCallback(
+    (taskId: string, columnId: string, range: boolean) => {
+      const columnTasks = tasksByColumn.get(columnId) ?? [];
+      const anchorTaskId = rangeSelectionAnchors.get(columnId) ?? null;
+      if (range) {
+        setSelectedTaskIds((current) => selectTaskRange(current, columnTasks, anchorTaskId, taskId));
+      } else {
+        setSelectedTaskIds((current) => toggleTaskSelection(current, taskId));
+      }
+      setRangeSelectionAnchors((current) => {
+        const nextAnchors = new Map(current);
+        nextAnchors.set(columnId, nextRangeSelectionAnchor(anchorTaskId, taskId, range));
+        return nextAnchors;
+      });
+    },
+    [rangeSelectionAnchors, tasksByColumn],
+  );
+  const handleTaskDrop = useCallback(
+    async (draggedTaskId: string, targetColumnId: string, targetPosition?: number) => {
+      const moves = planTaskDrop({
+        draggedTaskId,
+        selectedTaskIds,
+        targetColumnId,
+        targetPosition,
+        visibleTasks: sortedTasks,
+      });
+      if (moves.length === 0) {
+        return;
+      }
+
+      await moveTaskBatchPreservingScroll(moves);
+      clearTaskSelection();
+    },
+    [clearTaskSelection, moveTaskBatchPreservingScroll, selectedTaskIds, sortedTasks],
+  );
+
+  useEffect(() => {
+    clearTaskSelection();
+  }, [activeBoardId, clearTaskSelection, displayMode]);
+
+  useEffect(() => {
+    if (displayMode !== "board" || selectedTaskIds.size === 0) {
+      return undefined;
+    }
+
+    const clearSelectionOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || isEditableKeyboardTarget(event.target) || document.querySelector(".task-card--menu-open")) {
+        return;
+      }
+      clearTaskSelection();
+    };
+
+    document.addEventListener("keydown", clearSelectionOnEscape);
+    return () => document.removeEventListener("keydown", clearSelectionOnEscape);
+  }, [clearTaskSelection, displayMode, selectedTaskIds.size]);
+
+  useEffect(() => {
+    setSelectedTaskIds((current) => {
+      if (current.size === 0) {
+        return current;
+      }
+
+      const visibleTaskIds = new Set(tasks.map((task) => task.id));
+      const nextSelection = new Set([...current].filter((taskId) => visibleTaskIds.has(taskId)));
+      return nextSelection.size === current.size ? current : nextSelection;
+    });
+    setRangeSelectionAnchors((current) => {
+      if (current.size === 0) {
+        return current;
+      }
+
+      const visibleTaskIds = new Set(tasks.map((task) => task.id));
+      const nextAnchors = new Map(
+        [...current].filter(([, taskId]) => visibleTaskIds.has(taskId)),
+      );
+      return nextAnchors.size === current.size ? current : nextAnchors;
+    });
+  }, [tasks]);
 
   useEffect(() => {
     if (!activeBoardId || displayMode !== "board") {
@@ -252,6 +364,11 @@ export function BoardWorkspace({
                   ? "Loading board"
                   : `${tasks.length} tasks · ${columns.length} columns · ${tasks.filter((task) => task.completedAt).length} done`}
               </Mono>
+              {selectedTaskIds.size > 0 && (
+                <button className="selection-clear-button" onClick={clearTaskSelection} type="button">
+                  Clear {selectedTaskIds.size} selected
+                </button>
+              )}
               <span className="subtoolbar__spacer" />
               <span className="toolbar-label">Sort</span>
               <select
@@ -282,12 +399,18 @@ export function BoardWorkspace({
                     column={column}
                     isCreating={newTaskColumnId === column.id}
                     key={column.id}
-                    onArchiveTask={onArchiveTask}
+                    onArchiveTask={async (taskId) => {
+                      await onArchiveTask(taskId);
+                      clearTaskSelection();
+                    }}
                     onCreateTask={onCreateTask}
+                    onDropTask={handleTaskDrop}
                     onMoveTask={moveTaskPreservingScroll}
                     onOpenCreateTask={onOpenCreateTask}
-                    onOpenTask={onOpenTask}
+                    onOpenTask={openTaskAndClearSelection}
+                    onSelectTask={selectTask}
                     onTaskScrollerMount={registerTaskScroller}
+                    selectedTaskIds={selectedTaskIds}
                     tasks={tasksByColumn.get(column.id) ?? []}
                     totalColumns={columns}
                   />
@@ -316,6 +439,14 @@ export function BoardWorkspace({
       )}
     </>
   );
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  const tagName = target.tagName.toLowerCase();
+  return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
 }
 
 function BoardTaskList({
