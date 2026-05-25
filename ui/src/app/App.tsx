@@ -7,7 +7,7 @@ import { api } from "../lib/api";
 import { apiMessage } from "../lib/errors";
 import { backgroundSyncIntervalMs, type TaskDraftsById } from "./sync";
 import { persistTheme, storedTheme } from "../lib/theme";
-import type { SearchResult, Theme, View } from "../domain/types";
+import type { SearchResult, Task, Theme, View } from "../domain/types";
 import { ActivityWorkspace } from "../features/activity";
 import { BoardWorkspace } from "../features/boards";
 import { ProjectsWorkspace } from "../features/projects";
@@ -85,7 +85,7 @@ export function App() {
   const selectedProjectId = activeProjectId ?? resolvedProjectId;
   const selectedBoardId = activeBoardId ?? resolvedBoardId;
   const trackTaskDraft = useCallback(
-    (taskId: string, fields: { title?: string; description?: string | null } | null) => {
+    (taskId: string, fields: Partial<Pick<Task, "description" | "labels" | "title">> | null) => {
       setTaskDrafts((current) => {
         if (!fields) {
           if (!current[taskId]) {

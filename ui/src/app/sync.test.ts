@@ -77,6 +77,18 @@ describe("sync merge helpers", () => {
       }),
     ).toEqual({ ...server, title: "Local draft" });
   });
+
+  it("protects dirty task labels from server replacement", () => {
+    const current = makeTask("task-a", { labels: ["local"] });
+    const server = makeTask("task-a", { labels: ["remote"] });
+
+    expect(
+      mergeTask(current, server, {
+        fields: { labels: ["local", "draft"] },
+        localModifiedAt: Date.now(),
+      }),
+    ).toEqual({ ...server, labels: ["local", "draft"] });
+  });
 });
 
 function makeProject(id: string): Project {

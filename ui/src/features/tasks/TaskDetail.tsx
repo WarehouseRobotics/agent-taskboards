@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import type { ActorType, BoardColumn, TaskActivity, TaskAttachment, TaskComment, TaskContext } from "../../domain/types";
 import { apiMessage } from "../../lib/errors";
 import { formatDate } from "../../lib/format";
+import { formatTaskLabels, parseTaskLabels, taskLabelsEqual } from "../../lib/task-labels";
 import { columnStatus } from "../../lib/task-display";
 import { ConfirmDialog } from "../../components/layout";
 import { Avatar, Button, EmptyState, Icon, InlineError, LabelChip, Mono, PriorityFlag, StatusIcon } from "../../components/ui";
@@ -22,6 +23,7 @@ import {
 
 interface TaskEditFields {
   description: string;
+  labelText: string;
   title: string;
 }
 
@@ -32,21 +34,24 @@ interface TaskEditDraft {
 }
 
 const emptyTaskDraft: TaskEditDraft = {
-  base: { description: "", title: "" },
-  current: { description: "", title: "" },
+  base: { description: "", labelText: "", title: "" },
+  current: { description: "", labelText: "", title: "" },
   taskId: "",
 };
 
-function makeTaskDraft(taskId: string, title: string, description: string): TaskEditDraft {
+function makeTaskDraft(taskId: string, title: string, description: string, labels: string[] = []): TaskEditDraft {
+  const labelText = formatTaskLabels(labels);
   return {
-    base: { description, title },
-    current: { description, title },
+    base: { description, labelText, title },
+    current: { description, labelText, title },
     taskId,
   };
 }
 
 function isTaskDraftDirty(draft: TaskEditDraft) {
-  return draft.current.title !== draft.base.title || draft.current.description !== draft.base.description;
+  return draft.current.title !== draft.base.title
+    || draft.current.description !== draft.base.description
+    || !taskLabelsEqual(parseTaskLabels(draft.current.labelText), parseTaskLabels(draft.base.labelText));
 }
 
 export function buildTaskReferenceText(visibleTitle: string, fallbackTitle: string, taskId: string) {
@@ -178,8 +183,8 @@ export function TaskDetail({
   onDeleteTaskAttachment: (taskId: string, attachmentId: string) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onPostComment: (taskId: string, body: string) => Promise<void>;
-  onTaskDraftChange: (taskId: string, fields: { title?: string; description?: string | null } | null) => void;
-  onUpdateTask: (taskId: string, input: { title?: string; description?: string | null }) => Promise<void>;
+  onTaskDraftChange: (taskId: string, fields: { title?: string; description?: string | null; labels?: string[] } | null) => void;
+  onUpdateTask: (taskId: string, input: { title?: string; description?: string | null; labels?: string[] }) => Promise<void>;
   onUploadTaskAttachment: (taskId: string, file: File) => Promise<TaskAttachment>;
 }) {
   const [comment, setComment] = useState("");
@@ -219,6 +224,8 @@ export function TaskDetail({
   const taskId = task?.id ?? "";
   const serverTitle = task?.title ?? "";
   const serverDescription = task?.description ?? "";
+  const serverLabels = task?.labels ?? [];
+  const serverLabelText = formatTaskLabels(serverLabels);
   const boardColumns = columns.length ? columns : (context?.board.columns ?? []);
   const column = boardColumns.find((item) => item.id === task?.columnId);
   const doneColumn = boardColumns.find((item) => item.isDone);
@@ -228,7 +235,7 @@ export function TaskDetail({
   );
   const activeDraft = task && draft.taskId === task.id
     ? draft
-    : makeTaskDraft(task?.id ?? "", serverTitle, serverDescription);
+    : makeTaskDraft(task?.id ?? "", serverTitle, serverDescription, serverLabels);
   const editDirty = task ? isTaskDraftDirty(activeDraft) : false;
   const hasPendingChanges = editDirty || Boolean(comment.trim());
   const attachments = context?.attachments ?? [];
@@ -268,7 +275,7 @@ export function TaskDetail({
     }
 
     setDraft((current) => {
-      const nextDraft = makeTaskDraft(taskId, serverTitle, serverDescription);
+      const nextDraft = makeTaskDraft(taskId, serverTitle, serverDescription, serverLabels);
       if (current.taskId !== taskId) {
         return nextDraft;
       }
@@ -276,7 +283,7 @@ export function TaskDetail({
       return isTaskDraftDirty(current) ? current : nextDraft;
     });
     setEditError(null);
-  }, [serverDescription, serverTitle, taskId]);
+  }, [serverDescription, serverLabelText, serverLabels, serverTitle, taskId]);
 
   useEffect(() => {
     setComment("");
@@ -305,14 +312,17 @@ export function TaskDetail({
       draftDirty
         ? {
             description: draft.current.description,
+            labels: parseTaskLabels(draft.current.labelText),
             title: draft.current.title,
           }
         : null,
     );
   }, [
     draft.base.description,
+    draft.base.labelText,
     draft.base.title,
     draft.current.description,
+    draft.current.labelText,
     draft.current.title,
     draft.taskId,
     onTaskDraftChange,
@@ -381,13 +391,33 @@ export function TaskDetail({
   const status = columnStatus(column);
   const trimmedTitle = activeDraft.current.title.trim();
   const trimmedDescription = activeDraft.current.description.trim();
+  const currentLabels = parseTaskLabels(activeDraft.current.labelText);
   const titleError = editDirty && !trimmedTitle ? "Title is required" : null;
   const canSave = editDirty && Boolean(trimmedTitle) && !saving;
   const activeDescriptionHeight = descriptionHeight ?? descriptionDefaultHeight(activeDraft.current.description);
   const descriptionStyle = { "--task-desc-height": `${activeDescriptionHeight}px` } as CSSProperties;
 
   const resetDraft = () => {
-    setDraft(makeTaskDraft(task.id, serverTitle, serverDescription));
+    setDraft(makeTaskDraft(task.id, serverTitle, serverDescription, serverLabels));
+    setEditError(null);
+  };
+
+  const removeLabel = (labelToRemove: string) => {
+    const nextLabels = currentLabels.filter((label) => label !== labelToRemove);
+    setDraft({
+      ...activeDraft,
+      current: { ...activeDraft.current, labelText: formatTaskLabels(nextLabels) },
+      taskId: task.id,
+    });
+    setEditError(null);
+  };
+
+  const clearLabels = () => {
+    setDraft({
+      ...activeDraft,
+      current: { ...activeDraft.current, labelText: "" },
+      taskId: task.id,
+    });
     setEditError(null);
   };
 
@@ -495,8 +525,9 @@ export function TaskDetail({
       await onUpdateTask(task.id, {
         title: trimmedTitle,
         description: trimmedDescription || null,
+        labels: currentLabels,
       });
-      setDraft(makeTaskDraft(task.id, trimmedTitle, trimmedDescription));
+      setDraft(makeTaskDraft(task.id, trimmedTitle, trimmedDescription, currentLabels));
       showDetailToast("Task updated");
     } catch (err) {
       setEditError(apiMessage(err));
@@ -549,7 +580,7 @@ export function TaskDetail({
             const source =
               current.taskId === task.id
                 ? current
-                : makeTaskDraft(task.id, serverTitle, serverDescription);
+                : makeTaskDraft(task.id, serverTitle, serverDescription, serverLabels);
             return {
               ...source,
               current: {
@@ -679,6 +710,47 @@ export function TaskDetail({
           rows={2}
           value={activeDraft.current.title}
         />
+        <div className="task-label-editor">
+          <div className="task-label-editor__heading">
+            <label htmlFor={`task-labels-${task.id}`}>Labels</label>
+            {currentLabels.length > 0 && (
+              <button className="task-label-editor__clear" onClick={clearLabels} type="button">
+                Clear all
+              </button>
+            )}
+          </div>
+          <input
+            aria-describedby={`task-labels-preview-${task.id}`}
+            id={`task-labels-${task.id}`}
+            onChange={(event) => {
+              setDraft({
+                ...activeDraft,
+                current: { ...activeDraft.current, labelText: event.target.value },
+                taskId: task.id,
+              });
+              setEditError(null);
+            }}
+            onKeyDown={saveOnShortcut}
+            placeholder="labels, comma separated"
+            value={activeDraft.current.labelText}
+          />
+          <div className="task-label-editor__chips" id={`task-labels-preview-${task.id}`}>
+            {currentLabels.length ? currentLabels.map((label) => (
+              <span className="editable-label-chip" key={label}>
+                <LabelChip label={label} />
+                <button
+                  aria-label={`Remove label ${label}`}
+                  className="label-chip__remove"
+                  onClick={() => removeLabel(label)}
+                  title="Remove label"
+                  type="button"
+                >
+                  <Icon name="close" size={11} />
+                </button>
+              </span>
+            )) : <span className="task-label-editor__empty">No labels</span>}
+          </div>
+        </div>
         <div
           className={`detail-section task-description task-description--${descriptionSizeTier(activeDraft.current.description)}`}
           style={descriptionStyle}

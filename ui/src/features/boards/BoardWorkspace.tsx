@@ -81,8 +81,8 @@ export function BoardWorkspace({
   onOpenTask: (taskId: string) => void;
   onPostComment: (taskId: string, body: string) => Promise<void>;
   onRefresh: (taskId?: string | null) => Promise<void>;
-  onTaskDraftChange: (taskId: string, fields: { title?: string; description?: string | null } | null) => void;
-  onUpdateTask: (taskId: string, input: { title?: string; description?: string | null }) => Promise<void>;
+  onTaskDraftChange: (taskId: string, fields: { title?: string; description?: string | null; labels?: string[] } | null) => void;
+  onUpdateTask: (taskId: string, input: { title?: string; description?: string | null; labels?: string[] }) => Promise<void>;
   onUploadTaskAttachment: (taskId: string, file: File) => Promise<TaskAttachment>;
   syncError: string | null;
   tasks: Task[];

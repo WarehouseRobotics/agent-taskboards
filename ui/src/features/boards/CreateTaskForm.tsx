@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { TaskPriority } from "../../domain/types";
+import { parseTaskLabels } from "../../lib/task-labels";
 import { useFormSubmission } from "../../lib/useFormSubmission";
 import { Button, InlineError } from "../../components/ui";
 
@@ -28,7 +29,7 @@ export function CreateTaskForm({
       description: description.trim() || null,
       columnId,
       priority,
-      labels: labels.split(",").map((label) => label.trim()).filter(Boolean),
+      labels: parseTaskLabels(labels),
     });
   });
 
