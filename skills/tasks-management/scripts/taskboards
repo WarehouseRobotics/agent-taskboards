@@ -14,13 +14,14 @@ AGENT_REF="${TASKBOARDS_AGENT_REF:-${CLAUDE_SESSION_ID:-local}}"
 
 usage() {
   cat <<'EOF'
-Usage: taskboards <verb> <path-or-shortcut> [key=value ...] [--json BODY | --data FILE]
+Usage: taskboards <verb> <path-or-shortcut> [key=value ...] [--json BODY | --data FILE | --body-file FILE | --field-file FIELD=FILE]
 
 Passthrough verbs: get, post, patch, delete
   taskboards get projects repositoryPath="$PWD"
   taskboards get tasks boardId=board_123 status=pending view=brief
-  taskboards post projects/<projectId>/boards/<boardId>/tasks --json '{"title":"..."}'
+  taskboards post projects/<projectId>/boards/<boardId>/tasks --data task.json
   taskboards patch tasks/<taskId> --json '{"priority":"high"}'
+  taskboards patch tasks/<taskId> --field-file description=description.md
 
 Shortcuts:
   taskboards health                        GET /api/agents/health
@@ -30,6 +31,7 @@ Shortcuts:
   taskboards complete <taskId>             POST /api/agents/tasks/<id>/complete
   taskboards archive <taskId>              POST /api/agents/tasks/<id>/archive
   taskboards comment <taskId> <body...>    POST /api/agents/tasks/<id>/comments
+  taskboards comment <taskId> --body-file note.md
   taskboards attach <taskId> <filePath>    POST /api/agents/tasks/<id>/attachments
 
 Env:
@@ -41,6 +43,15 @@ EOF
 }
 
 die() { echo "taskboards: $*" >&2; exit 2; }
+
+declare -a temp_files=()
+cleanup() {
+  local file
+  for file in "${temp_files[@]}"; do
+    rm -f "$file"
+  done
+}
+trap cleanup EXIT
 
 urlencode() {
   local LC_ALL=C
@@ -72,6 +83,100 @@ json_escape() {
   printf '%s' "$out"
 }
 
+new_temp_json_file() {
+  local __target="$1"
+  local file
+  file="$(mktemp "${TMPDIR:-/tmp}/taskboards-json.XXXXXX")" || die "could not create temporary JSON file"
+  temp_files+=("$file")
+  printf -v "$__target" '%s' "$file"
+}
+
+require_json_builder() {
+  if command -v node >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1; then
+    return 0
+  fi
+  die "file-backed JSON bodies require node or python3; use --data FILE with a complete JSON body instead"
+}
+
+build_comment_body_file() {
+  local body_file="$1"
+  local out_file="$2"
+  [[ -f "$body_file" ]] || die "--body-file: file not found: $body_file"
+  [[ -r "$body_file" ]] || die "--body-file: file is not readable: $body_file"
+  [[ -s "$body_file" ]] || die "--body-file: file is empty: $body_file"
+  require_json_builder
+  if command -v node >/dev/null 2>&1; then
+    node -e '
+const fs = require("fs");
+const [bodyPath, outPath, authorName, authorRef] = process.argv.slice(1);
+const body = fs.readFileSync(bodyPath, "utf8");
+fs.writeFileSync(outPath, JSON.stringify({
+  authorType: "agent",
+  authorName,
+  authorRef,
+  body
+}));
+' "$body_file" "$out_file" "$AGENT_NAME" "$AGENT_REF" || die "--body-file: failed to build JSON request body"
+  else
+    python3 -c '
+import json
+import sys
+body_path, out_path, author_name, author_ref = sys.argv[1:]
+with open(body_path, "r", encoding="utf-8") as source:
+    body = source.read()
+with open(out_path, "w", encoding="utf-8") as dest:
+    json.dump({
+        "authorType": "agent",
+        "authorName": author_name,
+        "authorRef": author_ref,
+        "body": body,
+    }, dest, ensure_ascii=False)
+' "$body_file" "$out_file" "$AGENT_NAME" "$AGENT_REF" || die "--body-file: failed to build JSON request body"
+  fi
+}
+
+build_field_file_body() {
+  local out_file="$1"
+  shift
+  local spec key file
+  for spec in "$@"; do
+    [[ "$spec" == *=* ]] || die "--field-file: expected field=FILE"
+    key="${spec%%=*}"
+    file="${spec#*=}"
+    [[ "$key" == "description" ]] || die "--field-file: unsupported field '$key' (supported: description)"
+    [[ -f "$file" ]] || die "--field-file: file not found: $file"
+    [[ -r "$file" ]] || die "--field-file: file is not readable: $file"
+  done
+  require_json_builder
+  if command -v node >/dev/null 2>&1; then
+    node -e '
+const fs = require("fs");
+const [outPath, ...specs] = process.argv.slice(1);
+const body = {};
+for (const spec of specs) {
+  const index = spec.indexOf("=");
+  const key = spec.slice(0, index);
+  const file = spec.slice(index + 1);
+  body[key] = fs.readFileSync(file, "utf8");
+}
+fs.writeFileSync(outPath, JSON.stringify(body));
+' "$out_file" "$@" || die "--field-file: failed to build JSON request body"
+  else
+    python3 -c '
+import json
+import sys
+out_path = sys.argv[1]
+body = {}
+for spec in sys.argv[2:]:
+    key, path = spec.split("=", 1)
+    with open(path, "r", encoding="utf-8") as source:
+        body[key] = source.read()
+with open(out_path, "w", encoding="utf-8") as dest:
+    json.dump(body, dest, ensure_ascii=False)
+' "$out_file" "$@" || die "--field-file: failed to build JSON request body"
+  fi
+}
+
 [[ $# -gt 0 ]] || { usage >&2; exit 2; }
 
 case "$1" in
@@ -82,6 +187,7 @@ cmd="$1"; shift
 verb=""
 path=""
 body=""
+body_data_file=""
 content_type=""
 shortcut_kind=""
 declare -a query=()
@@ -135,8 +241,10 @@ path="${path#/}"
 path="${path#api/agents/}"
 
 declare -a comment_body_parts=()
+declare -a field_file_specs=()
 explicit_json=""
 explicit_data=""
+body_file=""
 
 while [[ $# -gt 0 ]]; do
   arg="$1"
@@ -147,6 +255,12 @@ while [[ $# -gt 0 ]]; do
     --data)    [[ $# -ge 2 ]] || die "--data: missing value"
                explicit_data="$2"; shift 2 ;;
     --data=*)  explicit_data="${arg#--data=}"; shift ;;
+    --body-file) [[ $# -ge 2 ]] || die "--body-file: missing value"
+                 body_file="$2"; shift 2 ;;
+    --body-file=*) body_file="${arg#--body-file=}"; shift ;;
+    --field-file) [[ $# -ge 2 ]] || die "--field-file: missing value"
+                  field_file_specs+=("$2"); shift 2 ;;
+    --field-file=*) field_file_specs+=("${arg#--field-file=}"); shift ;;
     *=*)
       key="${arg%%=*}"; val="${arg#*=}"
       query+=("$(urlencode "$key")=$(urlencode "$val")")
@@ -155,24 +269,49 @@ while [[ $# -gt 0 ]]; do
       if [[ "$shortcut_kind" == "comment" ]]; then
         comment_body_parts+=("$arg"); shift
       else
-        die "unknown argument: $arg (use key=value or --json/--data)"
+        die "unknown argument: $arg (use key=value, --json, --data, --body-file, or --field-file)"
       fi ;;
   esac
 done
 
-if [[ "$shortcut_kind" == "attach" && ( -n "$explicit_json" || -n "$explicit_data" ) ]]; then
+if [[ "$shortcut_kind" == "attach" && ( -n "$explicit_json" || -n "$explicit_data" || -n "$body_file" || ${#field_file_specs[@]} -gt 0 ) ]]; then
   die "attach: use key=value options only; the request body comes from <filePath>"
 fi
 
-# Auto-fill comment body when the caller did not supply --json/--data.
-if [[ "$shortcut_kind" == "comment" && -z "$explicit_json" && -z "$explicit_data" ]]; then
-  [[ ${#comment_body_parts[@]} -gt 0 ]] || die "comment: missing body"
+body_source_count=0
+[[ -n "$explicit_json" ]] && ((body_source_count += 1))
+[[ -n "$explicit_data" ]] && ((body_source_count += 1))
+[[ -n "$body_file" ]] && ((body_source_count += 1))
+[[ ${#field_file_specs[@]} -gt 0 ]] && ((body_source_count += 1))
+if [[ $body_source_count -gt 1 ]]; then
+  die "use only one request body source: inline comment, --json, --data, --body-file, or --field-file"
+fi
+
+if [[ "$shortcut_kind" == "comment" && ${#comment_body_parts[@]} -gt 0 && $body_source_count -gt 0 ]]; then
+  die "use either inline comment text or a request body option, not both"
+fi
+
+if [[ -n "$body_file" && "$shortcut_kind" != "comment" ]]; then
+  die "--body-file is only supported with the comment shortcut"
+fi
+
+if [[ ${#field_file_specs[@]} -gt 0 && ( "$verb" != "PATCH" && "$verb" != "POST" ) ]]; then
+  die "--field-file is only supported with post or patch requests"
+fi
+
+# Auto-fill comment body when the caller did not supply another body source.
+if [[ "$shortcut_kind" == "comment" && $body_source_count -eq 0 ]]; then
+  [[ ${#comment_body_parts[@]} -gt 0 ]] || die "comment: missing body; use 'taskboards comment <taskId> --body-file FILE' for long text or 'taskboards comment <taskId> --data FILE' for full JSON"
   comment_body="${comment_body_parts[*]}"
   body="{\"authorType\":\"agent\""
   body+=",\"authorName\":\"$(json_escape "$AGENT_NAME")\""
   body+=",\"authorRef\":\"$(json_escape "$AGENT_REF")\""
   body+=",\"body\":\"$(json_escape "$comment_body")\"}"
   content_type="application/json"
+fi
+
+if [[ "$shortcut_kind" != "comment" && ${#comment_body_parts[@]} -gt 0 ]]; then
+  die "unexpected inline body text"
 fi
 
 if [[ -n "$explicit_json" ]]; then
@@ -184,8 +323,18 @@ if [[ -n "$explicit_data" ]]; then
   [[ "$data_file" == "$explicit_data" ]] || die "--data: pass a file path without a leading @"
   [[ -f "$data_file" ]] || die "--data: file not found: $data_file"
   [[ -r "$data_file" ]] || die "--data: file is not readable: $data_file"
-  body="$(<"$data_file")"
-  [[ -n "$body" ]] || die "--data: file is empty: $data_file"
+  [[ -s "$data_file" ]] || die "--data: file is empty: $data_file"
+  body_data_file="$data_file"
+  content_type="application/json"
+fi
+if [[ -n "$body_file" ]]; then
+  new_temp_json_file body_data_file
+  build_comment_body_file "$body_file" "$body_data_file"
+  content_type="application/json"
+fi
+if [[ ${#field_file_specs[@]} -gt 0 ]]; then
+  new_temp_json_file body_data_file
+  build_field_file_body "$body_data_file" "${field_file_specs[@]}"
   content_type="application/json"
 fi
 
@@ -200,6 +349,7 @@ declare -a curl_args=(-sS -X "$verb")
 [[ -n "$API_KEY" ]]      && curl_args+=(-H "Authorization: Bearer $API_KEY")
 [[ -n "$content_type" ]] && curl_args+=(-H "Content-Type: $content_type")
 [[ -n "$body" ]]         && curl_args+=(--data-raw "$body")
+[[ -n "$body_data_file" ]] && curl_args+=(--data-binary "@$body_data_file")
 [[ ${#curl_form_args[@]} -gt 0 ]] && curl_args+=("${curl_form_args[@]}")
 curl_args+=("$url")
 

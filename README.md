@@ -231,8 +231,13 @@ skills/tasks-management/scripts/taskboards get projects repositoryPath="$PWD"
 skills/tasks-management/scripts/taskboards get projects/<projectId>/boards
 skills/tasks-management/scripts/taskboards context <taskId>
 skills/tasks-management/scripts/taskboards move <taskId> in_progress
-skills/tasks-management/scripts/taskboards comment <taskId> "Implementation started."
+skills/tasks-management/scripts/taskboards comment <taskId> --body-file /tmp/taskboards-note.md
 ```
+
+Use file-backed writes for generated markdown, multiline comments, and long
+task descriptions. Short inline comments are supported, but agents should use
+`--body-file FILE`, `--field-file description=FILE`, or full JSON via
+`--data FILE` when text contains quotes, backticks, braces, or newlines.
 
 Search before creating new tasks so agents can update existing work instead of
 duplicating it:

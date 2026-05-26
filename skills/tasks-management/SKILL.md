@@ -29,14 +29,18 @@ not cover.
 Invocation grammar:
 
 ```text
-taskboards <verb> <path-or-shortcut> [key=value ...] [--json BODY | --data FILE]
+taskboards <verb> <path-or-shortcut> [key=value ...] [--json BODY | --data FILE | --body-file FILE | --field-file FIELD=FILE]
 ```
 
 - `<verb>` is `get`, `post`, `patch`, `delete`, or one of the shortcuts below.
 - `<path>` is API-relative (the wrapper prepends `/api/agents/`).
 - Bare `key=value` args become URL-encoded query parameters.
-- `--json '<body>'` sets a JSON request body inline.
-- `--data FILE` reads a JSON request body from a local file.
+- `--json '<body>'` sets a small/simple JSON request body inline.
+- `--data FILE` reads a complete JSON request body from a local file.
+- `--body-file FILE` reads a plain text/markdown comment body from a file and
+  wraps it with agent identity. Use this for long comments.
+- `--field-file FIELD=FILE` reads one text field from a file. Currently use
+  `description=FILE` for task description patches.
 
 Responses are returned verbatim — markdown narrative plus a fenced TOON block
 by default. Add `format=yaml|json|none` as a `key=value` arg to switch.
@@ -62,10 +66,29 @@ Read from the shell; the wrapper handles the rest:
 | `taskboards complete <taskId>`          | `POST /api/agents/tasks/<id>/complete`                                   |
 | `taskboards archive <taskId>`           | `POST /api/agents/tasks/<id>/archive`                                    |
 | `taskboards comment <taskId> <body...>` | `POST /api/agents/tasks/<id>/comments` with auto-filled agent identity   |
+| `taskboards comment <taskId> --body-file FILE` | Same, with comment body read safely from a text file              |
 | `taskboards attach <taskId> <filePath>` | `POST /api/agents/tasks/<id>/attachments` with multipart `file` upload   |
 
 The `comment` shortcut auto-fills `authorType=agent`, `authorName`, and
-`authorRef` from env. Pass `--json '{...}'` to override the whole body.
+`authorRef` from env. Pass `--body-file FILE` for multiline notes or generated
+markdown. Pass `--data FILE` to override the whole body with explicit JSON.
+
+## Safe Text Bodies
+
+Never paste long generated text, markdown, JSON-looking snippets, quotes,
+backticks, or multiline descriptions directly into a shell command. Shell
+quoting can corrupt the body before the wrapper receives it.
+
+Use these patterns instead:
+
+```sh
+taskboards comment <taskId> --body-file /tmp/taskboards-note.md
+taskboards patch tasks/<taskId> --field-file description=/tmp/taskboards-description.md
+taskboards post projects/<projectNameOrId>/boards/<boardNameOrId>/tasks --data /tmp/taskboards-task.json
+```
+
+Reserve inline `taskboards comment <taskId> "short note"` and `--json '{...}'`
+for brief one-line values with no special characters.
 
 ## Orientation flow (do this before substantive work)
 
@@ -93,11 +116,12 @@ taskboards context <taskId>
 ```
 
 Create a task (`columnKey` defaults to the board's first column on the server
-side):
+side). For descriptions longer than a short sentence, write the complete JSON
+body to a file and pass it with `--data`:
 
 ```sh
 taskboards post projects/<projectNameOrId>/boards/<boardNameOrId>/tasks \
-  --json '{"title":"...","description":"...","columnKey":"ready","priority":"normal","labels":[]}'
+  --data /tmp/taskboards-task.json
 ```
 
 Move a task — the shortcut sends `{"columnKey":"<key>"}`. Moving into a done
@@ -107,10 +131,12 @@ column sets `completedAt`; moving out clears it.
 taskboards move <taskId> in_progress
 ```
 
-Comment (identity auto-filled from env):
+Comment (identity auto-filled from env). Use inline text only for short,
+single-line notes:
 
 ```sh
 taskboards comment <taskId> "Implementation started; see commit abc123."
+taskboards comment <taskId> --body-file /tmp/taskboards-note.md
 ```
 
 Attach evidence such as a screenshot, log, or trace file:
@@ -124,6 +150,7 @@ Update fields (`title`, `description`, `priority`, `labels`,
 
 ```sh
 taskboards patch tasks/<taskId> --json '{"priority":"high"}'
+taskboards patch tasks/<taskId> --field-file description=/tmp/taskboards-description.md
 ```
 
 Complete (sets `completedAt` without moving columns) and archive:

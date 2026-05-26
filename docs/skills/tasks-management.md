@@ -31,14 +31,17 @@ wrapper does not cover.
 Invocation grammar:
 
 ```text
-taskboards <verb> <path-or-shortcut> [key=value ...] [--json BODY | --data FILE]
+taskboards <verb> <path-or-shortcut> [key=value ...] [--json BODY | --data FILE | --body-file FILE | --field-file FIELD=FILE]
 ```
 
 `<verb>` is one of `get`, `post`, `patch`, `delete`, or one of the shortcuts
 below. `<path>` is API-relative (the wrapper prepends
 `$TASKBOARDS_HOST_URL/api/agents/`). Bare `key=value` arguments become
-URL-encoded query string entries. `--json` sets a JSON body inline; `--data`
-reads a JSON body from a local file.
+URL-encoded query string entries. `--json` sets a small/simple JSON body
+inline; `--data` reads a complete JSON body from a local file. For generated
+markdown or multiline task text, agents should avoid shell argv and use
+`--body-file FILE` for comments or `--field-file description=FILE` for task
+description patches.
 
 Built-in shortcuts:
 
@@ -47,8 +50,12 @@ Built-in shortcuts:
 - `taskboards move <taskId> <columnKey>` for column transitions
 - `taskboards complete <taskId>` and `taskboards archive <taskId>` for task
   state changes
-- `taskboards comment <taskId> <body...>` to append an agent comment with
-  identity auto-filled from env
+- `taskboards comment <taskId> <body...>` to append a brief one-line agent
+  comment with identity auto-filled from env
+- `taskboards comment <taskId> --body-file FILE` to append a multiline or
+  generated markdown comment safely
+- `taskboards patch tasks/<taskId> --field-file description=FILE` to update a
+  long task description safely
 - `taskboards attach <taskId> <filePath>` to upload an attachment such as a
   screenshot, log, or trace file
 
@@ -65,6 +72,21 @@ Wrapper environment:
 - `TASKBOARDS_AGENT_NAME` — comment author name (default `Claude Code`).
 - `TASKBOARDS_AGENT_REF` — comment author reference (default
   `$CLAUDE_SESSION_ID` if set, else `local`).
+
+## Safe Text Bodies
+
+Agents should never paste long generated text, markdown, JSON-looking snippets,
+quotes, backticks, or multiline descriptions directly into a shell command.
+Those bodies should be written to a local file first, then sent with:
+
+```sh
+taskboards comment <taskId> --body-file /tmp/taskboards-note.md
+taskboards patch tasks/<taskId> --field-file description=/tmp/taskboards-description.md
+taskboards post projects/<projectId>/boards/<boardId>/tasks --data /tmp/taskboards-task.json
+```
+
+Inline `taskboards comment <taskId> "short note"` and `--json '{...}'` are for
+brief one-line values only.
 
 
 
