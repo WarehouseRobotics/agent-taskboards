@@ -282,6 +282,46 @@
   color: var(--fg-faint);
 }
 
+.breadcrumb__id-copy {
+  height: 20px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-faint);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.breadcrumb__id-copy:hover {
+  border-color: var(--line);
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.breadcrumb__id-copy:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.breadcrumb__id-copy--copied {
+  animation: breadcrumb-id-copy-blink 850ms var(--ease);
+}
+
+@keyframes breadcrumb-id-copy-blink {
+  0%,
+  100% {
+    background: transparent;
+    color: var(--fg-subtle);
+  }
+
+  35%,
+  70% {
+    background: color-mix(in oklch, var(--accent) 14%, transparent);
+    color: var(--accent);
+  }
+}
+
 .topbar__actions,
 .form-actions,
 .detail-actions {

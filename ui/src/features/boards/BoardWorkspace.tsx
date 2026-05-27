@@ -5,6 +5,7 @@ import { formatDate } from "../../lib/format";
 import { Button, EmptyState, Icon, InlineError, LabelChip, Mono, PriorityFlag, StatusIcon } from "../../components/ui";
 import { Topbar } from "../../components/layout";
 import { TaskDetail } from "../tasks";
+import { buildBoardReferenceText } from "./board-reference";
 import {
   nextRangeSelectionAnchor,
   planTaskDrop,
@@ -326,7 +327,13 @@ export function BoardWorkspace({
         }
         crumbs={[
           { label: activeProject.name, glyph: glyphForName(activeProject.name) },
-          { label: activeBoard?.name ?? "No board", id: activeBoard?.id, icon: <Icon name="board" /> },
+          {
+            label: activeBoard?.name ?? "No board",
+            id: activeBoard?.id,
+            icon: <Icon name="board" />,
+            idCopyLabel: activeBoard ? `Copy reference for board ${activeBoard.name}` : undefined,
+            idCopyText: activeBoard ? buildBoardReferenceText(activeBoard.name, activeBoard.id) : undefined,
+          },
         ]}
       />
       <InlineError message={error ?? mutationError ?? (syncError ? `Background sync failed: ${syncError}` : null)} />
