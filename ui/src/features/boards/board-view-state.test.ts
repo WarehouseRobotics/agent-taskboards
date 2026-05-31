@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BoardColumn, Task } from "../../domain/types";
-import { normalizeColumnScrollTop, sortBoardTasks } from "./board-view-state";
+import { normalizeBoardScrollLeft, normalizeColumnScrollTop, sortBoardTasks } from "./board-view-state";
 
 describe("board task sorting", () => {
   const columns = [
@@ -82,6 +82,25 @@ describe("column scroll normalization", () => {
   it("returns zero for negative or invalid saved scroll positions", () => {
     expect(normalizeColumnScrollTop(-10, 300, 100)).toBe(0);
     expect(normalizeColumnScrollTop(Number.NaN, 300, 100)).toBe(0);
+  });
+});
+
+describe("board horizontal scroll normalization", () => {
+  it("keeps a saved scroll position that still fits", () => {
+    expect(normalizeBoardScrollLeft(120, 800, 400)).toBe(120);
+  });
+
+  it("clamps a saved scroll position when board content becomes narrower", () => {
+    expect(normalizeBoardScrollLeft(640, 800, 300)).toBe(500);
+  });
+
+  it("returns zero when the board no longer scrolls", () => {
+    expect(normalizeBoardScrollLeft(120, 400, 520)).toBe(0);
+  });
+
+  it("returns zero for negative or invalid saved scroll positions", () => {
+    expect(normalizeBoardScrollLeft(-10, 800, 400)).toBe(0);
+    expect(normalizeBoardScrollLeft(Number.NaN, 800, 400)).toBe(0);
   });
 });
 

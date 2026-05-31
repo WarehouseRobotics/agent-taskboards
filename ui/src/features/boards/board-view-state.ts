@@ -50,13 +50,21 @@ export function sortBoardTasks(tasks: Task[], columns: BoardColumn[], sortKey: B
   return [...tasks].sort((a, b) => compareTasks(a, b, columnPositions, sortKey));
 }
 
-export function normalizeColumnScrollTop(savedScrollTop: number, scrollHeight: number, clientHeight: number) {
-  if (!Number.isFinite(savedScrollTop) || savedScrollTop <= 0) {
+export function normalizeScrollOffset(savedOffset: number, scrollSize: number, clientSize: number) {
+  if (!Number.isFinite(savedOffset) || savedOffset <= 0) {
     return 0;
   }
 
-  const maxScrollTop = Math.max(0, scrollHeight - clientHeight);
-  return Math.min(savedScrollTop, maxScrollTop);
+  const maxOffset = Math.max(0, scrollSize - clientSize);
+  return Math.min(savedOffset, maxOffset);
+}
+
+export function normalizeBoardScrollLeft(savedScrollLeft: number, scrollWidth: number, clientWidth: number) {
+  return normalizeScrollOffset(savedScrollLeft, scrollWidth, clientWidth);
+}
+
+export function normalizeColumnScrollTop(savedScrollTop: number, scrollHeight: number, clientHeight: number) {
+  return normalizeScrollOffset(savedScrollTop, scrollHeight, clientHeight);
 }
 
 function compareTasks(

@@ -16,6 +16,7 @@ import {
 import { BoardColumnView } from "./BoardColumnView";
 import {
   boardSortOptions,
+  normalizeBoardScrollLeft,
   normalizeColumnScrollTop,
   persistBoardDisplayMode,
   sortBoardTasks,
@@ -23,6 +24,12 @@ import {
   type BoardDisplayMode,
   type BoardSortKey,
 } from "./board-view-state";
+
+interface CapturedBoardScroll {
+  boardId: string;
+  boardScrollLeft: number | null;
+  columnPositions: Map<string, number>;
+}
 
 export function BoardWorkspace({
   activeBoard,
@@ -102,8 +109,9 @@ export function BoardWorkspace({
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(() => new Set());
   const [rangeSelectionAnchors, setRangeSelectionAnchors] = useState<Map<string, string>>(() => new Map());
   const activeBoardId = activeBoard?.id ?? null;
+  const boardScrollerElement = useRef<HTMLDivElement | null>(null);
   const columnScrollerElements = useRef(new Map<string, HTMLDivElement>());
-  const capturedColumnScroll = useRef<{ boardId: string; positions: Map<string, number> } | null>(null);
+  const capturedBoardScroll = useRef<CapturedBoardScroll | null>(null);
   const sortedTasks = useMemo(() => sortBoardTasks(tasks, columns, sortKey), [columns, sortKey, tasks]);
   const columnsById = useMemo(() => new Map(columns.map((column) => [column.id, column])), [columns]);
   const tasksByColumn = useMemo(() => {
@@ -140,38 +148,101 @@ export function BoardWorkspace({
     }
     columnScrollerElements.current.delete(columnId);
   }, []);
-  const captureColumnScroll = useCallback(() => {
+  const captureBoardScroll = useCallback(() => {
     if (!activeBoardId) {
-      capturedColumnScroll.current = null;
+      capturedBoardScroll.current = null;
       return;
     }
 
-    const scrollPositions = new Map<string, number>();
+    const columnPositions = new Map<string, number>();
     for (const [columnId, element] of columnScrollerElements.current) {
-      scrollPositions.set(columnId, element.scrollTop);
+      columnPositions.set(columnId, element.scrollTop);
     }
-    capturedColumnScroll.current = { boardId: activeBoardId, positions: scrollPositions };
+    capturedBoardScroll.current = {
+      boardId: activeBoardId,
+      boardScrollLeft: boardScrollerElement.current?.scrollLeft ?? null,
+      columnPositions,
+    };
   }, [activeBoardId]);
+  const preserveBoardScroll = useCallback(
+    async <T,>(action: () => Promise<T>) => {
+      if (activeBoardId && displayMode === "board") {
+        captureBoardScroll();
+      }
+      return action();
+    },
+    [activeBoardId, captureBoardScroll, displayMode],
+  );
+  const refreshPreservingScroll = useCallback(
+    async (taskId?: string | null) => preserveBoardScroll(() => onRefresh(taskId)),
+    [onRefresh, preserveBoardScroll],
+  );
+  const createTaskPreservingScroll = useCallback(
+    async (input: {
+      title: string;
+      description?: string | null;
+      columnId?: string;
+      priority?: TaskPriority;
+      labels?: string[];
+    }) => preserveBoardScroll(() => onCreateTask(input)),
+    [onCreateTask, preserveBoardScroll],
+  );
+  const archiveTaskPreservingScroll = useCallback(
+    async (taskId: string) => preserveBoardScroll(() => onArchiveTask(taskId)),
+    [onArchiveTask, preserveBoardScroll],
+  );
+  const completeTaskPreservingScroll = useCallback(
+    async (taskId: string) => preserveBoardScroll(() => onCompleteTask(taskId)),
+    [onCompleteTask, preserveBoardScroll],
+  );
+  const deleteCommentPreservingScroll = useCallback(
+    async (taskId: string, commentId: string) => preserveBoardScroll(() => onDeleteComment(taskId, commentId)),
+    [onDeleteComment, preserveBoardScroll],
+  );
+  const deleteTaskAttachmentPreservingScroll = useCallback(
+    async (taskId: string, attachmentId: string) => preserveBoardScroll(() => onDeleteTaskAttachment(taskId, attachmentId)),
+    [onDeleteTaskAttachment, preserveBoardScroll],
+  );
+  const postCommentPreservingScroll = useCallback(
+    async (taskId: string, body: string) => preserveBoardScroll(() => onPostComment(taskId, body)),
+    [onPostComment, preserveBoardScroll],
+  );
+  const updateTaskPreservingScroll = useCallback(
+    async (taskId: string, input: { title?: string; description?: string | null; labels?: string[] }) =>
+      preserveBoardScroll(() => onUpdateTask(taskId, input)),
+    [onUpdateTask, preserveBoardScroll],
+  );
+  const uploadTaskAttachmentPreservingScroll = useCallback(
+    async (taskId: string, file: File) => preserveBoardScroll(() => onUploadTaskAttachment(taskId, file)),
+    [onUploadTaskAttachment, preserveBoardScroll],
+  );
+  const recordBoardScroll = useCallback(() => {
+    const element = boardScrollerElement.current;
+    if (!activeBoardId || displayMode !== "board" || !element) {
+      return;
+    }
+
+    const capturedScroll = capturedBoardScroll.current;
+    capturedBoardScroll.current = {
+      boardId: activeBoardId,
+      boardScrollLeft: element.scrollLeft,
+      columnPositions: capturedScroll?.boardId === activeBoardId ? capturedScroll.columnPositions : new Map(),
+    };
+  }, [activeBoardId, displayMode]);
   const moveTaskPreservingScroll = useCallback(
     async (taskId: string, input: { columnId?: string; position?: number }) => {
-      if (activeBoardId && displayMode === "board") {
-        captureColumnScroll();
-      }
-      await onMoveTask(taskId, input);
+      await preserveBoardScroll(() => onMoveTask(taskId, input));
     },
-    [activeBoardId, captureColumnScroll, displayMode, onMoveTask],
+    [onMoveTask, preserveBoardScroll],
   );
   const moveTaskBatchPreservingScroll = useCallback(
     async (moves: TaskMovePlan[]) => {
       if (moves.length === 0) {
         return true;
       }
-      if (activeBoardId && displayMode === "board") {
-        captureColumnScroll();
-      }
-      return onMoveTasks(moves);
+      return preserveBoardScroll(() => onMoveTasks(moves));
     },
-    [activeBoardId, captureColumnScroll, displayMode, onMoveTasks],
+    [onMoveTasks, preserveBoardScroll],
   );
   const selectTask = useCallback(
     (taskId: string, columnId: string, range: boolean) => {
@@ -254,27 +325,36 @@ export function BoardWorkspace({
 
   useEffect(() => {
     if (!activeBoardId || displayMode !== "board") {
-      capturedColumnScroll.current = null;
+      capturedBoardScroll.current = null;
     }
   }, [activeBoardId, displayMode]);
 
   useLayoutEffect(() => {
-    const capturedScroll = capturedColumnScroll.current;
+    const capturedScroll = capturedBoardScroll.current;
     if (!capturedScroll || loadingWorkspace || !activeBoardId || displayMode !== "board") {
       return;
     }
     if (capturedScroll.boardId !== activeBoardId) {
-      capturedColumnScroll.current = null;
+      capturedBoardScroll.current = null;
       return;
     }
 
-    for (const [columnId, savedScrollTop] of capturedScroll.positions) {
+    const boardScroller = boardScrollerElement.current;
+    if (boardScroller && capturedScroll.boardScrollLeft !== null) {
+      boardScroller.scrollLeft = normalizeBoardScrollLeft(
+        capturedScroll.boardScrollLeft,
+        boardScroller.scrollWidth,
+        boardScroller.clientWidth,
+      );
+    }
+
+    for (const [columnId, savedScrollTop] of capturedScroll.columnPositions) {
       const element = columnScrollerElements.current.get(columnId);
       if (element) {
         element.scrollTop = normalizeColumnScrollTop(savedScrollTop, element.scrollHeight, element.clientHeight);
       }
     }
-    capturedColumnScroll.current = null;
+    capturedBoardScroll.current = null;
   }, [activeBoardId, columns, displayMode, loadingWorkspace, tasks]);
 
   if (!activeProject) {
@@ -311,7 +391,7 @@ export function BoardWorkspace({
             <Button icon={<Icon name="activity" />} onClick={onOpenProjectActivity} variant="ghost">
               Activity
             </Button>
-            <Button icon={<Icon name="refresh" />} onClick={() => onRefresh(activeTaskId)} variant="ghost">
+            <Button icon={<Icon name="refresh" />} onClick={() => void refreshPreservingScroll(activeTaskId)} variant="ghost">
               Sync
             </Button>
             <Button
@@ -399,7 +479,7 @@ export function BoardWorkspace({
                 tasks={sortedTasks}
               />
             ) : (
-              <div className="board-columns">
+              <div className="board-columns" onScroll={recordBoardScroll} ref={boardScrollerElement}>
                 {columns.map((column) => (
                   <BoardColumnView
                     activeTaskId={activeTaskId}
@@ -407,10 +487,10 @@ export function BoardWorkspace({
                     isCreating={newTaskColumnId === column.id}
                     key={column.id}
                     onArchiveTask={async (taskId) => {
-                      await onArchiveTask(taskId);
+                      await archiveTaskPreservingScroll(taskId);
                       clearTaskSelection();
                     }}
-                    onCreateTask={onCreateTask}
+                    onCreateTask={createTaskPreservingScroll}
                     onDropTask={handleTaskDrop}
                     onMoveTask={moveTaskPreservingScroll}
                     onOpenCreateTask={onOpenCreateTask}
@@ -430,16 +510,16 @@ export function BoardWorkspace({
               columns={columns}
               context={activeTaskContext}
               loading={loadingTask}
-              onArchiveTask={onArchiveTask}
+              onArchiveTask={archiveTaskPreservingScroll}
               onClose={onCloseTask}
-              onCompleteTask={onCompleteTask}
-              onDeleteComment={onDeleteComment}
-              onDeleteTaskAttachment={onDeleteTaskAttachment}
+              onCompleteTask={completeTaskPreservingScroll}
+              onDeleteComment={deleteCommentPreservingScroll}
+              onDeleteTaskAttachment={deleteTaskAttachmentPreservingScroll}
               onMoveTask={moveTaskPreservingScroll}
-              onPostComment={onPostComment}
+              onPostComment={postCommentPreservingScroll}
               onTaskDraftChange={onTaskDraftChange}
-              onUpdateTask={onUpdateTask}
-              onUploadTaskAttachment={onUploadTaskAttachment}
+              onUpdateTask={updateTaskPreservingScroll}
+              onUploadTaskAttachment={uploadTaskAttachmentPreservingScroll}
             />
           )}
         </div>
