@@ -6,6 +6,7 @@ import { useBoard, useHealth, useProjectTree, useTaskContexts, withCurrentTaskCo
 import { api } from "../lib/api";
 import { apiMessage } from "../lib/errors";
 import { backgroundSyncIntervalMs, type TaskDraftsById } from "./sync";
+import { documentTitleForRoute } from "./document-title";
 import { persistTheme, storedTheme } from "../lib/theme";
 import type { SearchResult, Task, Theme, View } from "../domain/types";
 import { ActivityWorkspace } from "../features/activity";
@@ -130,9 +131,22 @@ export function App() {
     [selectedProjectId, projectTree],
   );
   const activeBoard = board ?? projectTree.flatMap((item) => item.boards).find((item) => item.id === selectedBoardId) ?? null;
+  const activeTask = useMemo(
+    () => tasks.find((task) => task.id === activeTaskId) ?? taskContext?.task ?? null,
+    [activeTaskId, taskContext?.task, tasks],
+  );
   const displayedProjectTree = withCurrentTaskCounts(projectTree, selectedBoardId, tasks);
   const error = projectError ?? boardError ?? taskError;
   const syncError = projectSyncError ?? boardSyncError ?? taskSyncError;
+
+  useEffect(() => {
+    document.title = documentTitleForRoute({
+      board: activeBoard,
+      project: activeProject,
+      route,
+      task: activeTask,
+    });
+  }, [activeBoard, activeProject, activeTask, route]);
 
   const refreshAfterMutation = useCallback(
     async (taskId?: string | null) => {

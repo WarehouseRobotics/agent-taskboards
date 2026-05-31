@@ -155,6 +155,10 @@ Every primary screen uses the same chrome:
   expandable project tree, footer health indicator. 240px fixed.
 - **Topbar carries breadcrumbs.** Project glyph → board → task title (when
   applicable). Stable IDs sit inline next to the title in mono.
+- **Browser title mirrors context.** The document title follows the same
+  hierarchy: board routes use `{project name} / {board name}`, and task routes
+  use `{board name} / {task title}` so tab labels stay useful during multi-tab
+  work.
 - **Task detail rail.** When a task is open, the right rail becomes the primary
   task work surface. It stays attached to the board, never floats, and uses a
   responsive width that is wide enough for editing while preserving column

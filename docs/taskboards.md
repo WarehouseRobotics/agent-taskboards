@@ -71,7 +71,10 @@ should make it easy to:
 - run maintenance actions such as cleanup and embedding reindexing
 
 The UI should be dense, calm, and work-focused. This is an operational tool, not
-a marketing site.
+a marketing site. Browser document titles should also carry the current working
+context so users can distinguish open tabs: board routes use
+`{project name} / {board name}`, and task routes use
+`{board name} / {task title}`.
 
 ## Agent Workflow
 

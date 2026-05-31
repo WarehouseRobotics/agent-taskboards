@@ -22,6 +22,11 @@ The v1 UI should prioritize operational workflows:
 
 The first screen should be the working app, not a marketing landing page.
 
+Browser document titles should reflect the current work context rather than a
+static app name. Board routes use `{project name} / {board name}`. Task routes
+use `{board name} / {task title}`. Other routes may fall back to
+`Agent Taskboards` unless they have a similarly useful contextual title.
+
 Project and board name forms should show the URL-safe naming rule while the
 user types. Creating or renaming a project or board should make invalid
 characters visually obvious before submit, using the same rule enforced by the
