@@ -7,7 +7,15 @@ import {
 } from "react";
 import type { BoardColumn, Task } from "../../domain/types";
 import { columnStatus } from "../../lib/task-display";
-import { Icon, LabelChip, Mono, PriorityFlag, StatusIcon } from "../../components/ui";
+import {
+  Icon,
+  Kbd,
+  LabelChip,
+  Mono,
+  PriorityFlag,
+  StatusIcon,
+} from "../../components/ui";
+import { isArchiveMenuHotkey } from "./task-card-menu-hotkeys";
 
 export function TaskCard({
   active,
@@ -40,6 +48,7 @@ export function TaskCard({
   const columnIndex = columns.findIndex((item) => item.id === column.id);
   const doneColumn = columns.find((item) => item.isDone);
   const menuId = `task-menu-${task.id}`;
+  const archiveDisabled = Boolean(task.archivedAt);
 
   useEffect(() => {
     if (!menuOpen) {
@@ -51,19 +60,25 @@ export function TaskCard({
         setMenuOpen(false);
       }
     };
-    const closeOnEscape = (event: KeyboardEvent) => {
+    const handleMenuKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setMenuOpen(false);
+        return;
+      }
+      if (isArchiveMenuHotkey(event, archiveDisabled)) {
+        event.preventDefault();
+        setMenuOpen(false);
+        void onArchiveTask(task.id);
       }
     };
 
     document.addEventListener("pointerdown", closeOnOutsidePointer);
-    document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("keydown", handleMenuKeyDown);
     return () => {
       document.removeEventListener("pointerdown", closeOnOutsidePointer);
-      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("keydown", handleMenuKeyDown);
     };
-  }, [menuOpen]);
+  }, [archiveDisabled, menuOpen, onArchiveTask, task.id]);
 
   const moveAdjacent = (direction: -1 | 1) => {
     const nextColumn = columns[columnIndex + direction];
@@ -192,10 +207,40 @@ export function TaskCard({
       )}
       {menuOpen && (
         <div className="task-card__menu" id={menuId} onClick={(event) => event.stopPropagation()} role="menu">
-          <button disabled={columnIndex <= 0} onClick={() => closeAndRun(() => moveAdjacent(-1))} role="menuitem" type="button">Move left</button>
-          <button disabled={columnIndex >= columns.length - 1} onClick={() => closeAndRun(() => moveAdjacent(1))} role="menuitem" type="button">Move right</button>
-          <button disabled={!doneColumn} onClick={() => closeAndRun(() => doneColumn && onMoveTask(task.id, { columnId: doneColumn.id }))} role="menuitem" type="button">Move to done</button>
-          <button className="danger-text" onClick={() => closeAndRun(() => onArchiveTask(task.id))} role="menuitem" type="button">Archive</button>
+          <button
+            disabled={columnIndex <= 0}
+            onClick={() => closeAndRun(() => moveAdjacent(-1))}
+            role="menuitem"
+            type="button"
+          >
+            Move left
+          </button>
+          <button
+            disabled={columnIndex >= columns.length - 1}
+            onClick={() => closeAndRun(() => moveAdjacent(1))}
+            role="menuitem"
+            type="button"
+          >
+            Move right
+          </button>
+          <button
+            disabled={!doneColumn}
+            onClick={() => closeAndRun(() => doneColumn && onMoveTask(task.id, { columnId: doneColumn.id }))}
+            role="menuitem"
+            type="button"
+          >
+            Move to done
+          </button>
+          <button
+            className="danger-text"
+            disabled={archiveDisabled}
+            onClick={() => closeAndRun(() => onArchiveTask(task.id))}
+            role="menuitem"
+            type="button"
+          >
+            <span>Archive</span>
+            <Kbd>A</Kbd>
+          </button>
         </div>
       )}
     </article>
