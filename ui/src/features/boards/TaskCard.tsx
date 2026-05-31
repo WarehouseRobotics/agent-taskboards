@@ -15,7 +15,10 @@ import {
   PriorityFlag,
   StatusIcon,
 } from "../../components/ui";
-import { isArchiveMenuHotkey } from "./task-card-menu-hotkeys";
+import {
+  isArchiveMenuHotkey,
+  isMoveToDoneMenuHotkey,
+} from "./task-card-menu-hotkeys";
 
 export function TaskCard({
   active,
@@ -49,6 +52,7 @@ export function TaskCard({
   const doneColumn = columns.find((item) => item.isDone);
   const menuId = `task-menu-${task.id}`;
   const archiveDisabled = Boolean(task.archivedAt);
+  const moveToDoneDisabled = !doneColumn;
 
   useEffect(() => {
     if (!menuOpen) {
@@ -69,6 +73,12 @@ export function TaskCard({
         event.preventDefault();
         setMenuOpen(false);
         void onArchiveTask(task.id);
+        return;
+      }
+      if (isMoveToDoneMenuHotkey(event, moveToDoneDisabled) && doneColumn) {
+        event.preventDefault();
+        setMenuOpen(false);
+        void onMoveTask(task.id, { columnId: doneColumn.id });
       }
     };
 
@@ -78,7 +88,15 @@ export function TaskCard({
       document.removeEventListener("pointerdown", closeOnOutsidePointer);
       document.removeEventListener("keydown", handleMenuKeyDown);
     };
-  }, [archiveDisabled, menuOpen, onArchiveTask, task.id]);
+  }, [
+    archiveDisabled,
+    doneColumn,
+    menuOpen,
+    moveToDoneDisabled,
+    onArchiveTask,
+    onMoveTask,
+    task.id,
+  ]);
 
   const moveAdjacent = (direction: -1 | 1) => {
     const nextColumn = columns[columnIndex + direction];
@@ -224,12 +242,13 @@ export function TaskCard({
             Move right
           </button>
           <button
-            disabled={!doneColumn}
+            disabled={moveToDoneDisabled}
             onClick={() => closeAndRun(() => doneColumn && onMoveTask(task.id, { columnId: doneColumn.id }))}
             role="menuitem"
             type="button"
           >
-            Move to done
+            <span>Move to done</span>
+            <Kbd>D</Kbd>
           </button>
           <button
             className="danger-text"

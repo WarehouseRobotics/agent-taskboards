@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isArchiveMenuHotkey, type TaskCardMenuHotkeyEvent } from "./task-card-menu-hotkeys";
+import {
+  isArchiveMenuHotkey,
+  isMoveToDoneMenuHotkey,
+  type TaskCardMenuHotkeyEvent,
+} from "./task-card-menu-hotkeys";
 
 describe("task card menu hotkeys", () => {
   it("matches lowercase and uppercase archive keys", () => {
@@ -20,6 +24,21 @@ describe("task card menu hotkeys", () => {
 
   it("does not match when archive is disabled", () => {
     expect(isArchiveMenuHotkey(eventFor("a"), true)).toBe(false);
+  });
+
+  it("matches lowercase and uppercase move-to-done keys", () => {
+    expect(isMoveToDoneMenuHotkey(eventFor("d"), false)).toBe(true);
+    expect(isMoveToDoneMenuHotkey(eventFor("D"), false)).toBe(true);
+  });
+
+  it("ignores modified move-to-done keys", () => {
+    expect(isMoveToDoneMenuHotkey(eventFor("d", { metaKey: true }), false)).toBe(false);
+    expect(isMoveToDoneMenuHotkey(eventFor("d", { ctrlKey: true }), false)).toBe(false);
+    expect(isMoveToDoneMenuHotkey(eventFor("d", { altKey: true }), false)).toBe(false);
+  });
+
+  it("does not match when move to done is disabled", () => {
+    expect(isMoveToDoneMenuHotkey(eventFor("d"), true)).toBe(false);
   });
 });
 
