@@ -15,6 +15,7 @@ import {
 } from "./board-selection";
 import { BoardColumnView } from "./BoardColumnView";
 import {
+  boardLoadingState,
   boardSortOptions,
   normalizeBoardScrollLeft,
   normalizeColumnScrollTop,
@@ -126,6 +127,8 @@ export function BoardWorkspace({
   }, [columns, sortedTasks]);
 
   const loadingWorkspace = loadingProjects || loadingBoard;
+  const { isRefreshing, showInitialSkeleton } = boardLoadingState(loadingWorkspace, Boolean(activeBoard));
+  const boardSummaryText = `${tasks.length} tasks · ${columns.length} columns · ${tasks.filter((task) => task.completedAt).length} done`;
   const setDisplayPreference = (mode: BoardDisplayMode) => {
     setDisplayMode(mode);
     persistBoardDisplayMode(mode);
@@ -447,9 +450,7 @@ export function BoardWorkspace({
                 </button>
               </div>
               <Mono faded>
-                {loadingWorkspace
-                  ? "Loading board"
-                  : `${tasks.length} tasks · ${columns.length} columns · ${tasks.filter((task) => task.completedAt).length} done`}
+                {isRefreshing ? `Syncing · ${boardSummaryText}` : boardSummaryText}
               </Mono>
               {selectedTaskIds.size > 0 && (
                 <button className="selection-clear-button" onClick={clearTaskSelection} type="button">
@@ -469,7 +470,7 @@ export function BoardWorkspace({
                 ))}
               </select>
             </div>
-            {loadingWorkspace ? (
+            {showInitialSkeleton ? (
               <BoardColumnsSkeleton />
             ) : displayMode === "list" ? (
               <BoardTaskList

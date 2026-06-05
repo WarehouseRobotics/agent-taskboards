@@ -45,6 +45,13 @@ export function persistBoardDisplayMode(mode: BoardDisplayMode) {
   }
 }
 
+export function boardLoadingState(loadingWorkspace: boolean, hasActiveBoard: boolean) {
+  return {
+    isRefreshing: loadingWorkspace && hasActiveBoard,
+    showInitialSkeleton: loadingWorkspace && !hasActiveBoard,
+  };
+}
+
 export function sortBoardTasks(tasks: Task[], columns: BoardColumn[], sortKey: BoardSortKey): Task[] {
   const columnPositions = new Map(columns.map((column, index) => [column.id, column.position ?? index]));
   return [...tasks].sort((a, b) => compareTasks(a, b, columnPositions, sortKey));

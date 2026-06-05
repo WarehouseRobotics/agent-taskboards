@@ -150,9 +150,12 @@ export function App() {
 
   const refreshAfterMutation = useCallback(
     async (taskId?: string | null) => {
-      await Promise.all([loadProjects(selectedProjectId, selectedBoardId), loadBoard()]);
+      await Promise.all([
+        loadProjects(selectedProjectId, selectedBoardId, { normalizeRoute: false, quiet: true }),
+        loadBoard({ quiet: true }),
+      ]);
       if (taskId) {
-        await loadTaskContext(taskId);
+        await loadTaskContext(taskId, { quiet: true });
       }
     },
     [loadBoard, loadProjects, loadTaskContext, selectedBoardId, selectedProjectId],

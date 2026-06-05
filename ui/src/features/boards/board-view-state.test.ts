@@ -1,6 +1,34 @@
 import { describe, expect, it } from "vitest";
 import type { BoardColumn, Task } from "../../domain/types";
-import { normalizeBoardScrollLeft, normalizeColumnScrollTop, sortBoardTasks } from "./board-view-state";
+import {
+  boardLoadingState,
+  normalizeBoardScrollLeft,
+  normalizeColumnScrollTop,
+  sortBoardTasks,
+} from "./board-view-state";
+
+describe("board loading state", () => {
+  it("shows an initial skeleton while loading without board content", () => {
+    expect(boardLoadingState(true, false)).toEqual({
+      isRefreshing: false,
+      showInitialSkeleton: true,
+    });
+  });
+
+  it("keeps board content mounted while refreshing an active board", () => {
+    expect(boardLoadingState(true, true)).toEqual({
+      isRefreshing: true,
+      showInitialSkeleton: false,
+    });
+  });
+
+  it("does not show loading indicators when the workspace is idle", () => {
+    expect(boardLoadingState(false, true)).toEqual({
+      isRefreshing: false,
+      showInitialSkeleton: false,
+    });
+  });
+});
 
 describe("board task sorting", () => {
   const columns = [
