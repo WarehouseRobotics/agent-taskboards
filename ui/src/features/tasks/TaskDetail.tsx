@@ -345,6 +345,7 @@ export function TaskDetail({
   const currentLabels = parseTaskLabels(activeDraft.current.labelText);
   const titleError = editDirty && !trimmedTitle ? "Title is required" : null;
   const canSave = editDirty && Boolean(trimmedTitle) && !saving;
+  const taskEditLocked = saving;
   const activeDescriptionHeight = descriptionHeight ?? descriptionDefaultHeight(activeDraft.current.description);
   const descriptionStyle = { "--task-desc-height": `${activeDescriptionHeight}px` } as CSSProperties;
 
@@ -354,6 +355,10 @@ export function TaskDetail({
   };
 
   const removeLabel = (labelToRemove: string) => {
+    if (taskEditLocked) {
+      return;
+    }
+
     const nextLabels = currentLabels.filter((label) => label !== labelToRemove);
     setDraft({
       ...activeDraft,
@@ -364,6 +369,10 @@ export function TaskDetail({
   };
 
   const clearLabels = () => {
+    if (taskEditLocked) {
+      return;
+    }
+
     setDraft({
       ...activeDraft,
       current: { ...activeDraft.current, labelText: "" },
@@ -462,6 +471,9 @@ export function TaskDetail({
 
   const submitTaskEdit = async (event?: FormEvent) => {
     event?.preventDefault();
+    if (taskEditLocked) {
+      return;
+    }
     if (!trimmedTitle) {
       setEditError("Title is required");
       return;
@@ -658,6 +670,7 @@ export function TaskDetail({
             setEditError(null);
           }}
           onKeyDown={saveOnShortcut}
+          readOnly={taskEditLocked}
           rows={2}
           value={activeDraft.current.title}
         />
@@ -665,7 +678,12 @@ export function TaskDetail({
           <div className="task-label-editor__heading">
             <label htmlFor={`task-labels-${task.id}`}>Labels</label>
             {currentLabels.length > 0 && (
-              <button className="task-label-editor__clear" onClick={clearLabels} type="button">
+              <button
+                className="task-label-editor__clear"
+                disabled={taskEditLocked}
+                onClick={clearLabels}
+                type="button"
+              >
                 Clear all
               </button>
             )}
@@ -683,6 +701,7 @@ export function TaskDetail({
             }}
             onKeyDown={saveOnShortcut}
             placeholder="labels, comma separated"
+            readOnly={taskEditLocked}
             value={activeDraft.current.labelText}
           />
           <div className="task-label-editor__chips" id={`task-labels-preview-${task.id}`}>
@@ -692,6 +711,7 @@ export function TaskDetail({
                 <button
                   aria-label={`Remove label ${label}`}
                   className="label-chip__remove"
+                  disabled={taskEditLocked}
                   onClick={() => removeLabel(label)}
                   title="Remove label"
                   type="button"
@@ -743,6 +763,7 @@ export function TaskDetail({
               }}
               onKeyDown={saveOnShortcut}
               placeholder="No description yet."
+              readOnly={taskEditLocked}
               ref={descriptionInputRef}
               value={activeDraft.current.description}
             />
