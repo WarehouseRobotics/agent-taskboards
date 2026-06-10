@@ -47,6 +47,9 @@ die() { echo "taskboards: $*" >&2; exit 2; }
 declare -a temp_files=()
 cleanup() {
   local file
+  if [[ ${#temp_files[@]} -eq 0 ]]; then
+    return 0
+  fi
   for file in "${temp_files[@]}"; do
     rm -f "$file"
   done

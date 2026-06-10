@@ -84,6 +84,17 @@ process.stdout.write("ok\\n");
     return JSON.parse(readFileSync(curlOutputPath, "utf8")) as CurlCapture;
   }
 
+  it("exits zero for successful calls that do not create temporary files", () => {
+    const result = spawnSync(scriptPath, ["health"], {
+      env: taskboardsEnv(),
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe("ok\n");
+    expect(result.stderr).toBe("");
+  });
+
   it("keeps short inline comments working", () => {
     const capture = runTaskboards([
       "comment",
