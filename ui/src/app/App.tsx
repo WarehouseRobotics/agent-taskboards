@@ -302,6 +302,9 @@ export function App() {
         loading={loadingProjects}
         onCreateBoard={() => setNewBoardOpen(true)}
         onCreateProject={() => setNewProjectOpen(true)}
+        onNavigateHome={() => {
+          navigate({ view: "board", projectId: null, boardId: null, taskId: null });
+        }}
         onOpenSearchResult={openSearchResult}
         onSearchSubmit={handleSearchSubmit}
         onSelectBoard={(projectId, boardId) => {

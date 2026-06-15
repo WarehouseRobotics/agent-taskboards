@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import type { Health, ProjectTreeItem, SearchResult, View } from "../../domain/types";
 import { glyphForName } from "../../lib/task-display";
 import { Icon, Mono, SkeletonRows, type IconName } from "../ui";
@@ -11,6 +11,7 @@ export function Sidebar({
   loading,
   onCreateBoard,
   onCreateProject,
+  onNavigateHome,
   onOpenSearchResult,
   onSearchSubmit,
   onSelectBoard,
@@ -25,6 +26,7 @@ export function Sidebar({
   loading: boolean;
   onCreateBoard: () => void;
   onCreateProject: () => void;
+  onNavigateHome: () => void;
   onOpenSearchResult: (result: SearchResult) => void;
   onSearchSubmit: (query: string) => void;
   onSelectBoard: (projectId: string, boardId: string) => void;
@@ -33,20 +35,38 @@ export function Sidebar({
   projectTree: ProjectTreeItem[];
   view: View;
 }) {
+  const handleHomeClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.altKey ||
+      event.shiftKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    onNavigateHome();
+  };
+
   return (
     <aside className="sidebar">
       <div className="sidebar__header">
-        <div className="app-mark">
-          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-            <rect x="1.5" y="1.5" width="3" height="9" rx="1" fill="currentColor" opacity="0.55" />
-            <rect x="5.5" y="1.5" width="3" height="6" rx="1" fill="currentColor" />
-            <rect x="9.5" y="1.5" width="1" height="4" rx="0.5" fill="currentColor" opacity="0.85" />
-          </svg>
-        </div>
-        <div className="sidebar__title">
-          <strong>Agent Taskboards</strong>
-          <Mono faded>localhost:8142</Mono>
-        </div>
+        <a className="sidebar__home" href="/" onClick={handleHomeClick}>
+          <div className="app-mark">
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <rect x="1.5" y="1.5" width="3" height="9" rx="1" fill="currentColor" opacity="0.55" />
+              <rect x="5.5" y="1.5" width="3" height="6" rx="1" fill="currentColor" />
+              <rect x="9.5" y="1.5" width="1" height="4" rx="0.5" fill="currentColor" opacity="0.85" />
+            </svg>
+          </div>
+          <div className="sidebar__title">
+            <strong>Agent Taskboards</strong>
+            <Mono faded>localhost:8142</Mono>
+          </div>
+        </a>
         <button className="icon-btn" title="Command menu">
           <Icon name="command" />
         </button>

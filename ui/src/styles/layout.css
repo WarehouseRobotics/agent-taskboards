@@ -22,6 +22,22 @@
   border-bottom: 1px solid var(--line-faint);
 }
 
+.sidebar__home {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  border-radius: var(--r-sm);
+  color: inherit;
+  gap: var(--s-2);
+  text-decoration: none;
+}
+
+.sidebar__home:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .app-mark {
   display: grid;
   flex: 0 0 22px;
