@@ -619,6 +619,7 @@ Request:
   "query": "blocked tasks about sqlite migrations",
   "projectId": "optional",
   "boardId": "optional",
+  "preferredBoardId": "optional",
   "taskId": "optional",
   "sourceTypes": ["board", "task", "comment"],
   "includeArchived": false,
@@ -635,6 +636,13 @@ Defaults:
 - `sourceTypes`: all indexed source types
 - `includeArchived`: `false`
 - `limit`: `10`
+
+For queries with six or more trimmed characters, task searches also include
+deterministic, case-insensitive task ID substring matches. These synthetic task
+results are ranked before semantic results, with exact ID matches first and
+matches from `preferredBoardId` prioritized within exact and partial match
+groups. `preferredBoardId` only affects ranking; `boardId` remains the board
+filter.
 
 Response:
 

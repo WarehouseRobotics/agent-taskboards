@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { ProjectTreeItem, SearchResult, SearchSourceType } from "../../domain/types";
+import type { ProjectTreeItem, SearchResult, SearchSourceType, Task } from "../../domain/types";
 import { Icon, Kbd, Mono, type IconName } from "../ui";
 import { useSearch, type SearchFilters } from "../../features/search/useSearch";
 
 const SIDEBAR_RESULT_LIMIT = 5;
-const SIDEBAR_SEARCH_FILTERS: SearchFilters = { limit: SIDEBAR_RESULT_LIMIT };
+const TASK_ID_SEARCH_MIN_LENGTH = 6;
 
 export function SidebarSearch({
+  activeBoardId,
+  currentBoardTasks,
   onOpenResult,
   onSubmitQuery,
   projectTree,
 }: {
+  activeBoardId: string | null;
+  currentBoardTasks: Task[];
   onOpenResult: (result: SearchResult) => void;
   onSubmitQuery: (query: string) => void;
   projectTree: ProjectTreeItem[];
@@ -20,14 +24,30 @@ export function SidebarSearch({
   const [highlight, setHighlight] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const trimmed = query.trim();
+  const exactCurrentBoardTask = useMemo(
+    () => findCurrentBoardTaskIdMatch(trimmed, currentBoardTasks),
+    [currentBoardTasks, trimmed],
+  );
+  const runSearchApi = shouldRunSidebarSearchApi({
+    currentBoardTasks,
+    open,
+    query: trimmed,
+  });
+  const filters = useMemo<SearchFilters>(
+    () => ({
+      limit: SIDEBAR_RESULT_LIMIT,
+      ...(activeBoardId ? { preferredBoardId: activeBoardId } : {}),
+    }),
+    [activeBoardId],
+  );
 
   const { results, loading, error, lastQuery } = useSearch({
     query,
-    filters: SIDEBAR_SEARCH_FILTERS,
-    enabled: open,
+    filters,
+    enabled: runSearchApi,
   });
 
-  const trimmed = query.trim();
   const showPopover = open && trimmed.length > 0;
   const visibleResults = useMemo(() => results.slice(0, SIDEBAR_RESULT_LIMIT), [results]);
 
@@ -74,6 +94,13 @@ export function SidebarSearch({
   }, [open]);
 
   const crumbLookup = useMemo(() => buildCrumbLookup(projectTree), [projectTree]);
+
+  useEffect(() => {
+    if (!open || !exactCurrentBoardTask) {
+      return;
+    }
+    selectResult(taskToSearchResult(exactCurrentBoardTask, "exact"));
+  }, [exactCurrentBoardTask, open]);
 
   function selectResult(result: SearchResult) {
     setOpen(false);
@@ -237,4 +264,42 @@ export function fallbackTitle(sourceType: SearchSourceType) {
   if (sourceType === "board") return "Board";
   if (sourceType === "comment") return "Comment";
   return "Task";
+}
+
+export function findCurrentBoardTaskIdMatch(query: string, tasks: Task[]) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (normalizedQuery.length < TASK_ID_SEARCH_MIN_LENGTH) {
+    return null;
+  }
+  return tasks.find((task) => task.id.toLowerCase() === normalizedQuery) ?? null;
+}
+
+export function shouldRunSidebarSearchApi({
+  currentBoardTasks,
+  open,
+  query,
+}: {
+  currentBoardTasks: Task[];
+  open: boolean;
+  query: string;
+}) {
+  return open && !findCurrentBoardTaskIdMatch(query, currentBoardTasks);
+}
+
+export function taskToSearchResult(
+  task: Task,
+  matchType: "exact" | "partial",
+): SearchResult {
+  return {
+    searchDocumentId: `task-id:${task.id}`,
+    sourceType: "task",
+    sourceId: task.id,
+    projectId: task.projectId,
+    boardId: task.boardId,
+    taskId: task.id,
+    title: task.title,
+    snippet: `Task ID: ${task.id}`,
+    distance: matchType === "exact" ? 0 : 0.001,
+    metadata: { sourceTextField: "taskId", matchType },
+  };
 }

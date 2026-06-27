@@ -1114,6 +1114,7 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
         query: query.q,
         projectId: scope.project?.id,
         boardId: scope.board?.id,
+        preferredBoardId: query.preferredBoardId,
         taskId: query.taskId,
         sourceTypes: query.sourceTypes,
         includeArchived: query.includeArchived,

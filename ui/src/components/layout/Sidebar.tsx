@@ -1,5 +1,5 @@
 import { useEffect, useState, type MouseEvent } from "react";
-import type { Health, ProjectTreeItem, SearchResult, View } from "../../domain/types";
+import type { Health, ProjectTreeItem, SearchResult, Task, View } from "../../domain/types";
 import { glyphForName } from "../../lib/task-display";
 import { Icon, Mono, SkeletonRows, type IconName } from "../ui";
 import { SidebarSearch } from "./SidebarSearch";
@@ -18,6 +18,8 @@ export function Sidebar({
   onSelectProject,
   onSelectView,
   projectTree,
+  selectedBoardId,
+  tasks,
   view,
 }: {
   activeBoardId: string | null;
@@ -33,6 +35,8 @@ export function Sidebar({
   onSelectProject: (projectId: string) => void;
   onSelectView: (view: View) => void;
   projectTree: ProjectTreeItem[];
+  selectedBoardId: string | null;
+  tasks: Task[];
   view: View;
 }) {
   const handleHomeClick = (event: MouseEvent<HTMLAnchorElement>) => {
@@ -72,6 +76,8 @@ export function Sidebar({
         </button>
       </div>
       <SidebarSearch
+        activeBoardId={selectedBoardId}
+        currentBoardTasks={tasks}
         onOpenResult={onOpenSearchResult}
         onSubmitQuery={onSearchSubmit}
         projectTree={projectTree}

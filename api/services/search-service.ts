@@ -31,6 +31,7 @@ const EMBEDDING_DIMENSIONS = 384;
 const SEARCH_VECTOR_MIN_LIMIT = 50;
 const SEARCH_VECTOR_INITIAL_MULTIPLIER = 16;
 const SEARCH_VECTOR_MAX_LIMIT = 2_000;
+const TASK_ID_SEARCH_MIN_LENGTH = 6;
 
 export type EmbeddingModel = {
   embed(text: string): Promise<EmbeddingResult>;
@@ -46,6 +47,13 @@ type SearchDocumentRow = {
   projectArchivedAt: Date | null;
   boardArchivedAt: Date | null;
   taskArchivedAt: Date | null;
+};
+
+type TaskIdSearchRow = {
+  id: string;
+  projectId: string;
+  boardId: string;
+  title: string;
 };
 
 type IndexedSearchDocumentRow = SearchDocumentRow & {
@@ -65,6 +73,8 @@ type IndexDocumentInput = {
   body: string;
   metadata: Record<string, unknown>;
 };
+
+type TaskIdMatchType = "exact" | "partial";
 
 export type EmbeddingIndexResult = {
   status: "indexed" | "skipped" | "error";
@@ -183,11 +193,16 @@ export class SearchService {
   }
 
   async search(input: SearchInput): Promise<SearchResult[]> {
+    const sourceTypes = input.sourceTypes ?? [...INDEXED_SOURCE_TYPES];
+    const taskIdMatches = this.searchTaskIds(input, sourceTypes);
+    if (taskIdMatches.length >= input.limit) {
+      return taskIdMatches.slice(0, input.limit);
+    }
+
     const queryEmbedding = await this.embeddings.embed(input.query);
     validateEmbeddingDimensions(queryEmbedding);
     const queryVector = vectorBuffer(queryEmbedding.vector);
     const limit = input.limit;
-    const sourceTypes = input.sourceTypes ?? [...INDEXED_SOURCE_TYPES];
     let vectorLimit = initialSearchVectorLimit(limit);
     let results: SearchResult[] = [];
 
@@ -198,15 +213,19 @@ export class SearchService {
         sourceTypes,
         vectorLimit,
       });
+      const mergedResults = mergeTaskIdMatches(taskIdMatches, results);
 
-      if (results.length >= limit || vectorLimit === SEARCH_VECTOR_MAX_LIMIT) {
-        return results.slice(0, limit);
+      if (
+        mergedResults.length >= limit ||
+        vectorLimit === SEARCH_VECTOR_MAX_LIMIT
+      ) {
+        return mergedResults.slice(0, limit);
       }
 
       vectorLimit = Math.min(vectorLimit * 2, SEARCH_VECTOR_MAX_LIMIT);
     }
 
-    return results.slice(0, limit);
+    return mergeTaskIdMatches(taskIdMatches, results).slice(0, limit);
   }
 
   private async indexSourceDocuments(
@@ -490,6 +509,78 @@ export class SearchService {
       .all(...params) as SearchDocumentVectorRow[];
   }
 
+  private searchTaskIds(
+    input: SearchInput,
+    sourceTypes: IndexedSourceType[],
+  ): SearchResult[] {
+    const query = input.query.trim().toLowerCase();
+    if (
+      query.length < TASK_ID_SEARCH_MIN_LENGTH ||
+      !sourceTypes.includes("task")
+    ) {
+      return [];
+    }
+
+    const clauses = ["lower(t.id) LIKE ? ESCAPE '\\'"];
+    const params: unknown[] = [`%${escapeLike(query)}%`];
+
+    if (input.projectId) {
+      clauses.push("t.project_id = ?");
+      params.push(input.projectId);
+    }
+
+    if (input.boardId) {
+      clauses.push("t.board_id = ?");
+      params.push(input.boardId);
+    }
+
+    if (input.taskId) {
+      clauses.push("t.id = ?");
+      params.push(input.taskId);
+    }
+
+    if (!input.includeArchived) {
+      clauses.push("t.archived_at IS NULL");
+      clauses.push("p.archived_at IS NULL");
+      clauses.push("b.archived_at IS NULL");
+    }
+
+    const rows = this.sqlite
+      .prepare(
+        `
+        SELECT
+          t.id,
+          t.project_id AS projectId,
+          t.board_id AS boardId,
+          t.title
+        FROM tasks t
+        JOIN projects p ON p.id = t.project_id
+        JOIN boards b ON b.id = t.board_id
+        WHERE ${clauses.join(" AND ")}
+      `,
+      )
+      .all(...params) as TaskIdSearchRow[];
+
+    return rows
+      .map((row) => {
+        const matchType = row.id.toLowerCase() === query ? "exact" : "partial";
+        const preferredBoardMatch = row.boardId === input.preferredBoardId;
+        return {
+          result: taskIdSearchResult(row, matchType),
+          rank:
+            (matchType === "exact" ? 0 : 2) +
+            (preferredBoardMatch ? 0 : 1),
+        };
+      })
+      .sort((left, right) => {
+        if (left.rank !== right.rank) {
+          return left.rank - right.rank;
+        }
+        return left.result.sourceId.localeCompare(right.result.sourceId);
+      })
+      .map((match) => match.result);
+  }
+
   private getTaskTitle(taskId: string) {
     const task = this.db
       .select({ title: tasks.title })
@@ -604,6 +695,47 @@ function makeTaskIndexDocuments(task: Task) {
   }
 
   return chunkedDocuments;
+}
+
+function taskIdSearchResult(
+  row: TaskIdSearchRow,
+  matchType: TaskIdMatchType,
+): SearchResult {
+  return {
+    searchDocumentId: `task-id:${row.id}`,
+    sourceType: "task",
+    sourceId: row.id,
+    projectId: row.projectId,
+    boardId: row.boardId,
+    taskId: row.id,
+    title: row.title,
+    snippet: `Task ID: ${row.id}`,
+    distance: matchType === "exact" ? 0 : 0.001,
+    metadata: { sourceTextField: "taskId", matchType },
+  };
+}
+
+function mergeTaskIdMatches(
+  taskIdMatches: SearchResult[],
+  semanticResults: SearchResult[],
+) {
+  if (taskIdMatches.length === 0) {
+    return semanticResults;
+  }
+
+  const matchedTaskIds = new Set(
+    taskIdMatches.map((result) => `${result.sourceType}:${result.sourceId}`),
+  );
+  return [
+    ...taskIdMatches,
+    ...semanticResults.filter(
+      (result) => !matchedTaskIds.has(`${result.sourceType}:${result.sourceId}`),
+    ),
+  ];
+}
+
+function escapeLike(value: string) {
+  return value.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
 function makeIndexDocumentChunk(

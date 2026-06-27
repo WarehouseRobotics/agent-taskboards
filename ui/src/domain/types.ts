@@ -174,6 +174,7 @@ export interface SearchInput {
   query: string;
   projectId?: string;
   boardId?: string;
+  preferredBoardId?: string;
   taskId?: string;
   sourceTypes?: SearchSourceType[];
   includeArchived?: boolean;

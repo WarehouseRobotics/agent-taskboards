@@ -457,6 +457,218 @@ describe("search service", () => {
     expect(results[0]?.sourceId).toBe(task.id);
   });
 
+  it("does not add deterministic task ID matches for short queries", async () => {
+    client = createMigratedClient();
+    const { db } = client;
+    const { project, board, column } = createBoardFixture("short-id-board");
+    db.insert(tasks)
+      .values({
+        id: "abcde-task",
+        projectId: project.id,
+        boardId: board.id,
+        columnId: column.id,
+        title: "Short ID candidate",
+        position: 0,
+      })
+      .run();
+
+    const search = new SearchService(client, createFakeEmbeddingModel());
+    const results = await search.search({
+      query: "abcde",
+      sourceTypes: ["task"],
+      includeArchived: false,
+      limit: 10,
+    });
+
+    expect(results).toHaveLength(0);
+  });
+
+  it("adds deterministic task ID matches ahead of semantic results", async () => {
+    client = createMigratedClient();
+    const { db } = client;
+    const { project, board, column } = createBoardFixture("id-search-board");
+    const idTask = db
+      .insert(tasks)
+      .values({
+        id: "target-deterministic-abc123",
+        projectId: project.id,
+        boardId: board.id,
+        columnId: column.id,
+        title: "Target deterministic task",
+        position: 0,
+      })
+      .returning()
+      .get();
+    const semanticTask = db
+      .insert(tasks)
+      .values({
+        projectId: project.id,
+        boardId: board.id,
+        columnId: column.id,
+        title: "ABC123 semantic text",
+        description: "Mention abc123 in indexed task content.",
+        position: 1,
+      })
+      .returning()
+      .get();
+
+    const search = new SearchService(client, createFakeEmbeddingModel());
+    await search.indexTask(semanticTask);
+    const results = await search.search({
+      query: "abc123",
+      sourceTypes: ["task"],
+      includeArchived: false,
+      limit: 10,
+    });
+
+    expect(results[0]).toMatchObject({
+      searchDocumentId: `task-id:${idTask.id}`,
+      sourceType: "task",
+      sourceId: idTask.id,
+      taskId: idTask.id,
+      snippet: `Task ID: ${idTask.id}`,
+      metadata: { sourceTextField: "taskId", matchType: "partial" },
+    });
+    expect(results.map((result) => result.sourceId)).toContain(
+      semanticTask.id,
+    );
+  });
+
+  it("ranks exact task ID matches before active-board partial matches", async () => {
+    client = createMigratedClient();
+    const { db } = client;
+    const project = db
+      .insert(projects)
+      .values({ name: "ranking-project" })
+      .returning()
+      .get();
+    const activeBoard = createBoardWithColumn(project.id, "active-ranking");
+    const otherBoard = createBoardWithColumn(project.id, "other-ranking");
+    db.insert(tasks)
+      .values({
+        id: "xneedle123",
+        projectId: project.id,
+        boardId: activeBoard.board.id,
+        columnId: activeBoard.column.id,
+        title: "Active partial match",
+        position: 0,
+      })
+      .run();
+    db.insert(tasks)
+      .values({
+        id: "needle123",
+        projectId: project.id,
+        boardId: otherBoard.board.id,
+        columnId: otherBoard.column.id,
+        title: "Other exact match",
+        position: 0,
+      })
+      .run();
+
+    const search = new SearchService(client, createFakeEmbeddingModel());
+    const results = await search.search({
+      query: "needle123",
+      preferredBoardId: activeBoard.board.id,
+      sourceTypes: ["task"],
+      includeArchived: false,
+      limit: 10,
+    });
+
+    expect(results.map((result) => result.sourceId)).toEqual([
+      "needle123",
+      "xneedle123",
+    ]);
+  });
+
+  it("ranks active-board partial task ID matches before other partial matches", async () => {
+    client = createMigratedClient();
+    const { db } = client;
+    const project = db
+      .insert(projects)
+      .values({ name: "preferred-project" })
+      .returning()
+      .get();
+    const activeBoard = createBoardWithColumn(project.id, "active-partial");
+    const otherBoard = createBoardWithColumn(project.id, "other-partial");
+    db.insert(tasks)
+      .values({
+        id: "other-shared123",
+        projectId: project.id,
+        boardId: otherBoard.board.id,
+        columnId: otherBoard.column.id,
+        title: "Other partial match",
+        position: 0,
+      })
+      .run();
+    db.insert(tasks)
+      .values({
+        id: "active-shared123",
+        projectId: project.id,
+        boardId: activeBoard.board.id,
+        columnId: activeBoard.column.id,
+        title: "Active partial match",
+        position: 0,
+      })
+      .run();
+
+    const search = new SearchService(client, createFakeEmbeddingModel());
+    const results = await search.search({
+      query: "shared123",
+      preferredBoardId: activeBoard.board.id,
+      sourceTypes: ["task"],
+      includeArchived: false,
+      limit: 10,
+    });
+
+    expect(results.map((result) => result.sourceId)).toEqual([
+      "active-shared123",
+      "other-shared123",
+    ]);
+  });
+
+  it("respects archived visibility and source type filters for task ID matches", async () => {
+    client = createMigratedClient();
+    const { db } = client;
+    const { project, board, column } = createBoardFixture("archived-id-board");
+    db.insert(tasks)
+      .values({
+        id: "archived-abc123",
+        projectId: project.id,
+        boardId: board.id,
+        columnId: column.id,
+        title: "Archived ID candidate",
+        position: 0,
+        archivedAt: new Date(),
+      })
+      .run();
+
+    const search = new SearchService(client, createFakeEmbeddingModel());
+    expect(
+      await search.search({
+        query: "abc123",
+        sourceTypes: ["task"],
+        includeArchived: false,
+        limit: 10,
+      }),
+    ).toHaveLength(0);
+    expect(
+      await search.search({
+        query: "abc123",
+        sourceTypes: ["task"],
+        includeArchived: true,
+        limit: 10,
+      }),
+    ).toHaveLength(1);
+    expect(
+      await search.search({
+        query: "abc123",
+        sourceTypes: ["comment"],
+        includeArchived: true,
+        limit: 10,
+      }),
+    ).toHaveLength(0);
+  });
+
   it("groups multiple matching chunks into one search result per source", async () => {
     client = createMigratedClient();
     const { db } = client;
@@ -626,6 +838,44 @@ describe("search service", () => {
       migrationsDir: resolve(process.cwd(), "drizzle"),
     });
     return createDatabaseClient(databasePath);
+  }
+
+  function createBoardFixture(boardName: string) {
+    if (!client) {
+      throw new Error("Expected migrated client");
+    }
+    const project = client.db
+      .insert(projects)
+      .values({ name: `${boardName}-project` })
+      .returning()
+      .get();
+    const { board, column } = createBoardWithColumn(project.id, boardName);
+    return { project, board, column };
+  }
+
+  function createBoardWithColumn(projectId: string, boardName: string) {
+    if (!client) {
+      throw new Error("Expected migrated client");
+    }
+    const board = client.db
+      .insert(boards)
+      .values({
+        projectId,
+        name: boardName,
+      })
+      .returning()
+      .get();
+    const column = client.db
+      .insert(boardColumns)
+      .values({
+        boardId: board.id,
+        key: "ready",
+        name: "Ready",
+        position: 0,
+      })
+      .returning()
+      .get();
+    return { board, column };
   }
 
   function makeLongText(prefix: string, paragraphs: number) {

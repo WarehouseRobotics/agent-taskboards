@@ -159,6 +159,7 @@ export const searchSchema = z.object({
   query: requiredString.max(1000),
   projectId: requiredString.optional(),
   boardId: requiredString.optional(),
+  preferredBoardId: requiredString.optional(),
   taskId: requiredString.optional(),
   sourceTypes: z.array(z.enum(indexedSearchSourceTypes)).min(1).optional(),
   includeArchived: z.boolean().optional().default(false),

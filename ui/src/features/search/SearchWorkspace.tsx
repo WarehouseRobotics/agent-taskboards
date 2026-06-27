@@ -26,11 +26,13 @@ export function SearchWorkspace({
   initialQuery,
   onOpenResult,
   onQueryChange,
+  preferredBoardId,
   projectTree,
 }: {
   initialQuery: string | null;
   onOpenResult: (result: SearchResult) => void;
   onQueryChange: (query: string | null) => void;
+  preferredBoardId: string | null;
   projectTree: ProjectTreeItem[];
 }) {
   const [query, setQuery] = useState(initialQuery ?? "");
@@ -57,10 +59,11 @@ export function SearchWorkspace({
     return {
       limit: WORKSPACE_RESULT_LIMIT,
       ...(projectId ? { projectId } : {}),
+      ...(preferredBoardId ? { preferredBoardId } : {}),
       ...(sourceTypes ? { sourceTypes } : {}),
       ...(includeArchived ? { includeArchived: true } : {}),
     };
-  }, [enabledSources, includeArchived, projectId]);
+  }, [enabledSources, includeArchived, preferredBoardId, projectId]);
 
   const { results, loading, error, lastQuery } = useSearch({ query, filters });
 

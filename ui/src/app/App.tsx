@@ -315,6 +315,8 @@ export function App() {
         }}
         onSelectView={selectView}
         projectTree={displayedProjectTree}
+        selectedBoardId={selectedBoardId}
+        tasks={tasks}
         view={view}
       />
       <main className="workspace">
@@ -464,6 +466,7 @@ export function App() {
             initialQuery={route.view === "search" ? route.query : null}
             onOpenResult={openSearchResult}
             onQueryChange={handleSearchQueryChange}
+            preferredBoardId={selectedBoardId}
             projectTree={displayedProjectTree}
           />
         )}

@@ -101,6 +101,7 @@ export const agentSearchQuerySchema = agentReadQuerySchema.extend({
   q: z.preprocess(firstQueryValue, z.string().trim().min(1)),
   projectId: queryString,
   boardId: queryString,
+  preferredBoardId: queryString,
   taskId: queryString,
   sourceTypes: queryCsv(searchSourceTypes).transform((value) =>
     value.length > 0 ? value : undefined,
