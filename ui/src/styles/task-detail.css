@@ -1,5 +1,6 @@
 .task-detail {
   --task-detail-width: clamp(360px, 36vw, 560px);
+  --task-detail-inline-padding: 18px;
 
   display: flex;
   flex: 0 0 var(--task-detail-width);
@@ -8,15 +9,18 @@
   width: var(--task-detail-width);
   min-height: 0;
   overflow-y: auto;
-  padding: var(--s-5) 18px;
+  padding: var(--s-5) var(--task-detail-inline-padding);
   border-left: 1px solid var(--line);
   background: var(--bg-surface);
 }
 
 .task-detail__top {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: var(--s-2);
+  margin-inline: calc(-1 * var(--task-detail-inline-padding));
+  padding-inline: var(--task-detail-inline-padding);
 }
 
 .detail-meta {
@@ -360,12 +364,21 @@
 }
 
 .detail-toast {
-  align-self: flex-start;
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--s-2));
+  left: 50%;
+  min-width: calc(80% + var(--s-3));
+  max-width: calc(100% - var(--s-4));
+  transform: translateX(-50%);
   border: 1px solid color-mix(in oklch, var(--status-done) 35%, var(--line));
   border-radius: var(--r-md);
   background: color-mix(in oklch, var(--status-done) 10%, var(--bg-surface));
+  box-shadow: var(--shadow-pop);
   color: var(--fg-muted);
   font-size: var(--fs-12);
+  line-height: var(--lh-snug);
+  pointer-events: none;
   padding: 5px 8px;
 }
 

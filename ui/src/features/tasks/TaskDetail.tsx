@@ -752,12 +752,12 @@ export function TaskDetail({
         <button className="icon-btn" onClick={requestClose} title="Close task">
           <Icon name="close" />
         </button>
+        {detailToast && (
+          <div className={`detail-toast detail-toast--${detailToast.tone}`} role="status" aria-live="polite">
+            {detailToast.message}
+          </div>
+        )}
       </div>
-      {detailToast && (
-        <div className={`detail-toast detail-toast--${detailToast.tone}`} role="status" aria-live="polite">
-          {detailToast.message}
-        </div>
-      )}
       <form className="task-edit-form" onSubmit={submitTaskEdit}>
         <textarea
           aria-label="Task title"
