@@ -37,6 +37,7 @@ export function BoardWorkspace({
   activeProject,
   activeTaskContext,
   activeTaskId,
+  autoSaveTaskChanges,
   columns,
   error,
   loadingBoard,
@@ -70,6 +71,7 @@ export function BoardWorkspace({
   activeProject: Project | null;
   activeTaskContext?: TaskContext;
   activeTaskId: string | null;
+  autoSaveTaskChanges: boolean;
   columns: BoardColumn[];
   error: string | null;
   loadingBoard: boolean;
@@ -508,6 +510,7 @@ export function BoardWorkspace({
           </div>
           {activeTaskId && (
             <TaskDetail
+              autoSaveTaskChanges={autoSaveTaskChanges}
               columns={columns}
               context={activeTaskContext}
               loading={loadingTask}

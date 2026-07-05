@@ -4,13 +4,17 @@ import type { IconName } from "../../components/ui";
 import { Topbar } from "../../components/layout";
 
 export function SettingsWorkspace({
+  autoSaveTaskChanges,
   health,
+  onAutoSaveTaskChangesChange,
   onSectionChange,
   onThemeChange,
   section,
   theme,
 }: {
+  autoSaveTaskChanges: boolean;
   health: Health | null;
+  onAutoSaveTaskChangesChange: (enabled: boolean) => void;
   onSectionChange: (section: string) => void;
   onThemeChange: (theme: Theme) => void;
   section: string;
@@ -59,6 +63,22 @@ export function SettingsWorkspace({
                 <span>API health</span>
                 <Mono>{health?.ok ? "ok" : "offline"}</Mono>
                 <strong>{health?.database?.ok ? "healthy" : "unavailable"}</strong>
+              </div>
+              <div className="setting-row">
+                <span>
+                  <strong>Auto-save task changes</strong>
+                  <small>Save the open task after 15 seconds without edits.</small>
+                </span>
+                <button
+                  aria-checked={autoSaveTaskChanges}
+                  aria-label="Auto-save task changes"
+                  className={autoSaveTaskChanges ? "settings-switch settings-switch--on" : "settings-switch"}
+                  onClick={() => onAutoSaveTaskChangesChange(!autoSaveTaskChanges)}
+                  role="switch"
+                  type="button"
+                >
+                  <span />
+                </button>
               </div>
             </section>
           )}

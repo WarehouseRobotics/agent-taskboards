@@ -16,6 +16,7 @@ import { ProjectsWorkspace } from "../features/projects";
 import { SearchWorkspace } from "../features/search";
 import { BoardSettingsPanel, SettingsWorkspace } from "../features/settings";
 import { PlannedWorkspace } from "../features/planned";
+import { persistTaskAutoSaveEnabled, storedTaskAutoSaveEnabled } from "../features/tasks/task-auto-save";
 import {
   CreateBoardPanel,
   CreateProjectPanel,
@@ -24,6 +25,7 @@ import {
 export function App() {
   const initialRoute = useMemo(() => parseRoute(), []);
   const [theme, setThemeState] = useState<Theme>(storedTheme);
+  const [autoSaveTaskChanges, setAutoSaveTaskChangesState] = useState(storedTaskAutoSaveEnabled);
   const [route, setRoute] = useState<AppRoute>(initialRoute);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
@@ -35,6 +37,11 @@ export function App() {
   const setTheme = (next: Theme) => {
     setThemeState(next);
     persistTheme(next);
+  };
+
+  const setAutoSaveTaskChanges = (enabled: boolean) => {
+    setAutoSaveTaskChangesState(enabled);
+    persistTaskAutoSaveEnabled(enabled);
   };
 
   const applyRoute = useCallback((nextRoute: AppRoute) => {
@@ -326,6 +333,7 @@ export function App() {
             activeProject={activeProject}
             activeTaskContext={taskContext}
             activeTaskId={activeTaskId}
+            autoSaveTaskChanges={autoSaveTaskChanges}
             columns={columns}
             error={error}
             loadingBoard={loadingBoard}
@@ -486,7 +494,9 @@ export function App() {
         {view === "maintenance" && <PlannedWorkspace icon="database" title="Maintenance" health={health} />}
         {view === "settings" && (
           <SettingsWorkspace
+            autoSaveTaskChanges={autoSaveTaskChanges}
             health={health}
+            onAutoSaveTaskChangesChange={setAutoSaveTaskChanges}
             onSectionChange={(section) => navigate({ view: "settings", section })}
             onThemeChange={setTheme}
             section={route.view === "settings" ? route.section : defaultSettingsSection}

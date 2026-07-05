@@ -21,6 +21,7 @@ import {
   storedDescriptionView,
   type TaskDescriptionView,
 } from "./task-description-view";
+import { taskAutoSaveDelayMs } from "./task-auto-save";
 
 interface TaskEditFields {
   description: string;
@@ -110,6 +111,7 @@ function isInteractivePreviewTarget(target: EventTarget | null) {
 }
 
 export function TaskDetail({
+  autoSaveTaskChanges,
   columns,
   context,
   loading,
@@ -124,6 +126,7 @@ export function TaskDetail({
   onUpdateTask,
   onUploadTaskAttachment,
 }: {
+  autoSaveTaskChanges: boolean;
   columns: BoardColumn[];
   context?: TaskContext;
   loading: boolean;
@@ -155,6 +158,9 @@ export function TaskDetail({
   const detailRef = useRef<HTMLElement | null>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement | null>(null);
   const descriptionResizeStart = useRef<{ pointerId: number; startHeight: number; startY: number } | null>(null);
+  const autoSaveTimeout = useRef<number | null>(null);
+  const autoSaveFailedDraftSignature = useRef<string | null>(null);
+  const saveTaskEditRef = useRef<((source?: "autosave" | "manual", draftSignature?: string) => Promise<boolean>) | null>(null);
   const detailToastTimeout = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const taskIdCopyBlinkTimeout = useRef<number | null>(null);
@@ -190,6 +196,25 @@ export function TaskDetail({
   const editDirty = task ? isTaskDraftDirty(activeDraft) : false;
   const hasPendingChanges = editDirty || Boolean(comment.trim());
   const attachments = context?.attachments ?? [];
+  const trimmedTitle = activeDraft.current.title.trim();
+  const trimmedDescription = activeDraft.current.description.trim();
+  const currentLabels = useMemo(
+    () => parseTaskLabels(activeDraft.current.labelText),
+    [activeDraft.current.labelText],
+  );
+  const titleError = editDirty && !trimmedTitle ? "Title is required" : null;
+  const canSave = editDirty && Boolean(trimmedTitle) && !saving;
+  const taskEditLocked = saving;
+  const activeDescriptionHeight = descriptionHeight ?? descriptionDefaultHeight(activeDraft.current.description);
+  const descriptionStyle = { "--task-desc-height": `${activeDescriptionHeight}px` } as CSSProperties;
+  const autoSaveDraftSignature = task
+    ? [
+        task.id,
+        activeDraft.current.title,
+        activeDraft.current.description,
+        currentLabels.join("\u0000"),
+      ].join("\u0001")
+    : "";
 
   const showDetailToast = useCallback((message: string, tone: "success" | "warning" = "success") => {
     setDetailToast({ message, tone });
@@ -198,6 +223,72 @@ export function TaskDetail({
     }
     detailToastTimeout.current = window.setTimeout(() => setDetailToast(null), 2400);
   }, []);
+
+  const clearAutoSaveTimer = useCallback(() => {
+    if (autoSaveTimeout.current) {
+      window.clearTimeout(autoSaveTimeout.current);
+      autoSaveTimeout.current = null;
+    }
+  }, []);
+
+  const saveTaskEdit = useCallback(
+    async (source: "autosave" | "manual" = "manual", draftSignature = autoSaveDraftSignature) => {
+      if (!taskId || taskEditLocked) {
+        return false;
+      }
+      if (!trimmedTitle) {
+        setEditError("Title is required");
+        return false;
+      }
+      if (!editDirty) {
+        return false;
+      }
+
+      clearAutoSaveTimer();
+      setSaving(true);
+      setEditError(null);
+      if (source === "manual") {
+        autoSaveFailedDraftSignature.current = null;
+      }
+
+      try {
+        await onUpdateTask(taskId, {
+          title: trimmedTitle,
+          description: trimmedDescription || null,
+          labels: currentLabels,
+        });
+        setDraft(makeTaskDraft(taskId, trimmedTitle, trimmedDescription, currentLabels));
+        autoSaveFailedDraftSignature.current = null;
+        showDetailToast(source === "autosave" ? "Task auto-saved" : "Task updated");
+        return true;
+      } catch (err) {
+        setEditError(apiMessage(err));
+        if (source === "autosave") {
+          autoSaveFailedDraftSignature.current = draftSignature;
+          showDetailToast("Auto-save failed", "warning");
+        }
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [
+      autoSaveDraftSignature,
+      clearAutoSaveTimer,
+      currentLabels,
+      editDirty,
+      onUpdateTask,
+      showDetailToast,
+      taskId,
+      taskEditLocked,
+      trimmedDescription,
+      trimmedTitle,
+    ],
+  );
+
+  useEffect(() => {
+    saveTaskEditRef.current = saveTaskEdit;
+  }, [saveTaskEdit]);
 
   const flashTaskIdCopy = useCallback(() => {
     if (taskIdCopyBlinkTimeout.current) {
@@ -219,6 +310,15 @@ export function TaskDetail({
 
     onClose();
   }, [hasPendingChanges, onClose, showDetailToast]);
+
+  useEffect(() => {
+    if (!taskId) {
+      return;
+    }
+
+    autoSaveFailedDraftSignature.current = null;
+    clearAutoSaveTimer();
+  }, [clearAutoSaveTimer, taskId]);
 
   useEffect(() => {
     if (!taskId) {
@@ -282,6 +382,7 @@ export function TaskDetail({
 
   useEffect(() => {
     return () => {
+      clearAutoSaveTimer();
       if (detailToastTimeout.current) {
         window.clearTimeout(detailToastTimeout.current);
       }
@@ -289,7 +390,38 @@ export function TaskDetail({
         window.clearTimeout(taskIdCopyBlinkTimeout.current);
       }
     };
-  }, []);
+  }, [clearAutoSaveTimer]);
+
+  useEffect(() => {
+    clearAutoSaveTimer();
+
+    if (
+      !autoSaveTaskChanges
+      || !taskId
+      || !editDirty
+      || !trimmedTitle
+      || saving
+      || autoSaveFailedDraftSignature.current === autoSaveDraftSignature
+    ) {
+      return;
+    }
+
+    const draftSignature = autoSaveDraftSignature;
+    autoSaveTimeout.current = window.setTimeout(() => {
+      autoSaveTimeout.current = null;
+      void saveTaskEditRef.current?.("autosave", draftSignature);
+    }, taskAutoSaveDelayMs);
+
+    return clearAutoSaveTimer;
+  }, [
+    autoSaveDraftSignature,
+    autoSaveTaskChanges,
+    clearAutoSaveTimer,
+    editDirty,
+    saving,
+    taskId,
+    trimmedTitle,
+  ]);
 
   useEffect(() => {
     if (!taskId) {
@@ -340,16 +472,10 @@ export function TaskDetail({
   }
 
   const status = columnStatus(column);
-  const trimmedTitle = activeDraft.current.title.trim();
-  const trimmedDescription = activeDraft.current.description.trim();
-  const currentLabels = parseTaskLabels(activeDraft.current.labelText);
-  const titleError = editDirty && !trimmedTitle ? "Title is required" : null;
-  const canSave = editDirty && Boolean(trimmedTitle) && !saving;
-  const taskEditLocked = saving;
-  const activeDescriptionHeight = descriptionHeight ?? descriptionDefaultHeight(activeDraft.current.description);
-  const descriptionStyle = { "--task-desc-height": `${activeDescriptionHeight}px` } as CSSProperties;
 
   const resetDraft = () => {
+    clearAutoSaveTimer();
+    autoSaveFailedDraftSignature.current = null;
     setDraft(makeTaskDraft(task.id, serverTitle, serverDescription, serverLabels));
     setEditError(null);
   };
@@ -471,32 +597,7 @@ export function TaskDetail({
 
   const submitTaskEdit = async (event?: FormEvent) => {
     event?.preventDefault();
-    if (taskEditLocked) {
-      return;
-    }
-    if (!trimmedTitle) {
-      setEditError("Title is required");
-      return;
-    }
-    if (!editDirty) {
-      return;
-    }
-
-    setSaving(true);
-    setEditError(null);
-    try {
-      await onUpdateTask(task.id, {
-        title: trimmedTitle,
-        description: trimmedDescription || null,
-        labels: currentLabels,
-      });
-      setDraft(makeTaskDraft(task.id, trimmedTitle, trimmedDescription, currentLabels));
-      showDetailToast("Task updated");
-    } catch (err) {
-      setEditError(apiMessage(err));
-    } finally {
-      setSaving(false);
-    }
+    await saveTaskEdit("manual");
   };
 
   const saveOnShortcut = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
