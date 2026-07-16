@@ -58,7 +58,7 @@ function isTaskDraftDirty(draft: TaskEditDraft) {
 
 export function buildTaskReferenceText(visibleTitle: string, fallbackTitle: string, taskId: string) {
   const title = visibleTitle.trim() || fallbackTitle.trim();
-  return `${title} ( id=${taskId} )`;
+  return `"${title}" ( id=${taskId} )`;
 }
 
 export function appendImageAttachmentMarkdown(description: string, attachment: TaskAttachment) {

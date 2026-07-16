@@ -5,13 +5,13 @@ import { appendImageAttachmentMarkdown, buildTaskReferenceText, filesFromClipboa
 describe("task reference helpers", () => {
   it("formats the visible task title and ID for copying", () => {
     expect(buildTaskReferenceText("  Fix clipboard copy  ", "Saved title", "task_123")).toBe(
-      "Fix clipboard copy ( id=task_123 )",
+      "\"Fix clipboard copy\" ( id=task_123 )",
     );
   });
 
   it("falls back to the saved title when the visible draft title is blank", () => {
     expect(buildTaskReferenceText("  ", "Saved title", "task_123")).toBe(
-      "Saved title ( id=task_123 )",
+      "\"Saved title\" ( id=task_123 )",
     );
   });
 });
