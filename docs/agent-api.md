@@ -384,7 +384,8 @@ mirrors the canonical API and does not change the task column.
 ### `POST /api/agents/tasks/:taskId/archive`
 
 Archives a task. The response should state that comments and activity remain
-attached and searchable when archived content is included.
+attached for direct archived reads, and that task-scoped search embeddings are
+removed.
 
 ### `GET /api/agents/tasks/:taskId/attachments`
 

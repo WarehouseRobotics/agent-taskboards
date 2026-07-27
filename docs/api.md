@@ -408,7 +408,8 @@ move the task to a done column.
 
 ### `POST /api/tasks/:taskId/archive`
 
-Sets `archivedAt` and appends a `task.archived` activity entry.
+Sets `archivedAt`, appends a `task.archived` activity entry, and deletes
+task-scoped search documents and vectors.
 
 ## Task Attachments
 
@@ -666,9 +667,11 @@ Response:
 }
 ```
 
-Archived projects, boards, and tasks are excluded unless
-`includeArchived: true` is provided. Comments inherit archive visibility from
-their parent task, board, and project.
+Archived projects and boards are excluded unless `includeArchived: true` is
+provided. Archiving a task deletes task-scoped search documents and vectors, so
+archived task and comment content is available through direct archived reads,
+not semantic search. Comments inherit archive visibility from their parent task,
+board, and project when indexed.
 
 ## Planned API Areas
 

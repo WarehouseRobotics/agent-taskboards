@@ -89,7 +89,7 @@ Search supports:
 
 - global queries across active content
 - scoped queries within a project or board
-- optional inclusion of archived content
+- optional inclusion of archived project and board content
 - result limits
 - compact snippets that explain why a result matched
 
@@ -103,8 +103,8 @@ useful snippet.
 ## Index Lifecycle
 
 Embeddings are created or refreshed inline after indexed text changes. A
-developer maintenance script can force-rebuild all board, task, and comment
-embeddings:
+developer maintenance script can force-rebuild all board embeddings plus active
+task and comment embeddings:
 
 ```sh
 docker compose exec taskboards npm run embeddings:reindex
@@ -116,7 +116,7 @@ Expected lifecycle events:
 - update embeddings when indexed text changes
 - remove stale chunk rows and vectors when text shrinks or chunk boundaries
   change
-- preserve or mark embeddings for archived content depending on search filters
+- delete task-scoped rows and vectors when a task is archived
 - support full reindexing as a maintenance action
 
 ## Privacy and Limits

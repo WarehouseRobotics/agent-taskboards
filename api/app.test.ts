@@ -1219,8 +1219,8 @@ describe("starter API", () => {
     ).toHaveLength(0);
     expect(
       client.db.select().from(searchDocuments).where(eq(searchDocuments.boardId, boardId)).all(),
-    ).toHaveLength(3);
-    expect(searchVectorCount()).toBe(3);
+    ).toHaveLength(1);
+    expect(searchVectorCount()).toBe(1);
   });
 
   it("remaps restored task IDs when unrelated data already uses a snapshot ID", async () => {
@@ -1431,6 +1431,18 @@ describe("starter API", () => {
       ),
     ).toBe("comment");
 
+    if (!client) {
+      throw new Error("Expected test database client");
+    }
+    expect(
+      client.db
+        .select()
+        .from(searchDocuments)
+        .where(eq(searchDocuments.taskId, taskId))
+        .all(),
+    ).toHaveLength(2);
+    expect(searchVectorCount()).toBe(3);
+
     await api("POST", `/api/tasks/${taskId}/archive`);
 
     const activeSearch = await api("POST", "/api/search", {
@@ -1444,7 +1456,36 @@ describe("starter API", () => {
       sourceTypes: ["task"],
       includeArchived: true,
     });
-    expect(arrayProp(archivedSearch.body, "results")).toHaveLength(1);
+    expect(arrayProp(archivedSearch.body, "results")).toHaveLength(0);
+
+    const archivedCommentSearch = await api("POST", "/api/search", {
+      query: "blocked vector filtering",
+      sourceTypes: ["comment"],
+      includeArchived: true,
+    });
+    expect(arrayProp(archivedCommentSearch.body, "results")).toHaveLength(0);
+
+    expect(
+      client.db
+        .select()
+        .from(searchDocuments)
+        .where(eq(searchDocuments.taskId, taskId))
+        .all(),
+    ).toHaveLength(0);
+    expect(searchVectorCount()).toBe(1);
+
+    const archivedRead = await api(
+      "GET",
+      `/api/tasks/${taskId}?includeArchived=true`,
+    );
+    expect(archivedRead.status).toBe(200);
+    expect(
+      arrayProp((await api("GET", `/api/tasks/${taskId}/comments`)).body, "comments"),
+    ).toHaveLength(1);
+    expect(
+      arrayProp((await api("GET", `/api/tasks/${taskId}/activity`)).body, "activity")
+        .map((item) => stringProp(asObject(item), "eventType")),
+    ).toEqual(["task.created", "comment.created", "task.archived"]);
   });
 
   it("enforces URL-safe unique project and board names", async () => {

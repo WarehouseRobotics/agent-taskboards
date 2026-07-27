@@ -228,5 +228,5 @@ objects are excluded from normal active views unless a caller explicitly asks to
 include archived content.
 
 Hard deletion can exist later as a maintenance operation, but it should remain
-deliberate because archived task context may still be useful for search,
-semantic memory, handoffs, and audit history.
+deliberate because archived task context may still be useful for direct reads,
+handoffs, and audit history.

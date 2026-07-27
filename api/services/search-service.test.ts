@@ -132,6 +132,91 @@ describe("search service", () => {
     expect(commentDocument?.title).toBe("Comment on: Build search");
   });
 
+  it("skips archived tasks and their comments during full reindex", async () => {
+    client = createMigratedClient();
+    const { db } = client;
+    const { project, board, column } = createBoardFixture(
+      "archived-reindex-board",
+    );
+    const activeTask = db
+      .insert(tasks)
+      .values({
+        projectId: project.id,
+        boardId: board.id,
+        columnId: column.id,
+        title: "Active reindex task",
+        position: 0,
+      })
+      .returning()
+      .get();
+    const archivedTask = db
+      .insert(tasks)
+      .values({
+        projectId: project.id,
+        boardId: board.id,
+        columnId: column.id,
+        title: "Archived reindex task",
+        position: 1,
+        archivedAt: new Date(),
+      })
+      .returning()
+      .get();
+    const archivedComment = db
+      .insert(taskComments)
+      .values({
+        projectId: project.id,
+        boardId: board.id,
+        taskId: archivedTask.id,
+        authorType: "agent",
+        body: "Archived reindex comment.",
+      })
+      .returning()
+      .get();
+    db.insert(taskComments)
+      .values({
+        projectId: project.id,
+        boardId: board.id,
+        taskId: activeTask.id,
+        authorType: "agent",
+        body: "Active reindex comment.",
+      })
+      .run();
+
+    const search = new SearchService(client, createFakeEmbeddingModel());
+    await search.indexTask(archivedTask);
+    await search.indexComment(archivedComment);
+    expect(
+      db
+        .select()
+        .from(searchDocuments)
+        .where(eq(searchDocuments.taskId, archivedTask.id))
+        .all(),
+    ).toHaveLength(2);
+
+    const result = await search.reindexAll({ force: true });
+
+    expect(result).toEqual({
+      discovered: 3,
+      indexed: 3,
+      skipped: 0,
+      errored: 0,
+    });
+    expect(
+      db
+        .select()
+        .from(searchDocuments)
+        .where(eq(searchDocuments.taskId, activeTask.id))
+        .all(),
+    ).toHaveLength(2);
+    expect(
+      db
+        .select()
+        .from(searchDocuments)
+        .where(eq(searchDocuments.taskId, archivedTask.id))
+        .all(),
+    ).toHaveLength(0);
+  });
+
   it("indexes long task and comment text as multiple chunks with metadata", async () => {
     client = createMigratedClient();
     const { db } = client;

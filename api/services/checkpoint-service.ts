@@ -765,13 +765,23 @@ export class CheckpointService {
       this.searchService.indexBoard(board),
     );
 
-    for (const task of restoredTasks) {
+    const activeTaskIds = new Set(
+      restoredTasks
+        .filter((task) => task.archivedAt === null)
+        .map((task) => task.id),
+    );
+
+    for (const task of restoredTasks.filter((task) =>
+      activeTaskIds.has(task.id),
+    )) {
       await runBestEffortIndex({ sourceType: "task", sourceId: task.id }, () =>
         this.searchService.indexTask(task),
       );
     }
 
-    for (const comment of restoredComments) {
+    for (const comment of restoredComments.filter((comment) =>
+      activeTaskIds.has(comment.taskId),
+    )) {
       await runBestEffortIndex(
         { sourceType: "comment", sourceId: comment.id },
         () => this.searchService.indexComment(comment),

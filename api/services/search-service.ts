@@ -168,8 +168,23 @@ export class SearchService {
     options: { force?: boolean } = {},
   ): Promise<ReindexAllResult> {
     const boardRows = this.db.select().from(boards).all();
-    const taskRows = this.db.select().from(tasks).all();
-    const commentRows = this.db.select().from(taskComments).all();
+    const allTaskRows = this.db.select().from(tasks).all();
+    const taskRows = allTaskRows.filter((task) => task.archivedAt === null);
+    const archivedTaskIds = allTaskRows
+      .filter((task) => task.archivedAt !== null)
+      .map((task) => task.id);
+    if (archivedTaskIds.length > 0) {
+      this.db
+        .delete(searchDocuments)
+        .where(inArray(searchDocuments.taskId, archivedTaskIds))
+        .run();
+    }
+    const activeTaskIds = new Set(taskRows.map((task) => task.id));
+    const commentRows = this.db
+      .select()
+      .from(taskComments)
+      .all()
+      .filter((comment) => activeTaskIds.has(comment.taskId));
     const result: ReindexAllResult = {
       discovered: boardRows.length + taskRows.length + commentRows.length,
       indexed: 0,

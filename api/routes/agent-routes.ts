@@ -805,7 +805,8 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
             title: "What changed",
             lines: [
               "- Comments and activity remain attached.",
-              "- Include archived content explicitly when you need to retrieve this task.",
+              "- Task-scoped search embeddings were removed.",
+              "- Include archived content explicitly when you need to read this task directly.",
               `- Generated activity \`${archived.activity.id}\`.`,
             ],
           },

@@ -2,6 +2,7 @@ import { and, asc, eq, isNull, ne } from "drizzle-orm";
 import type { DatabaseClient } from "../db/client.js";
 import {
   boardColumns,
+  searchDocuments,
   type BoardColumn,
   taskActivity,
   tasks,
@@ -359,6 +360,10 @@ export class TaskService {
         })
         .returning()
         .get();
+
+      tx.delete(searchDocuments)
+        .where(eq(searchDocuments.taskId, task.id))
+        .run();
 
       return { task: nextTask, activity };
     });
