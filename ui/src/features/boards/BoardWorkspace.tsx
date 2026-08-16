@@ -9,6 +9,7 @@ import { buildBoardReferenceText } from "./board-reference";
 import {
   nextRangeSelectionAnchor,
   planTaskDrop,
+  selectedTasksInVisibleOrder,
   selectTaskRange,
   toggleTaskSelection,
   type TaskMovePlan,
@@ -46,6 +47,7 @@ export function BoardWorkspace({
   mutationError,
   newTaskColumnId,
   onArchiveTask,
+  onArchiveTasks,
   onCloseTask,
   onCreateBoard,
   onCreateProject,
@@ -80,6 +82,7 @@ export function BoardWorkspace({
   mutationError: string | null;
   newTaskColumnId: string | null;
   onArchiveTask: (taskId: string) => Promise<void>;
+  onArchiveTasks: (taskIds: string[]) => Promise<boolean>;
   onCloseTask: () => void;
   onCreateBoard: () => void;
   onCreateProject: () => void;
@@ -109,6 +112,7 @@ export function BoardWorkspace({
 }) {
   const [displayMode, setDisplayMode] = useState<BoardDisplayMode>(storedBoardDisplayMode);
   const [sortKey, setSortKey] = useState<BoardSortKey>("position");
+  const [archivingSelection, setArchivingSelection] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(() => new Set());
   const [rangeSelectionAnchors, setRangeSelectionAnchors] = useState<Map<string, string>>(() => new Map());
   const activeBoardId = activeBoard?.id ?? null;
@@ -284,6 +288,22 @@ export function BoardWorkspace({
     },
     [clearTaskSelection, moveTaskBatchPreservingScroll, selectedTaskIds, sortedTasks],
   );
+  const archiveSelectedTasks = useCallback(async () => {
+    const taskIds = selectedTasksInVisibleOrder(sortedTasks, selectedTaskIds).map((task) => task.id);
+    if (taskIds.length === 0 || archivingSelection) {
+      return;
+    }
+
+    setArchivingSelection(true);
+    try {
+      const archived = await preserveBoardScroll(() => onArchiveTasks(taskIds));
+      if (archived) {
+        clearTaskSelection();
+      }
+    } finally {
+      setArchivingSelection(false);
+    }
+  }, [archivingSelection, clearTaskSelection, onArchiveTasks, preserveBoardScroll, selectedTaskIds, sortedTasks]);
 
   useEffect(() => {
     clearTaskSelection();
@@ -455,9 +475,19 @@ export function BoardWorkspace({
                 {isRefreshing ? `Syncing · ${boardSummaryText}` : boardSummaryText}
               </Mono>
               {selectedTaskIds.size > 0 && (
-                <button className="selection-clear-button" onClick={clearTaskSelection} type="button">
-                  Clear {selectedTaskIds.size} selected
-                </button>
+                <>
+                  <button
+                    className="selection-action-button selection-action-button--danger"
+                    disabled={archivingSelection}
+                    onClick={() => void archiveSelectedTasks()}
+                    type="button"
+                  >
+                    {archivingSelection ? "Archiving…" : "Archive selected"}
+                  </button>
+                  <button className="selection-action-button" onClick={clearTaskSelection} type="button">
+                    Clear {selectedTaskIds.size} selected
+                  </button>
+                </>
               )}
               <span className="subtoolbar__spacer" />
               <span className="toolbar-label">Sort</span>

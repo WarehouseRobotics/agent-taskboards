@@ -21,6 +21,7 @@ import {
   CreateBoardPanel,
   CreateProjectPanel,
 } from "./CreateResourcePanels";
+import { archiveTaskBatch } from "./archive-tasks";
 
 export function App() {
   const initialRoute = useMemo(() => parseRoute(), []);
@@ -235,6 +236,42 @@ export function App() {
     },
     [activeTaskId, refreshAfterMutation],
   );
+  const archiveTasks = useCallback(
+    async (taskIds: string[]) => {
+      if (taskIds.length === 0) {
+        return true;
+      }
+
+      setMutationError(null);
+      try {
+        const result = await archiveTaskBatch({
+          archiveTask: async (taskId) => {
+            await api.archiveTask(taskId);
+          },
+          onSettled: async (archivedTaskIds) => {
+            const activeTaskArchived = Boolean(activeTaskId && archivedTaskIds.includes(activeTaskId));
+            if (activeTaskArchived) {
+              navigate(
+                { view: "board", projectId: selectedProjectId, boardId: selectedBoardId, taskId: null },
+                "replace",
+              );
+            }
+            await refreshAfterMutation(activeTaskArchived ? null : activeTaskId);
+          },
+          taskIds,
+        });
+        if (result.error) {
+          setMutationError(apiMessage(result.error));
+          return false;
+        }
+        return true;
+      } catch (err) {
+        setMutationError(apiMessage(err));
+        return false;
+      }
+    },
+    [activeTaskId, navigate, refreshAfterMutation, selectedBoardId, selectedProjectId],
+  );
 
   const openTask = (taskId: string) => {
     navigate({
@@ -351,6 +388,7 @@ export function App() {
                 setMutationError(apiMessage(err));
               }
             }}
+            onArchiveTasks={archiveTasks}
             onCloseTask={() =>
               navigate({ view: "board", projectId: selectedProjectId, boardId: selectedBoardId, taskId: null })
             }

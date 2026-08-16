@@ -38,6 +38,7 @@ The board view should make task state easy to scan and change:
 
 - columns represent workflow states
 - tasks can be created, edited, moved, archived, and completed
+- task checkboxes support range selection, group dragging, and immediate bulk archival from the board toolbar
 - task cards show compact, high-signal information
 - blocked or review states should be visually obvious
 - archived content should stay out of active board views by default

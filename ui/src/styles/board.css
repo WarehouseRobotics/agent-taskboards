@@ -82,7 +82,7 @@
   z-index: 10;
 }
 
-.selection-clear-button {
+.selection-action-button {
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   background: var(--bg-surface-2);
@@ -93,10 +93,27 @@
   white-space: nowrap;
 }
 
-.selection-clear-button:hover {
+.selection-action-button:hover:not(:disabled) {
   border-color: var(--line-strong);
   background: var(--bg-hover);
   color: var(--fg);
+}
+
+.selection-action-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.selection-action-button--danger {
+  border-color: color-mix(in oklch, var(--status-blocked) 42%, var(--line));
+  background: transparent;
+  color: var(--status-blocked);
+}
+
+.selection-action-button--danger:hover:not(:disabled) {
+  border-color: color-mix(in oklch, var(--status-blocked) 62%, var(--line));
+  background: color-mix(in oklch, var(--status-blocked) 8%, transparent);
+  color: var(--status-blocked);
 }
 
 .task-card__meta,
