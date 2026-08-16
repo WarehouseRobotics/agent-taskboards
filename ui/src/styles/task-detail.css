@@ -785,3 +785,9 @@
   background: var(--bg-surface);
   padding: 10px;
 }
+
+.comment-form__input {
+  max-height: 420px;
+  overflow-y: hidden;
+  resize: none;
+}

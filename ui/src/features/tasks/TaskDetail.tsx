@@ -1,4 +1,4 @@
-import { ChangeEvent, ClipboardEvent as ReactClipboardEvent, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { ChangeEvent, ClipboardEvent as ReactClipboardEvent, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ActorType, BoardColumn, TaskActivity, TaskAttachment, TaskComment, TaskContext } from "../../domain/types";
@@ -40,6 +40,8 @@ const emptyTaskDraft: TaskEditDraft = {
   current: { description: "", labelText: "", title: "" },
   taskId: "",
 };
+
+const commentInputMaxHeight = 420;
 
 function makeTaskDraft(taskId: string, title: string, description: string, labels: string[] = []): TaskEditDraft {
   const labelText = formatTaskLabels(labels);
@@ -156,6 +158,7 @@ export function TaskDetail({
   const [descriptionHeight, setDescriptionHeight] = useState<number | null>(() => storedDescriptionHeight());
   const [resizingDescription, setResizingDescription] = useState(false);
   const detailRef = useRef<HTMLElement | null>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement | null>(null);
   const descriptionResizeStart = useRef<{ pointerId: number; startHeight: number; startY: number } | null>(null);
   const autoSaveTimeout = useRef<number | null>(null);
@@ -177,6 +180,17 @@ export function TaskDetail({
     changeDescriptionView("edit");
     focusDescriptionInput();
   }, [changeDescriptionView, focusDescriptionInput]);
+  const syncCommentInputHeight = useCallback(() => {
+    const input = commentInputRef.current;
+    if (!input) {
+      return;
+    }
+
+    input.style.height = "auto";
+    const nextHeight = Math.min(input.scrollHeight, commentInputMaxHeight);
+    input.style.height = `${nextHeight}px`;
+    input.style.overflowY = input.scrollHeight > commentInputMaxHeight ? "auto" : "hidden";
+  }, []);
   const task = context?.task;
   const taskId = task?.id ?? "";
   const serverTitle = task?.title ?? "";
@@ -343,6 +357,10 @@ export function TaskDetail({
     setShowActivity(false);
     setTaskIdCopyBlink(false);
   }, [taskId]);
+
+  useLayoutEffect(() => {
+    syncCommentInputHeight();
+  }, [comment, syncCommentInputHeight, taskId]);
 
   useEffect(() => {
     if (!taskId) {
@@ -1039,6 +1057,8 @@ export function TaskDetail({
             <Mono faded>commenting as human · authorType=human</Mono>
           </div>
           <textarea
+            className="comment-form__input"
+            ref={commentInputRef}
             value={comment}
             onChange={(event) => setComment(event.target.value)}
             placeholder="Add a comment, decision, or handoff note..."
