@@ -127,7 +127,11 @@ low, normal, high, urgent
 
 Task movement is an explicit state transition. Clients move a task by
 destination column and optional position; they do not rewrite the whole board.
-The system reorders affected tasks in the source and destination columns.
+The system reorders affected tasks in the source and destination columns. A
+move may also name another active board in the same project. Cross-board moves
+preserve the task and its child context, match the source column key when no
+destination column is supplied, and fall back to the target board's first
+column when that key is absent.
 
 Completing a task and moving a task to a done column are related but distinct:
 

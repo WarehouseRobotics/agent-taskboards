@@ -1,7 +1,7 @@
 import { ChangeEvent, ClipboardEvent as ReactClipboardEvent, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ActorType, BoardColumn, TaskActivity, TaskAttachment, TaskComment, TaskContext } from "../../domain/types";
+import type { ActorType, Board, BoardColumn, TaskActivity, TaskAttachment, TaskComment, TaskContext } from "../../domain/types";
 import { copyTextToClipboard } from "../../lib/clipboard";
 import { apiMessage } from "../../lib/errors";
 import { formatDate } from "../../lib/format";
@@ -114,6 +114,7 @@ function isInteractivePreviewTarget(target: EventTarget | null) {
 
 export function TaskDetail({
   autoSaveTaskChanges,
+  boards,
   columns,
   context,
   loading,
@@ -123,12 +124,14 @@ export function TaskDetail({
   onDeleteComment,
   onDeleteTaskAttachment,
   onMoveTask,
+  onMoveTaskToBoard,
   onPostComment,
   onTaskDraftChange,
   onUpdateTask,
   onUploadTaskAttachment,
 }: {
   autoSaveTaskChanges: boolean;
+  boards: Board[];
   columns: BoardColumn[];
   context?: TaskContext;
   loading: boolean;
@@ -138,6 +141,7 @@ export function TaskDetail({
   onDeleteComment: (taskId: string, commentId: string) => Promise<void>;
   onDeleteTaskAttachment: (taskId: string, attachmentId: string) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
+  onMoveTaskToBoard: (taskId: string, boardId: string) => Promise<boolean>;
   onPostComment: (taskId: string, body: string) => Promise<void>;
   onTaskDraftChange: (taskId: string, fields: { title?: string; description?: string | null; labels?: string[] } | null) => void;
   onUpdateTask: (taskId: string, input: { title?: string; description?: string | null; labels?: string[] }) => Promise<void>;
@@ -151,6 +155,7 @@ export function TaskDetail({
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
   const [pendingDeleteComment, setPendingDeleteComment] = useState<CommentTimelineItem | null>(null);
   const [saving, setSaving] = useState(false);
+  const [movingBoard, setMovingBoard] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const [taskIdCopyBlink, setTaskIdCopyBlink] = useState(false);
@@ -936,6 +941,28 @@ export function TaskDetail({
       </div>
       <div className="detail-actions">
         <select
+          aria-label="Move task to board"
+          disabled={movingBoard}
+          value={task.boardId}
+          onChange={async (event) => {
+            const boardId = event.target.value;
+            if (boardId === task.boardId) {
+              return;
+            }
+            setMovingBoard(true);
+            try {
+              await onMoveTaskToBoard(task.id, boardId);
+            } finally {
+              setMovingBoard(false);
+            }
+          }}
+        >
+          {boards.map((board) => (
+            <option key={board.id} value={board.id}>{board.name}</option>
+          ))}
+        </select>
+        <select
+          aria-label="Move task to column"
           value={task.columnId}
           onChange={(event) => onMoveTask(task.id, { columnId: event.target.value })}
         >

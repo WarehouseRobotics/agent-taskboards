@@ -36,6 +36,7 @@ interface CapturedBoardScroll {
 export function BoardWorkspace({
   activeBoard,
   activeProject,
+  activeProjectBoards,
   activeTaskContext,
   activeTaskId,
   autoSaveTaskChanges,
@@ -56,6 +57,7 @@ export function BoardWorkspace({
   onDeleteComment,
   onDeleteTaskAttachment,
   onMoveTask,
+  onMoveTaskToBoard,
   onMoveTasks,
   onOpenCreateTask,
   onOpenProjectActivity,
@@ -71,6 +73,7 @@ export function BoardWorkspace({
 }: {
   activeBoard: Board | null;
   activeProject: Project | null;
+  activeProjectBoards: Board[];
   activeTaskContext?: TaskContext;
   activeTaskId: string | null;
   autoSaveTaskChanges: boolean;
@@ -97,6 +100,7 @@ export function BoardWorkspace({
   onDeleteComment: (taskId: string, commentId: string) => Promise<void>;
   onDeleteTaskAttachment: (taskId: string, attachmentId: string) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
+  onMoveTaskToBoard: (taskId: string, boardId: string) => Promise<boolean>;
   onMoveTasks: (moves: TaskMovePlan[]) => Promise<boolean>;
   onOpenCreateTask: (columnId: string | null) => void;
   onOpenProjectActivity: () => void;
@@ -541,6 +545,7 @@ export function BoardWorkspace({
           {activeTaskId && (
             <TaskDetail
               autoSaveTaskChanges={autoSaveTaskChanges}
+              boards={activeProjectBoards}
               columns={columns}
               context={activeTaskContext}
               loading={loadingTask}
@@ -550,6 +555,7 @@ export function BoardWorkspace({
               onDeleteComment={deleteCommentPreservingScroll}
               onDeleteTaskAttachment={deleteTaskAttachmentPreservingScroll}
               onMoveTask={moveTaskPreservingScroll}
+              onMoveTaskToBoard={onMoveTaskToBoard}
               onPostComment={postCommentPreservingScroll}
               onTaskDraftChange={onTaskDraftChange}
               onUpdateTask={updateTaskPreservingScroll}

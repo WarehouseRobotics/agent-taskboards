@@ -28,6 +28,7 @@ Shortcuts:
   taskboards help                          GET /api/agents/help
   taskboards context <taskId>              full task context with comments+activity
   taskboards move <taskId> <columnKey>     POST /api/agents/tasks/<id>/move
+  taskboards move-board <taskId> <boardId> POST /api/agents/tasks/<id>/move
   taskboards complete <taskId>             POST /api/agents/tasks/<id>/complete
   taskboards archive <taskId>              POST /api/agents/tasks/<id>/archive
   taskboards comment <taskId> <body...>    POST /api/agents/tasks/<id>/comments
@@ -212,6 +213,12 @@ case "$cmd" in
     [[ $# -ge 2 ]] || die "move: usage 'move <taskId> <columnKey>'"
     verb="POST"; path="tasks/$1/move"
     body="{\"columnKey\":\"$(json_escape "$2")\"}"
+    content_type="application/json"
+    shift 2 ;;
+  move-board)
+    [[ $# -ge 2 ]] || die "move-board: usage 'move-board <taskId> <boardId>'"
+    verb="POST"; path="tasks/$1/move"
+    body="{\"boardId\":\"$(json_escape "$2")\"}"
     content_type="application/json"
     shift 2 ;;
   complete)

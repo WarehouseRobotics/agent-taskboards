@@ -75,6 +75,26 @@ describe("api client", () => {
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "DELETE" });
   });
 
+  it("moves a task to another board", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          task: { id: "task 1", boardId: "board 2" },
+          activity: { eventType: "task.moved" },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await api.moveTask("task 1", { boardId: "board 2" });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/tasks/task%201/move");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "POST" });
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(
+      JSON.stringify({ boardId: "board 2" }),
+    );
+  });
+
   it("manages board checkpoints through encoded board endpoints", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     fetchMock

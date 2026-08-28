@@ -298,7 +298,7 @@ export const api = {
 
   moveTask: async (
     taskId: string,
-    input: { columnId?: string; columnKey?: string; position?: number },
+    input: { boardId?: string; columnId?: string; columnKey?: string; position?: number },
   ) => {
     const body = await request<{ task: Task; activity: TaskActivity }>(
       `/api/tasks/${encodeURIComponent(taskId)}/move`,

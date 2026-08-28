@@ -48,6 +48,7 @@ Built-in shortcuts:
 - `taskboards health` and `taskboards help` for orientation
 - `taskboards context <taskId>` for a full task view with comments and activity
 - `taskboards move <taskId> <columnKey>` for column transitions
+- `taskboards move-board <taskId> <boardId>` for same-project board transfers
 - `taskboards complete <taskId>` and `taskboards archive <taskId>` for task
   state changes
 - `taskboards comment <taskId> <body...>` to append a brief one-line agent

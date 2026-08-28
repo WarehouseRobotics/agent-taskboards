@@ -506,6 +506,253 @@ describe("starter API", () => {
     expect(objectProp(blockedResponse.body, "task").completedAt).toBeNull();
   });
 
+  it("moves tasks between boards while preserving children and search scope", async () => {
+    const { projectId, boardId } = await createProjectAndBoard();
+    const targetBoard = objectProp(
+      (
+        await api("POST", `/api/projects/${projectId}/boards`, {
+          name: "target-board",
+        })
+      ).body,
+      "board",
+    );
+    const targetBoardId = stringProp(targetBoard, "id");
+    const targetReadyColumn = arrayProp(targetBoard, "columns")
+      .map(asObject)
+      .find((column) => stringProp(column, "key") === "ready");
+    if (!targetReadyColumn) {
+      throw new Error("Expected target ready column");
+    }
+
+    const destinationTask = objectProp(
+      (
+        await api(
+          "POST",
+          `/api/projects/${projectId}/boards/${targetBoardId}/tasks`,
+          { title: "Destination task", columnKey: "ready" },
+        )
+      ).body,
+      "task",
+    );
+    const sourceTask = objectProp(
+      (
+        await api(
+          "POST",
+          `/api/projects/${projectId}/boards/${boardId}/tasks`,
+          { title: "Transfer task", columnKey: "ready" },
+        )
+      ).body,
+      "task",
+    );
+    const sourceTaskId = stringProp(sourceTask, "id");
+    const comment = objectProp(
+      (
+        await api("POST", `/api/tasks/${sourceTaskId}/comments`, {
+          authorType: "agent",
+          body: "Preserve this context.",
+        })
+      ).body,
+      "comment",
+    );
+    const attachment = objectProp(
+      (
+        await uploadFile(
+          `/api/tasks/${sourceTaskId}/attachments`,
+          "transfer.txt",
+          "preserve this file",
+          "text/plain",
+        )
+      ).body,
+      "attachment",
+    );
+
+    const moveResponse = await api("POST", `/api/tasks/${sourceTaskId}/move`, {
+      boardId: targetBoardId,
+      position: 0,
+    });
+
+    expect(moveResponse.status).toBe(200);
+    const movedTask = objectProp(moveResponse.body, "task");
+    expect(stringProp(movedTask, "id")).toBe(sourceTaskId);
+    expect(stringProp(movedTask, "boardId")).toBe(targetBoardId);
+    expect(stringProp(movedTask, "columnId")).toBe(
+      stringProp(targetReadyColumn, "id"),
+    );
+    expect(numberProp(movedTask, "position")).toBe(0);
+
+    const targetTasks = arrayProp(
+      (
+        await api(
+          "GET",
+          `/api/projects/${projectId}/boards/${targetBoardId}/tasks`,
+        )
+      ).body,
+      "tasks",
+    ).map(asObject);
+    expect(targetTasks.map((task) => stringProp(task, "id"))).toEqual([
+      sourceTaskId,
+      stringProp(destinationTask, "id"),
+    ]);
+
+    if (!client) {
+      throw new Error("Expected test database client");
+    }
+    expect(
+      client.db
+        .select()
+        .from(taskComments)
+        .where(eq(taskComments.id, stringProp(comment, "id")))
+        .get()?.boardId,
+    ).toBe(targetBoardId);
+    expect(
+      client.db
+        .select()
+        .from(taskAttachments)
+        .where(eq(taskAttachments.id, stringProp(attachment, "id")))
+        .get()?.boardId,
+    ).toBe(targetBoardId);
+    expect(
+      client.db
+        .select()
+        .from(taskActivity)
+        .where(eq(taskActivity.taskId, sourceTaskId))
+        .all()
+        .every((entry) => entry.boardId === targetBoardId),
+    ).toBe(true);
+    expect(
+      client.db
+        .select()
+        .from(searchDocuments)
+        .where(eq(searchDocuments.taskId, sourceTaskId))
+        .all()
+        .every((document) => document.boardId === targetBoardId),
+    ).toBe(true);
+    expect(
+      client.sqlite
+        .prepare(
+          "SELECT DISTINCT board_id AS boardId FROM search_document_vectors WHERE task_id = ?",
+        )
+        .all(sourceTaskId),
+    ).toEqual([{ boardId: targetBoardId }]);
+
+    const activity = objectProp(moveResponse.body, "activity");
+    const activityData = objectProp(activity, "data");
+    expect(stringProp(activityData, "fromBoardId")).toBe(boardId);
+    expect(stringProp(activityData, "toBoardId")).toBe(targetBoardId);
+  });
+
+  it("falls back to the first target column and supports explicit cross-board columns", async () => {
+    const { projectId, boardId } = await createProjectAndBoard();
+    const targetBoard = objectProp(
+      (
+        await api("POST", `/api/projects/${projectId}/boards`, {
+          name: "custom-workflow",
+          columns: [
+            { key: "triage", name: "Triage", position: 0, isDone: false },
+            { key: "shipped", name: "Shipped", position: 1, isDone: true },
+          ],
+        })
+      ).body,
+      "board",
+    );
+    const targetBoardId = stringProp(targetBoard, "id");
+    const targetColumns = arrayProp(targetBoard, "columns").map(asObject);
+    const triageColumn = targetColumns[0];
+    const shippedColumn = targetColumns[1];
+
+    const fallbackTask = objectProp(
+      (
+        await api(
+          "POST",
+          `/api/projects/${projectId}/boards/${boardId}/tasks`,
+          { title: "Fallback transfer", columnKey: "ready" },
+        )
+      ).body,
+      "task",
+    );
+    const fallbackMove = await api(
+      "POST",
+      `/api/tasks/${stringProp(fallbackTask, "id")}/move`,
+      { boardId: targetBoardId },
+    );
+    expect(stringProp(objectProp(fallbackMove.body, "task"), "columnId")).toBe(
+      stringProp(triageColumn, "id"),
+    );
+
+    const explicitTask = objectProp(
+      (
+        await api(
+          "POST",
+          `/api/projects/${projectId}/boards/${boardId}/tasks`,
+          { title: "Explicit transfer", columnKey: "ready" },
+        )
+      ).body,
+      "task",
+    );
+    const explicitMove = await api(
+      "POST",
+      `/api/tasks/${stringProp(explicitTask, "id")}/move`,
+      { boardId: targetBoardId, columnId: stringProp(shippedColumn, "id") },
+    );
+    expect(stringProp(objectProp(explicitMove.body, "task"), "columnId")).toBe(
+      stringProp(shippedColumn, "id"),
+    );
+    expect(objectProp(explicitMove.body, "task").completedAt).toEqual(
+      expect.any(String),
+    );
+  });
+
+  it("rejects invalid cross-board destinations without moving the task", async () => {
+    const { projectId, boardId } = await createProjectAndBoard();
+    const task = objectProp(
+      (
+        await api(
+          "POST",
+          `/api/projects/${projectId}/boards/${boardId}/tasks`,
+          { title: "Do not transfer", columnKey: "ready" },
+        )
+      ).body,
+      "task",
+    );
+    const taskId = stringProp(task, "id");
+    const otherProject = await createNamedProjectAndBoard(
+      "other-project",
+      "other-board",
+    );
+
+    const crossProject = await api("POST", `/api/tasks/${taskId}/move`, {
+      boardId: otherProject.boardId,
+    });
+    expect(crossProject.status).toBe(404);
+
+    const archivedBoard = objectProp(
+      (
+        await api("POST", `/api/projects/${projectId}/boards`, {
+          name: "archived-target",
+        })
+      ).body,
+      "board",
+    );
+    const archivedBoardId = stringProp(archivedBoard, "id");
+    await api(
+      "POST",
+      `/api/projects/${projectId}/boards/${archivedBoardId}/archive`,
+    );
+    const archivedMove = await api("POST", `/api/tasks/${taskId}/move`, {
+      boardId: archivedBoardId,
+    });
+    expect(archivedMove.status).toBe(404);
+
+    const unchangedTask = objectProp(
+      (await api("GET", `/api/tasks/${taskId}`)).body,
+      "task",
+    );
+    expect(stringProp(unchangedTask, "boardId")).toBe(boardId);
+    expect(stringProp(unchangedTask, "columnId")).toBe(
+      stringProp(task, "columnId"),
+    );
+  });
+
   it("updates task title and description and records activity", async () => {
     const { projectId, boardId } = await createProjectAndBoard();
     const task = objectProp(
@@ -1233,7 +1480,7 @@ describe("starter API", () => {
     expect(searchVectorCount()).toBe(1);
   });
 
-  it("remaps restored task IDs when unrelated data already uses a snapshot ID", async () => {
+  it("remaps restored IDs after a checkpointed task moves to another board", async () => {
     const { projectId, boardId } = await createProjectAndBoard();
     const taskResponse = await api(
       "POST",
@@ -1274,26 +1521,10 @@ describe("starter API", () => {
       "board",
     );
     const otherBoardId = stringProp(otherBoard, "id");
-    const otherColumnId = stringProp(
-      asObject(arrayProp(otherBoard, "columns")[0]),
-      "id",
-    );
-
-    if (!client) {
-      throw new Error("Expected test database client");
-    }
-    client.db.delete(tasks).where(eq(tasks.id, taskId)).run();
-    client.db
-      .insert(tasks)
-      .values({
-        id: taskId,
-        projectId,
-        boardId: otherBoardId,
-        columnId: otherColumnId,
-        title: "Unrelated colliding task",
-        position: 0,
-      })
-      .run();
+    const moveResponse = await api("POST", `/api/tasks/${taskId}/move`, {
+      boardId: otherBoardId,
+    });
+    expect(moveResponse.status).toBe(200);
 
     const restoreResponse = await api(
       "POST",
@@ -1313,8 +1544,11 @@ describe("starter API", () => {
     );
     const comments = arrayProp(commentsResponse.body, "comments").map(asObject);
     expect(comments).toHaveLength(1);
-    expect(stringProp(comments[0], "id")).toBe(commentId);
+    expect(stringProp(comments[0], "id")).not.toBe(commentId);
     expect(stringProp(comments[0], "taskId")).toBe(remappedTaskId);
+    if (!client) {
+      throw new Error("Expected test database client");
+    }
     expect(
       stringProp(
         client.db.select().from(tasks).where(eq(tasks.id, taskId)).get(),

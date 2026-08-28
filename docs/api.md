@@ -438,21 +438,26 @@ Mutable fields:
 
 ### `POST /api/tasks/:taskId/move`
 
-Moves a task to another column and optional position, reordering affected tasks
-inside a database transaction. The operation appends a `task.moved` activity
-entry.
+Moves a task to another column, or to another active board in the same project,
+with an optional position. The operation transactionally reorders affected
+tasks, preserves child context, and appends a `task.moved` activity entry.
 
 Request:
 
 ```json
 {
+  "boardId": "board_456",
   "columnKey": "blocked",
   "position": 0
 }
 ```
 
-Column selection uses either `columnId` or `columnKey`. `position` is optional;
-when omitted, the task moves to the end of the destination column.
+`boardId` is optional and defaults to the task's current board. Column selection
+uses either `columnId` or `columnKey`. For a cross-board move that omits both,
+the API matches the source column key and falls back to the destination board's
+first column. `position` is optional; when omitted, the task moves to the end of
+the destination column. Destination boards must be active and belong to the
+task's project.
 
 Moving into an `isDone` column sets `completedAt` if it is not already set.
 Moving to a non-done column clears `completedAt`.

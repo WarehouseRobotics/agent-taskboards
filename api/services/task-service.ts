@@ -2,6 +2,8 @@ import { and, asc, eq, isNull, ne } from "drizzle-orm";
 import type { DatabaseClient } from "../db/client.js";
 import {
   boardColumns,
+  taskAttachments,
+  taskComments,
   searchDocuments,
   type BoardColumn,
   taskActivity,
@@ -30,6 +32,7 @@ export type TaskServiceOptions = {
 
 export class TaskService {
   private readonly db: DatabaseClient["db"];
+  private readonly sqlite: DatabaseClient["sqlite"];
   private readonly taskIdSuffixGenerator: TaskIdSuffixGenerator;
 
   constructor(
@@ -40,6 +43,7 @@ export class TaskService {
     options: TaskServiceOptions = {},
   ) {
     this.db = databaseClient.db;
+    this.sqlite = databaseClient.sqlite;
     this.taskIdSuffixGenerator =
       options.taskIdSuffixGenerator ?? generateTaskIdSuffix;
   }
@@ -187,32 +191,38 @@ export class TaskService {
 
   moveTask(taskId: string, input: TaskMoveInput) {
     const task = this.getTask(taskId, false);
-    const targetColumn = this.resolveTaskColumn(task.boardId, {
-      columnId: input.columnId,
-      columnKey: input.columnKey,
-    });
+    const sourceColumn = this.db
+      .select()
+      .from(boardColumns)
+      .where(eq(boardColumns.id, task.columnId))
+      .get();
+
+    if (!sourceColumn) {
+      throw new ApiError(
+        409,
+        "invalid_state",
+        "Task source column no longer exists",
+      );
+    }
+
+    const targetBoardId = input.boardId
+      ? this.boardService.getBoard(task.projectId, input.boardId, false).id
+      : task.boardId;
+    const targetColumn = input.columnId || input.columnKey
+      ? this.resolveTaskColumn(targetBoardId, {
+          columnId: input.columnId,
+          columnKey: input.columnKey,
+        })
+      : this.resolveTaskColumnForBoardMove(targetBoardId, sourceColumn.key);
+    const changesBoard = targetBoardId !== task.boardId;
 
     return this.db.transaction((tx) => {
-      const sourceColumn = tx
-        .select()
-        .from(boardColumns)
-        .where(eq(boardColumns.id, task.columnId))
-        .get();
-
-      if (!sourceColumn) {
-        throw new ApiError(
-          409,
-          "invalid_state",
-          "Task source column no longer exists",
-        );
-      }
-
       const destinationTasks = tx
         .select()
         .from(tasks)
         .where(
           and(
-            eq(tasks.boardId, task.boardId),
+            eq(tasks.boardId, targetBoardId),
             eq(tasks.columnId, targetColumn.id),
             isNull(tasks.archivedAt),
             ne(tasks.id, task.id),
@@ -228,7 +238,7 @@ export class TaskService {
       const destinationTaskIds = destinationTasks.map((item) => item.id);
       destinationTaskIds.splice(position, 0, task.id);
 
-      if (sourceColumn.id !== targetColumn.id) {
+      if (changesBoard || sourceColumn.id !== targetColumn.id) {
         const sourceTasks = tx
           .select()
           .from(tasks)
@@ -260,6 +270,7 @@ export class TaskService {
           tx.update(tasks)
             .set({
               columnId: targetColumn.id,
+              boardId: targetBoardId,
               position: index,
               completedAt,
             })
@@ -272,6 +283,26 @@ export class TaskService {
           .set({ position: index })
           .where(eq(tasks.id, movedTaskId))
           .run();
+      }
+
+      if (changesBoard) {
+        tx.update(taskComments)
+          .set({ boardId: targetBoardId })
+          .where(eq(taskComments.taskId, task.id))
+          .run();
+        tx.update(taskActivity)
+          .set({ boardId: targetBoardId })
+          .where(eq(taskActivity.taskId, task.id))
+          .run();
+        tx.update(taskAttachments)
+          .set({ boardId: targetBoardId })
+          .where(eq(taskAttachments.taskId, task.id))
+          .run();
+        tx.update(searchDocuments)
+          .set({ boardId: targetBoardId })
+          .where(eq(searchDocuments.taskId, task.id))
+          .run();
+        this.moveTaskSearchVectors(task.id, targetBoardId);
       }
 
       const nextTask = tx
@@ -288,13 +319,17 @@ export class TaskService {
         .insert(taskActivity)
         .values({
           projectId: task.projectId,
-          boardId: task.boardId,
+          boardId: targetBoardId,
           taskId: task.id,
           eventType: "task.moved",
-          summary: `Task moved to ${targetColumn.name}`,
+          summary: changesBoard
+            ? `Task moved to another board in ${targetColumn.name}`
+            : `Task moved to ${targetColumn.name}`,
           data: {
+            fromBoardId: task.boardId,
             fromColumnId: sourceColumn.id,
             fromColumnKey: sourceColumn.key,
+            toBoardId: targetBoardId,
             toColumnId: targetColumn.id,
             toColumnKey: targetColumn.key,
             position,
@@ -411,6 +446,58 @@ export class TaskService {
     }
 
     return column;
+  }
+
+  private resolveTaskColumnForBoardMove(boardId: string, sourceColumnKey: string) {
+    const matchingColumn = this.db
+      .select()
+      .from(boardColumns)
+      .where(
+        and(
+          eq(boardColumns.boardId, boardId),
+          eq(boardColumns.key, sourceColumnKey),
+        ),
+      )
+      .get();
+
+    return matchingColumn ?? this.resolveTaskColumn(boardId, {});
+  }
+
+  private moveTaskSearchVectors(taskId: string, boardId: string) {
+    const vectors = this.sqlite
+      .prepare(
+        `SELECT project_id, task_id, source_type, search_document_id, embedding
+         FROM search_document_vectors
+         WHERE task_id = ?`,
+      )
+      .all(taskId) as Array<{
+        project_id: string;
+        task_id: string;
+        source_type: string;
+        search_document_id: string;
+        embedding: Buffer;
+      }>;
+
+    for (const vector of vectors) {
+      this.sqlite
+        .prepare("DELETE FROM search_document_vectors WHERE search_document_id = ?")
+        .run(vector.search_document_id);
+      this.sqlite
+        .prepare(
+          `INSERT INTO search_document_vectors (
+             project_id, board_id, task_id, source_type,
+             search_document_id, embedding
+           ) VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          vector.project_id,
+          boardId,
+          vector.task_id,
+          vector.source_type,
+          vector.search_document_id,
+          vector.embedding,
+        );
+    }
   }
 
   private nextTaskPosition(boardId: string, columnId: string) {

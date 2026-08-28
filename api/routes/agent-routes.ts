@@ -102,6 +102,7 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
             "GET /api/agents/tasks/:taskId/attachments",
             "POST /api/agents/tasks/:taskId/attachments",
             "POST /api/agents/projects/:projectId/boards/:boardId/tasks",
+            "POST /api/agents/tasks/:taskId/move",
             "POST /api/agents/tasks/:taskId/comments",
             "GET /api/agents/search?q=<query>",
           ],
@@ -747,6 +748,7 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
           {
             title: "What changed",
             lines: [
+              `- Task is now on board \`${context.board.name}\` (\`${context.board.id}\`).`,
               `- Task is now in column \`${context.column.key}\`.`,
               "- Moving into a done column sets `completedAt`; moving out of one clears it.",
               `- Generated activity \`${moved.activity.id}\`.`,

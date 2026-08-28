@@ -366,10 +366,14 @@ Moves a task using the same JSON body as `POST /api/tasks/:id/move`:
 
 ```json
 {
-  "columnKey": "blocked",
+  "boardId": "board_456",
   "position": 0
 }
 ```
+
+Omit `boardId` for an ordinary column move. A board-only move preserves the
+task and its context, matches the current column key on the active destination
+board, and falls back to that board's first column.
 
 The response must mention completion side effects:
 

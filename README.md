@@ -231,6 +231,7 @@ skills/tasks-management/scripts/taskboards get projects repositoryPath="$PWD"
 skills/tasks-management/scripts/taskboards get projects/<projectId>/boards
 skills/tasks-management/scripts/taskboards context <taskId>
 skills/tasks-management/scripts/taskboards move <taskId> in_progress
+skills/tasks-management/scripts/taskboards move-board <taskId> <boardId>
 skills/tasks-management/scripts/taskboards comment <taskId> --body-file /tmp/taskboards-note.md
 ```
 
@@ -260,7 +261,7 @@ Useful starting points:
 - `GET /api/projects/:projectId/boards/:boardId?includeTasks=true`: read a
   board with tasks.
 - `POST /api/projects/:projectId/boards/:boardId/tasks`: create a task.
-- `POST /api/tasks/:taskId/move`: move a task to another column.
+- `POST /api/tasks/:taskId/move`: move a task to another column or sibling board.
 - `POST /api/tasks/:taskId/comments`: append a task comment.
 - `GET /api/tasks/:taskId/context`: fetch task, comments, activity, and parent
   board context.

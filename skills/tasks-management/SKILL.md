@@ -63,6 +63,7 @@ Read from the shell; the wrapper handles the rest:
 | `taskboards help`                       | `GET /api/agents/help`                                                   |
 | `taskboards context <taskId>`           | `GET /api/agents/tasks/<id>/context?view=full&include=comments,activity` |
 | `taskboards move <taskId> <columnKey>`  | `POST /api/agents/tasks/<id>/move`                                       |
+| `taskboards move-board <taskId> <boardId>` | `POST /api/agents/tasks/<id>/move`                                    |
 | `taskboards complete <taskId>`          | `POST /api/agents/tasks/<id>/complete`                                   |
 | `taskboards archive <taskId>`           | `POST /api/agents/tasks/<id>/archive`                                    |
 | `taskboards comment <taskId> <body...>` | `POST /api/agents/tasks/<id>/comments` with auto-filled agent identity   |
@@ -129,7 +130,12 @@ column sets `completedAt`; moving out clears it.
 
 ```sh
 taskboards move <taskId> in_progress
+taskboards move-board <taskId> <boardId>
 ```
+
+`move-board` preserves the task and its context, moves it to an active sibling
+board in the same project, and matches the current column key there. If the
+destination board has no matching key, the task moves to its first column.
 
 Comment (identity auto-filled from env). Use inline text only for short,
 single-line notes:

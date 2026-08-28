@@ -132,13 +132,14 @@ export const taskUpdateSchema = z.object({
 
 export const taskMoveSchema = z
   .object({
+    boardId: requiredString.optional(),
     columnId: requiredString.optional(),
     columnKey: requiredString.optional(),
     position: z.number().int().min(0).optional(),
   })
-  .refine((value) => value.columnId || value.columnKey, {
+  .refine((value) => value.boardId || value.columnId || value.columnKey, {
     path: ["columnId"],
-    message: "Provide columnId or columnKey",
+    message: "Provide boardId, columnId, or columnKey",
   })
   .refine((value) => !(value.columnId && value.columnKey), {
     path: ["columnKey"],

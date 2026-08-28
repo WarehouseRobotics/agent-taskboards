@@ -342,6 +342,42 @@ describe("agent markdown API", () => {
     expect(archive.text).toContain("Comments and activity remain attached.");
   });
 
+  it("moves a task to a sibling board and reports the resulting context", async () => {
+    const { projectId, boardId } = await createProjectAndBoard();
+    const targetBoard = objectProp(
+      jsonBlock(
+        (
+          await api(
+            "POST",
+            `/api/agents/projects/${projectId}/boards?format=json`,
+            { name: "delivery" },
+          )
+        ).text,
+      ),
+      "board",
+    );
+    const targetBoardId = stringProp(targetBoard, "id");
+    const taskId = await createTask(projectId, boardId, {
+      title: "Move this task",
+      columnKey: "ready",
+    });
+
+    const move = await api(
+      "POST",
+      `/api/agents/tasks/${taskId}/move?format=json`,
+      { boardId: targetBoardId },
+    );
+
+    expect(move.status).toBe(200);
+    expect(move.text).toContain(
+      `Task is now on board \`delivery\` (\`${targetBoardId}\`).`,
+    );
+    expect(move.text).toContain("Task is now in column `ready`.");
+    const movedTask = objectProp(jsonBlock(move.text), "task");
+    expect(stringProp(movedTask, "boardId")).toBe(targetBoardId);
+    expect(stringProp(movedTask, "boardName")).toBe("delivery");
+  });
+
   it("uploads and exposes task attachment paths to agents without an agent delete endpoint", async () => {
     const { projectId, boardId } = await createProjectAndBoard();
     const taskId = await createTask(projectId, boardId, {

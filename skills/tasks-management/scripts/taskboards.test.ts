@@ -116,6 +116,33 @@ process.stdout.write("ok\\n");
     });
   });
 
+  it("moves a task to another board", () => {
+    const capture = runTaskboards([
+      "move-board",
+      "task_123",
+      "board_456",
+    ]);
+
+    expect(capture.args).toContain(
+      "http://taskboards.test/api/agents/tasks/task_123/move",
+    );
+    expect(JSON.parse(capture.bodyContent ?? "")).toEqual({
+      boardId: "board_456",
+    });
+  });
+
+  it("reports move-board usage when the destination is missing", () => {
+    const result = spawnSync(scriptPath, ["move-board", "task_123"], {
+      env: taskboardsEnv(),
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain(
+      "move-board: usage 'move-board <taskId> <boardId>'",
+    );
+  });
+
   it("uses --body-file to preserve multiline markdown and special characters", () => {
     const notePath = join(tmpDir, "note.md");
     const note = [

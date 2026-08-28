@@ -22,6 +22,7 @@ import {
   CreateProjectPanel,
 } from "./CreateResourcePanels";
 import { archiveTaskBatch } from "./archive-tasks";
+import { transferTaskToBoard } from "./move-task-to-board";
 
 export function App() {
   const initialRoute = useMemo(() => parseRoute(), []);
@@ -134,10 +135,11 @@ export function App() {
     taskContext,
   } = useTaskContexts(activeTaskId);
 
-  const activeProject = useMemo(
-    () => projectTree.find((item) => item.project.id === selectedProjectId)?.project ?? null,
+  const activeProjectTree = useMemo(
+    () => projectTree.find((item) => item.project.id === selectedProjectId) ?? null,
     [selectedProjectId, projectTree],
   );
+  const activeProject = activeProjectTree?.project ?? null;
   const activeBoard = board ?? projectTree.flatMap((item) => item.boards).find((item) => item.id === selectedBoardId) ?? null;
   const activeTask = useMemo(
     () => tasks.find((task) => task.id === activeTaskId) ?? taskContext?.task ?? null,
@@ -368,6 +370,7 @@ export function App() {
           <BoardWorkspace
             activeBoard={activeBoard}
             activeProject={activeProject}
+            activeProjectBoards={activeProjectTree?.boards ?? []}
             activeTaskContext={taskContext}
             activeTaskId={activeTaskId}
             autoSaveTaskChanges={autoSaveTaskChanges}
@@ -439,6 +442,27 @@ export function App() {
               }
             }}
             onMoveTask={moveTask}
+            onMoveTaskToBoard={async (taskId, boardId) => {
+              setMutationError(null);
+              return transferTaskToBoard({
+                boardId,
+                moveTask: api.moveTask,
+                onError: (err) => setMutationError(apiMessage(err)),
+                onSuccess: async () => {
+                  navigate(
+                    {
+                      view: "board",
+                      projectId: selectedProjectId,
+                      boardId: selectedBoardId,
+                      taskId: null,
+                    },
+                    "replace",
+                  );
+                  await refreshAfterMutation(null);
+                },
+                taskId,
+              });
+            }}
             onMoveTasks={moveTasks}
             onOpenCreateTask={(columnId) => setNewTaskColumnId(columnId)}
             onOpenProjectActivity={() =>
