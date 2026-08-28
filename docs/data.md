@@ -166,6 +166,33 @@ Starter API reads exclude archived projects, boards, and tasks unless the
 endpoint supports `includeArchived=true`. Comments and activity do not have
 their own archive state; they remain attached to their task.
 
+Maintenance storage reporting applies inherited archive state. A board and all
+of its descendants are reported as archived when its project or the board is
+archived. Task-owned rows, including comments, activity, attachment metadata,
+search documents, and vector chunks, are reported as archived when the project,
+board, or task is archived. This is the same ancestor visibility rule used by
+semantic search.
+
+## Storage Attribution
+
+`GET /api/maintenance/storage` reports an allocated-footprint estimate by
+project and board:
+
+- canonical data is the stored payload of project, board, column, checkpoint,
+  task, comment, activity, and attachment metadata rows
+- text and blob values use their UTF-8/blob byte length; integer values use the
+  corresponding SQLite serial integer width
+- embedding data includes search-document payload and sqlite-vec's allocated
+  vector slots, validity bitmap, and row-ID arrays for each partition chunk
+- attachment `sizeBytes` is counted only as an integer field; the uploaded file
+  itself lives outside SQLite and is excluded
+
+The attributed estimate does not include record headers, B-tree indexes, page
+padding, schema rows, or minor sqlite-vec metadata. The database summary reports
+those bytes, along with free pages, in `unattributedBytes`. As a result, scoped
+totals explain the main consumers of the database but are not exact physical
+page ownership.
+
 ## Ordering
 
 Board columns are ordered by `position`.

@@ -6,8 +6,9 @@ implemented starter API covers projects, boards, board columns, tasks, task
 movement, task completion, archival, comments, activity, task attachments, and
 task context.
 
-Text embedding search is implemented for boards, tasks, and comments. Broader
-maintenance APIs are still planned areas.
+Text embedding search is implemented for boards, tasks, and comments. The
+maintenance API exposes read-only database storage attribution; destructive
+maintenance actions are still planned.
 
 ## API Principles
 
@@ -74,6 +75,61 @@ Returns API and database status:
   }
 }
 ```
+
+## Maintenance Storage
+
+`GET /api/maintenance/storage`
+
+Returns a read-only estimate of database storage attributed to every project
+and board. The response always includes archived projects and boards. Active and
+archived usage are split into canonical `dataBytes`, derived `embeddingBytes`,
+and `totalBytes` buckets.
+
+```json
+{
+  "calculatedAt": "2026-08-28T10:00:00.000Z",
+  "database": {
+    "path": "/data/taskboards.sqlite",
+    "pageSizeBytes": 4096,
+    "pageCount": 1024,
+    "databaseBytes": 4194304,
+    "freeBytes": 0,
+    "attributedBytes": 3145728,
+    "unattributedBytes": 1048576
+  },
+  "active": {
+    "dataBytes": 65536,
+    "embeddingBytes": 1500000,
+    "totalBytes": 1565536
+  },
+  "archived": {
+    "dataBytes": 32768,
+    "embeddingBytes": 1547424,
+    "totalBytes": 1580192
+  },
+  "projects": [
+    {
+      "id": "project-id",
+      "name": "agent-taskboards",
+      "archivedAt": null,
+      "active": {},
+      "archived": {},
+      "totalBytes": 3145728,
+      "boards": []
+    }
+  ]
+}
+```
+
+Project totals include the project row and all descendant board data. Board
+totals include the board row and its descendants. Child data inherits archive
+state from its project, board, or owning task. `databaseBytes` is the SQLite
+page size multiplied by the page count; `unattributedBytes` is the remainder
+after scoped payload and embedding capacity are attributed.
+
+The estimates intentionally exclude uploaded file contents, SQLite indexes,
+record headers, and page padding. See `docs/data.md` for the byte-accounting
+rules.
 
 ## Projects
 

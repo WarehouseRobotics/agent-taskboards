@@ -4,6 +4,7 @@ import type { DatabaseClient } from "../db/client.js";
 import { BoardService } from "./board-service.js";
 import { CheckpointService } from "./checkpoint-service.js";
 import { CommentService } from "./comment-service.js";
+import { MaintenanceService } from "./maintenance-service.js";
 import { ProjectService } from "./project-service.js";
 import { SearchService, type EmbeddingModel } from "./search-service.js";
 import { TaskService } from "./task-service.js";
@@ -18,6 +19,7 @@ export interface ApiServices {
   attachments: AttachmentService;
   activity: ActivityService;
   search: SearchService;
+  maintenance: MaintenanceService;
 }
 
 export type CreateServicesOptions = {
@@ -50,6 +52,7 @@ export function createServices(
     tasks,
     search,
   );
+  const maintenance = new MaintenanceService(databaseClient);
 
   return {
     projects,
@@ -60,5 +63,6 @@ export function createServices(
     attachments,
     activity,
     search,
+    maintenance,
   };
 }

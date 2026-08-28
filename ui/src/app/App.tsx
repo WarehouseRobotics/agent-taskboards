@@ -15,7 +15,7 @@ import type { TaskMovePlan } from "../features/boards/board-selection";
 import { ProjectsWorkspace } from "../features/projects";
 import { SearchWorkspace } from "../features/search";
 import { BoardSettingsPanel, SettingsWorkspace } from "../features/settings";
-import { PlannedWorkspace } from "../features/planned";
+import { MaintenanceWorkspace } from "../features/maintenance";
 import { persistTaskAutoSaveEnabled, storedTaskAutoSaveEnabled } from "../features/tasks/task-auto-save";
 import {
   CreateBoardPanel,
@@ -529,7 +529,7 @@ export function App() {
             projectTree={displayedProjectTree}
           />
         )}
-        {view === "maintenance" && <PlannedWorkspace icon="database" title="Maintenance" health={health} />}
+        {view === "maintenance" && <MaintenanceWorkspace />}
         {view === "settings" && (
           <SettingsWorkspace
             autoSaveTaskChanges={autoSaveTaskChanges}

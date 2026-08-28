@@ -33,6 +33,28 @@ describe("api client", () => {
     );
   });
 
+  it("loads the maintenance storage report", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          calculatedAt: "2026-08-28T10:00:00.000Z",
+          database: { databaseBytes: 4096 },
+          active: { dataBytes: 0, embeddingBytes: 0, totalBytes: 0 },
+          archived: { dataBytes: 0, embeddingBytes: 0, totalBytes: 0 },
+          projects: [],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await api.maintenanceStorage();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/maintenance/storage",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
+  });
+
   it("deletes comments through the encoded task comment endpoint", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(

@@ -80,3 +80,22 @@ Maintenance status should include simple health information:
 - last successful reindex time when available
 
 These checks should be exposed in a form that both humans and agents can use.
+
+## Database Usage Report
+
+The Maintenance UI and `GET /api/maintenance/storage` expose storage attributed
+to every project and board. Each scope shows active canonical data, active
+embedding data, archived canonical data, archived embedding data, and a total.
+Archived projects and boards are included automatically.
+
+Archive state is inherited: child rows are archived for reporting when their
+project, board, or owning task is archived. Project totals include their own row
+and all boards; board totals include the board row, columns, checkpoints, tasks,
+task-owned records, search documents, and vector chunks.
+
+The report is an allocated-footprint estimate rather than exact page ownership.
+It counts canonical record payload, search-document payload, and allocated
+sqlite-vec chunk capacity. SQLite indexes, record headers, page padding, schema
+data, free pages, and minor vector metadata remain in the database-level
+unattributed total. Durable upload files are outside the database and are not
+included.

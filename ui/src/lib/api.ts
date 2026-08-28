@@ -5,6 +5,7 @@ import type {
   BoardCheckpoint,
   BoardCheckpointRestoreResponse,
   Health,
+  MaintenanceStorageReport,
   Project,
   ProjectActivityResponse,
   SearchInput,
@@ -64,6 +65,9 @@ function jsonBody(value: unknown) {
 
 export const api = {
   health: () => request<Health>("/api/health"),
+
+  maintenanceStorage: () =>
+    request<MaintenanceStorageReport>("/api/maintenance/storage"),
 
   listProjects: async () => {
     const body = await request<{ projects: Project[] }>("/api/projects");

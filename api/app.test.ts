@@ -89,6 +89,16 @@ describe("starter API", () => {
     previousUploadsPath = undefined;
   });
 
+  it("reports database storage through the maintenance endpoint", async () => {
+    const response = await api("GET", "/api/maintenance/storage");
+
+    expect(response.status).toBe(200);
+    const database = objectProp(response.body, "database");
+    expect(numberProp(database, "databaseBytes")).toBeGreaterThan(0);
+    expect(numberProp(database, "attributedBytes")).toBe(0);
+    expect(arrayProp(response.body, "projects")).toEqual([]);
+  });
+
   it("creates projects, boards with default columns, tasks, comments, and context", async () => {
     const projectResponse = await api("POST", "/api/projects", {
       name: "agent-taskboards",

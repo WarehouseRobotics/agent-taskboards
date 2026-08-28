@@ -162,6 +162,47 @@ export interface Health {
   };
 }
 
+export interface StorageSizeBucket {
+  dataBytes: number;
+  embeddingBytes: number;
+  totalBytes: number;
+}
+
+export interface StorageUsageSplit {
+  active: StorageSizeBucket;
+  archived: StorageSizeBucket;
+  totalBytes: number;
+}
+
+export interface BoardStorageUsage extends StorageUsageSplit {
+  id: string;
+  name: string;
+  archivedAt: string | null;
+}
+
+export interface ProjectStorageUsage extends StorageUsageSplit {
+  id: string;
+  name: string;
+  archivedAt: string | null;
+  boards: BoardStorageUsage[];
+}
+
+export interface MaintenanceStorageReport {
+  calculatedAt: string;
+  database: {
+    path: string;
+    pageSizeBytes: number;
+    pageCount: number;
+    databaseBytes: number;
+    freeBytes: number;
+    attributedBytes: number;
+    unattributedBytes: number;
+  };
+  active: StorageSizeBucket;
+  archived: StorageSizeBucket;
+  projects: ProjectStorageUsage[];
+}
+
 export interface ProjectTreeItem {
   project: Project;
   boards: Board[];
