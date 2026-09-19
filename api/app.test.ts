@@ -99,6 +99,108 @@ describe("starter API", () => {
     expect(arrayProp(response.body, "projects")).toEqual([]);
   });
 
+  it("manages the prompt library through the REST routes", async () => {
+    const seededPrompts = await api("GET", "/api/prompts");
+    expect(seededPrompts.status).toBe(200);
+    expect(
+      arrayProp(seededPrompts.body, "prompts").map((item) =>
+        stringProp(asObject(item), "defaultKey"),
+      ),
+    ).toEqual([
+      "umbrella-implement",
+      "umbrella-code-review",
+      "address-review-findings",
+    ]);
+
+    const seededCategories = await api("GET", "/api/prompt-categories");
+    expect(seededCategories.status).toBe(200);
+    const seededCategory = asObject(
+      arrayProp(seededCategories.body, "categories")[0],
+    );
+    expect(stringProp(seededCategory, "name")).toBe("☂️ Umbrella");
+
+    const categoryResponse = await api("POST", "/api/prompt-categories", {
+      name: "🔧 Fixes",
+      description: "Prompts for bug fixing",
+    });
+    expect(categoryResponse.status).toBe(201);
+    const categoryId = stringProp(
+      objectProp(categoryResponse.body, "category"),
+      "id",
+    );
+
+    const duplicateCategory = await api("POST", "/api/prompt-categories", {
+      name: "🔧 Fixes",
+    });
+    expect(duplicateCategory.status).toBe(409);
+
+    const promptResponse = await api("POST", "/api/prompts", {
+      name: "Fix the bug",
+      body: "Please fix {{TASK}} on the current branch.",
+      categoryIds: [categoryId],
+    });
+    expect(promptResponse.status).toBe(201);
+    const createdPrompt = objectProp(promptResponse.body, "prompt");
+    const promptId = stringProp(createdPrompt, "id");
+    expect(arrayProp(createdPrompt, "categoryIds")).toEqual([categoryId]);
+
+    const invalidPrompt = await api("POST", "/api/prompts", {
+      name: "No body",
+      body: "   ",
+    });
+    expect(invalidPrompt.status).toBe(400);
+
+    const filtered = await api("GET", `/api/prompts?categoryId=${categoryId}`);
+    expect(
+      arrayProp(filtered.body, "prompts").map((item) =>
+        stringProp(asObject(item), "id"),
+      ),
+    ).toEqual([promptId]);
+
+    const patched = await api("PATCH", `/api/prompts/${promptId}`, {
+      name: "Fix the bug carefully",
+      categoryIds: [],
+    });
+    expect(patched.status).toBe(200);
+    const patchedPrompt = objectProp(patched.body, "prompt");
+    expect(stringProp(patchedPrompt, "name")).toBe("Fix the bug carefully");
+    expect(arrayProp(patchedPrompt, "categoryIds")).toEqual([]);
+
+    const used = await api("POST", `/api/prompts/${promptId}/use`);
+    expect(used.status).toBe(200);
+    expect(numberProp(objectProp(used.body, "prompt"), "usageCount")).toBe(1);
+
+    const missingPrompt = await api("GET", "/api/prompts/not-a-prompt");
+    expect(missingPrompt.status).toBe(404);
+
+    const seededPromptId = stringProp(
+      asObject(arrayProp(seededPrompts.body, "prompts")[0]),
+      "id",
+    );
+    const deletedDefault = await api("DELETE", `/api/prompts/${seededPromptId}`);
+    expect(deletedDefault.status).toBe(200);
+
+    const restoreResponse = await api("POST", "/api/prompts/restore-defaults");
+    expect(restoreResponse.status).toBe(200);
+    expect(arrayProp(restoreResponse.body, "restored")).toEqual([
+      "prompt:umbrella-implement",
+    ]);
+
+    const restoreAgain = await api("POST", "/api/prompts/restore-defaults");
+    expect(arrayProp(restoreAgain.body, "restored")).toEqual([]);
+
+    const deletedCategory = await api(
+      "DELETE",
+      `/api/prompt-categories/${categoryId}`,
+    );
+    expect(deletedCategory.status).toBe(200);
+    const promptAfterCategoryDelete = await api(
+      "GET",
+      `/api/prompts/${promptId}`,
+    );
+    expect(promptAfterCategoryDelete.status).toBe(200);
+  });
+
   it("creates projects, boards with default columns, tasks, comments, and context", async () => {
     const projectResponse = await api("POST", "/api/projects", {
       name: "agent-taskboards",

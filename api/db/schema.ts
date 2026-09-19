@@ -304,6 +304,73 @@ export const taskAttachments = sqliteTable(
   }),
 );
 
+export const promptCategories = sqliteTable(
+  "prompt_categories",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    description: text("description"),
+    position: integer("position").notNull(),
+    defaultKey: text("default_key"),
+    metadata: jsonObject("metadata"),
+    createdAt: timestamp("created_at"),
+    updatedAt: updatedTimestamp(),
+  },
+  (table) => ({
+    nameUnique: uniqueIndex("prompt_categories_name_unique").on(table.name),
+    defaultKeyUnique: uniqueIndex("prompt_categories_default_key_unique").on(
+      table.defaultKey,
+    ),
+    positionIdx: index("prompt_categories_position_idx").on(table.position),
+  }),
+);
+
+export const prompts = sqliteTable(
+  "prompts",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    body: text("body").notNull(),
+    position: integer("position").notNull(),
+    usageCount: integer("usage_count").notNull().default(0),
+    lastUsedAt: nullableTimestamp("last_used_at"),
+    defaultKey: text("default_key"),
+    metadata: jsonObject("metadata"),
+    createdAt: timestamp("created_at"),
+    updatedAt: updatedTimestamp(),
+  },
+  (table) => ({
+    defaultKeyUnique: uniqueIndex("prompts_default_key_unique").on(
+      table.defaultKey,
+    ),
+    positionIdx: index("prompts_position_idx").on(table.position),
+    lastUsedIdx: index("prompts_last_used_idx").on(table.lastUsedAt),
+  }),
+);
+
+export const promptCategoryLinks = sqliteTable(
+  "prompt_category_links",
+  {
+    id: id(),
+    promptId: text("prompt_id")
+      .notNull()
+      .references(() => prompts.id, { onDelete: "cascade" }),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => promptCategories.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    createdAt: timestamp("created_at"),
+  },
+  (table) => ({
+    promptCategoryUnique: uniqueIndex(
+      "prompt_category_links_prompt_category_unique",
+    ).on(table.promptId, table.categoryId),
+    categoryIdx: index("prompt_category_links_category_idx").on(
+      table.categoryId,
+    ),
+  }),
+);
+
 export const searchDocuments = sqliteTable(
   "search_documents",
   {
@@ -462,6 +529,31 @@ export const taskAttachmentsRelations = relations(taskAttachments, ({ one }) => 
   }),
 }));
 
+export const promptCategoriesRelations = relations(
+  promptCategories,
+  ({ many }) => ({
+    links: many(promptCategoryLinks),
+  }),
+);
+
+export const promptsRelations = relations(prompts, ({ many }) => ({
+  links: many(promptCategoryLinks),
+}));
+
+export const promptCategoryLinksRelations = relations(
+  promptCategoryLinks,
+  ({ one }) => ({
+    prompt: one(prompts, {
+      fields: [promptCategoryLinks.promptId],
+      references: [prompts.id],
+    }),
+    category: one(promptCategories, {
+      fields: [promptCategoryLinks.categoryId],
+      references: [promptCategories.id],
+    }),
+  }),
+);
+
 export const searchDocumentsRelations = relations(searchDocuments, ({ one }) => ({
   project: one(projects, {
     fields: [searchDocuments.projectId],
@@ -503,3 +595,12 @@ export type NewTaskAttachment = typeof taskAttachments.$inferInsert;
 
 export type SearchDocument = typeof searchDocuments.$inferSelect;
 export type NewSearchDocument = typeof searchDocuments.$inferInsert;
+
+export type PromptCategory = typeof promptCategories.$inferSelect;
+export type NewPromptCategory = typeof promptCategories.$inferInsert;
+
+export type Prompt = typeof prompts.$inferSelect;
+export type NewPrompt = typeof prompts.$inferInsert;
+
+export type PromptCategoryLink = typeof promptCategoryLinks.$inferSelect;
+export type NewPromptCategoryLink = typeof promptCategoryLinks.$inferInsert;

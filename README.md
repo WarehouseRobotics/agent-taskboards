@@ -29,6 +29,8 @@ comments with a GGUF embedding model.
 - Default Kanban workflow columns: `backlog`, `ready`, `in_progress`, `blocked`,
   `review`, and `done`.
 - React UI for human task management.
+- Prompt library with categories, default prompts, and a task-detail prompt
+  picker that fills `{{TASK}}`/`{{PARENT_TASK}}` tokens on copy.
 - Express API for scripts and AI agents.
 - SQLite persistence in `data/taskboards.sqlite`.
 - Local semantic search over boards, tasks, and comments using `node-llama-cpp`
@@ -276,6 +278,7 @@ See [docs/api.md](docs/api.md) for the full API contract.
 - [docs/tasks-and-boards.md](docs/tasks-and-boards.md): domain model.
 - [docs/api.md](docs/api.md): JSON API structure.
 - [docs/agent-api.md](docs/agent-api.md): markdown-first agent API design.
+- [docs/prompts.md](docs/prompts.md): prompt library and prompt picker.
 - [docs/ui.md](docs/ui.md): UI architecture and principles.
 - [docs/text-embedding.md](docs/text-embedding.md): local embeddings and vector
   search.

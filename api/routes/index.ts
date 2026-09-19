@@ -9,6 +9,7 @@ import { registerCheckpointRoutes } from "./checkpoint-routes.js";
 import { registerHealthRoutes } from "./health-routes.js";
 import { registerMaintenanceRoutes } from "./maintenance-routes.js";
 import { registerProjectRoutes } from "./project-routes.js";
+import { registerPromptRoutes } from "./prompt-routes.js";
 import { registerSearchRoutes } from "./search-routes.js";
 import { registerTaskRoutes } from "./task-routes.js";
 
@@ -22,6 +23,7 @@ export function registerRoutes(app: Express, options: RegisterRoutesOptions) {
   registerHealthRoutes(app, options.databaseClient, options.migrationResult);
   registerMaintenanceRoutes(app, options.services);
   registerProjectRoutes(app, options.services);
+  registerPromptRoutes(app, options.services);
   registerBoardRoutes(app, options.services);
   registerCheckpointRoutes(app, options.services);
   registerTaskRoutes(app, options.services);

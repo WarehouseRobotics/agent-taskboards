@@ -54,6 +54,9 @@ project -> board -> task -> comments/activity
   ordering, optional metadata, and durable identifiers.
 - Comments and activity provide append-only context for task decisions, agent
   notes, handoffs, and status updates.
+- A global prompt library stores reusable prompt texts, organized by optional
+  categories, that humans copy into agent sessions from the task detail's
+  prompt picker. See `docs/prompts.md`.
 
 Columns represent workflow state on a board. The exact default columns can
 evolve, but the model should support common Kanban states such as backlog,
@@ -141,6 +144,7 @@ should stay local and ignored.
 - `docs/api.md`: implemented starter API contract and planned API areas
 - `docs/agent-api.md`: planned markdown-first API contract for coding agents
 - `docs/data.md`: storage, timestamps, JSON fields, and low-level data details
+- `docs/prompts.md`: prompt library, prompt picker, and token contract
 - `docs/text-embedding.md`: local embedding and semantic search design
 - `docs/ui.md`: UI architecture and user experience principles
 - `docs/design.md`: visual and interaction design rules

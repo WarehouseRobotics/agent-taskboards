@@ -31,4 +31,9 @@ describe("router", () => {
       "/activity",
     );
   });
+
+  it("parses and serializes the prompts route", () => {
+    expect(parseRoute("/prompts", "")).toEqual({ view: "prompts" });
+    expect(routePath({ view: "prompts" })).toBe("/prompts");
+  });
 });

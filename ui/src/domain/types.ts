@@ -1,6 +1,6 @@
 export type Theme = "dark" | "light";
 
-export type View = "activity" | "board" | "projects" | "search" | "maintenance" | "settings";
+export type View = "activity" | "board" | "projects" | "search" | "prompts" | "maintenance" | "settings";
 
 export type TaskPriority = "low" | "normal" | "high" | "urgent";
 
@@ -238,6 +238,37 @@ export interface SearchResult {
 export interface SearchResponse {
   query: string;
   results: SearchResult[];
+}
+
+export interface PromptCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  position: number;
+  defaultKey: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface Prompt {
+  id: string;
+  name: string;
+  body: string;
+  position: number;
+  usageCount: number;
+  lastUsedAt: string | null;
+  defaultKey: string | null;
+  metadata: Record<string, unknown>;
+  categoryIds: string[];
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface PromptRestoreDefaultsResponse {
+  restored: string[];
+  categories: PromptCategory[];
+  prompts: Prompt[];
 }
 
 export interface TaskContext {

@@ -87,6 +87,7 @@ export function Sidebar({
         <NavItem active={view === "projects"} count={projectTree.length} icon="list" label="Projects" onClick={() => onSelectView("projects")} />
         <NavItem active={view === "activity"} icon="activity" label="Activity" onClick={() => onSelectView("activity")} />
         <NavItem active={view === "search"} icon="search" label="Search" onClick={() => onSelectView("search")} />
+        <NavItem active={view === "prompts"} icon="prompt" label="Prompts" onClick={() => onSelectView("prompts")} />
         <NavItem active={view === "maintenance"} icon="database" label="Maintenance" onClick={() => onSelectView("maintenance")} />
         <NavItem active={view === "settings"} icon="settings" label="Settings" onClick={() => onSelectView("settings")} />
       </nav>
@@ -137,7 +138,7 @@ function NavItem({
 }: {
   active: boolean;
   count?: number;
-  icon: Extract<IconName, "activity" | "board" | "database" | "list" | "search" | "settings">;
+  icon: Extract<IconName, "activity" | "board" | "database" | "list" | "prompt" | "search" | "settings">;
   label: string;
   onClick: () => void;
 }) {

@@ -4,6 +4,7 @@ import { columnStatus, glyphForName } from "../../lib/task-display";
 import { formatDate } from "../../lib/format";
 import { Button, EmptyState, Icon, InlineError, LabelChip, Mono, PriorityFlag, StatusIcon } from "../../components/ui";
 import { Topbar } from "../../components/layout";
+import { PromptPicker } from "../prompts";
 import { TaskDetail } from "../tasks";
 import { buildBoardReferenceText } from "./board-reference";
 import {
@@ -119,6 +120,8 @@ export function BoardWorkspace({
   const [archivingSelection, setArchivingSelection] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(() => new Set());
   const [rangeSelectionAnchors, setRangeSelectionAnchors] = useState<Map<string, string>>(() => new Map());
+  const [promptPickerOpen, setPromptPickerOpen] = useState(false);
+  const promptPickerPanelRef = useRef<HTMLElement | null>(null);
   const activeBoardId = activeBoard?.id ?? null;
   const boardScrollerElement = useRef<HTMLDivElement | null>(null);
   const columnScrollerElements = useRef(new Map<string, HTMLDivElement>());
@@ -135,6 +138,11 @@ export function BoardWorkspace({
     }
     return map;
   }, [columns, sortedTasks]);
+
+  const activePickerTask = useMemo(
+    () => tasks.find((task) => task.id === activeTaskId) ?? activeTaskContext?.task ?? null,
+    [activeTaskContext?.task, activeTaskId, tasks],
+  );
 
   const loadingWorkspace = loadingProjects || loadingBoard;
   const { isRefreshing, showInitialSkeleton } = boardLoadingState(loadingWorkspace, Boolean(activeBoard));
@@ -542,11 +550,20 @@ export function BoardWorkspace({
               </div>
             )}
           </div>
+          {activeTaskId && promptPickerOpen && activePickerTask && (
+            <PromptPicker
+              boardTasks={tasks}
+              onClose={() => setPromptPickerOpen(false)}
+              panelRef={promptPickerPanelRef}
+              task={activePickerTask}
+            />
+          )}
           {activeTaskId && (
             <TaskDetail
               autoSaveTaskChanges={autoSaveTaskChanges}
               boards={activeProjectBoards}
               columns={columns}
+              companionPanelRef={promptPickerPanelRef}
               context={activeTaskContext}
               loading={loadingTask}
               onArchiveTask={archiveTaskPreservingScroll}
@@ -558,8 +575,10 @@ export function BoardWorkspace({
               onMoveTaskToBoard={onMoveTaskToBoard}
               onPostComment={postCommentPreservingScroll}
               onTaskDraftChange={onTaskDraftChange}
+              onTogglePromptPicker={() => setPromptPickerOpen((current) => !current)}
               onUpdateTask={updateTaskPreservingScroll}
               onUploadTaskAttachment={uploadTaskAttachmentPreservingScroll}
+              promptPickerOpen={promptPickerOpen}
             />
           )}
         </div>

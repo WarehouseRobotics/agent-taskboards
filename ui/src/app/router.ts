@@ -5,6 +5,7 @@ export type AppRoute =
   | { view: "board"; projectId: string | null; boardId: string | null; taskId: string | null }
   | { view: "projects"; projectId: string | null }
   | { view: "search"; query: string | null }
+  | { view: "prompts" }
   | { view: "maintenance" }
   | { view: "settings"; section: string };
 
@@ -40,6 +41,10 @@ export function parseRoute(
     const query = new URLSearchParams(search).get("q");
     const trimmed = query?.trim();
     return { view: "search", query: trimmed ? trimmed : null };
+  }
+
+  if (parts[0] === "prompts") {
+    return { view: "prompts" };
   }
 
   if (parts[0] === "maintenance") {

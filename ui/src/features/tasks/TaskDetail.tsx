@@ -1,8 +1,9 @@
-import { ChangeEvent, ClipboardEvent as ReactClipboardEvent, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { ChangeEvent, ClipboardEvent as ReactClipboardEvent, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ActorType, Board, BoardColumn, TaskActivity, TaskAttachment, TaskComment, TaskContext } from "../../domain/types";
 import { copyTextToClipboard } from "../../lib/clipboard";
+import { buildTaskReferenceText } from "../../lib/task-reference";
 import { apiMessage } from "../../lib/errors";
 import { formatDate } from "../../lib/format";
 import { formatTaskLabels, parseTaskLabels, taskLabelsEqual } from "../../lib/task-labels";
@@ -22,6 +23,7 @@ import {
   type TaskDescriptionView,
 } from "./task-description-view";
 import { taskAutoSaveDelayMs } from "./task-auto-save";
+import { isOutsideTaskDetailSurfaces } from "./task-detail-surfaces";
 
 interface TaskEditFields {
   description: string;
@@ -56,11 +58,6 @@ function isTaskDraftDirty(draft: TaskEditDraft) {
   return draft.current.title !== draft.base.title
     || draft.current.description !== draft.base.description
     || !taskLabelsEqual(parseTaskLabels(draft.current.labelText), parseTaskLabels(draft.base.labelText));
-}
-
-export function buildTaskReferenceText(visibleTitle: string, fallbackTitle: string, taskId: string) {
-  const title = visibleTitle.trim() || fallbackTitle.trim();
-  return `"${title}" ( id=${taskId} )`;
 }
 
 export function appendImageAttachmentMarkdown(description: string, attachment: TaskAttachment) {
@@ -116,6 +113,7 @@ export function TaskDetail({
   autoSaveTaskChanges,
   boards,
   columns,
+  companionPanelRef,
   context,
   loading,
   onArchiveTask,
@@ -127,12 +125,15 @@ export function TaskDetail({
   onMoveTaskToBoard,
   onPostComment,
   onTaskDraftChange,
+  onTogglePromptPicker,
   onUpdateTask,
   onUploadTaskAttachment,
+  promptPickerOpen = false,
 }: {
   autoSaveTaskChanges: boolean;
   boards: Board[];
   columns: BoardColumn[];
+  companionPanelRef?: RefObject<HTMLElement | null>;
   context?: TaskContext;
   loading: boolean;
   onArchiveTask: (taskId: string) => Promise<void>;
@@ -144,8 +145,10 @@ export function TaskDetail({
   onMoveTaskToBoard: (taskId: string, boardId: string) => Promise<boolean>;
   onPostComment: (taskId: string, body: string) => Promise<void>;
   onTaskDraftChange: (taskId: string, fields: { title?: string; description?: string | null; labels?: string[] } | null) => void;
+  onTogglePromptPicker?: () => void;
   onUpdateTask: (taskId: string, input: { title?: string; description?: string | null; labels?: string[] }) => Promise<void>;
   onUploadTaskAttachment: (taskId: string, file: File) => Promise<TaskAttachment>;
+  promptPickerOpen?: boolean;
 }) {
   const [comment, setComment] = useState("");
   const [draft, setDraft] = useState<TaskEditDraft>(emptyTaskDraft);
@@ -452,9 +455,11 @@ export function TaskDetail({
     }
 
     const handleOutsidePointerDown = (event: PointerEvent) => {
-      const panel = detailRef.current;
-      const target = event.target;
-      if (!panel || !(target instanceof Node) || panel.contains(target)) {
+      const outside = isOutsideTaskDetailSurfaces(
+        [detailRef.current, companionPanelRef?.current ?? null],
+        event.target,
+      );
+      if (!outside) {
         return;
       }
       if (pendingDeleteComment) {
@@ -473,7 +478,7 @@ export function TaskDetail({
 
     document.addEventListener("pointerdown", handleOutsidePointerDown, true);
     return () => document.removeEventListener("pointerdown", handleOutsidePointerDown, true);
-  }, [hasPendingChanges, onClose, pendingDeleteComment, showDetailToast, taskId]);
+  }, [companionPanelRef, hasPendingChanges, onClose, pendingDeleteComment, showDetailToast, taskId]);
 
   if (loading && !context) {
     return (
@@ -772,6 +777,16 @@ export function TaskDetail({
           <span>created {formatDate(task.createdAt)}</span>
           <span>updated {formatDate(task.updatedAt)}</span>
         </div>
+        {onTogglePromptPicker && (
+          <button
+            aria-pressed={promptPickerOpen}
+            className={promptPickerOpen ? "icon-btn task-detail__prompts-toggle task-detail__prompts-toggle--open" : "icon-btn task-detail__prompts-toggle"}
+            onClick={onTogglePromptPicker}
+            title={promptPickerOpen ? "Close prompt picker" : "Open prompt picker"}
+          >
+            <Icon name="prompt" />
+          </button>
+        )}
         <button className="icon-btn" onClick={requestClose} title="Close task">
           <Icon name="close" />
         </button>

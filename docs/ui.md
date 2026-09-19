@@ -102,6 +102,31 @@ Search should support both human recall and agent memory inspection:
 Search results should link directly to the relevant project, board, task, or
 comment context.
 
+## Prompt Library Experience
+
+The prompt library manages reusable prompt texts for agent sessions. It opens
+from the sidebar `Prompts` entry, between Search and Maintenance:
+
+- a left rail lists All prompts, Uncategorized, and each category with counts
+- the middle list shows prompts for the current filter with usage metadata
+- the right editor pane edits name, body, and category membership in place
+- toolbar actions cover new prompt, new category, and restore defaults
+- deletes are hard deletes behind explicit confirmation dialogs
+
+Prompt names are user-authored data and may contain emoji; the chrome around
+them stays glyph-free.
+
+## Prompt Picker Experience
+
+The prompt picker brings the library to the task detail:
+
+- it opens from a toggle in the task detail header and extends as a nested
+  sidebar on the task detail's left, attached rather than floating
+- the initial state leads with recently used prompts for one-click copying
+- one click copies the prompt body with `{{TASK}}` and `{{PARENT_TASK}}`
+  tokens rendered from the open task; a row expands to preview the exact text
+- unresolved tokens copy as their bare names and never block the copy
+
 ## Maintenance Experience
 
 Maintenance tools should be visible but calm. The UI should support:

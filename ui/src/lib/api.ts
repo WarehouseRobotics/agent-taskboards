@@ -8,6 +8,9 @@ import type {
   MaintenanceStorageReport,
   Project,
   ProjectActivityResponse,
+  Prompt,
+  PromptCategory,
+  PromptRestoreDefaultsResponse,
   SearchInput,
   SearchResponse,
   Task,
@@ -326,8 +329,114 @@ export const api = {
     return body;
   },
 
+  getTask: async (taskId: string) => {
+    const body = await request<{ task: Task }>(
+      `/api/tasks/${encodeURIComponent(taskId)}`,
+    );
+    return body.task;
+  },
+
   getTaskContext: async (taskId: string) =>
     request<TaskContext>(`/api/tasks/${encodeURIComponent(taskId)}/context`),
+
+  listPromptCategories: async () => {
+    const body = await request<{ categories: PromptCategory[] }>(
+      "/api/prompt-categories",
+    );
+    return body.categories;
+  },
+
+  createPromptCategory: async (input: {
+    name: string;
+    description?: string | null;
+  }) => {
+    const body = await request<{ category: PromptCategory }>(
+      "/api/prompt-categories",
+      { method: "POST", body: jsonBody(input) },
+    );
+    return body.category;
+  },
+
+  updatePromptCategory: async (
+    categoryId: string,
+    input: { name?: string; description?: string | null },
+  ) => {
+    const body = await request<{ category: PromptCategory }>(
+      `/api/prompt-categories/${encodeURIComponent(categoryId)}`,
+      { method: "PATCH", body: jsonBody(input) },
+    );
+    return body.category;
+  },
+
+  deletePromptCategory: async (categoryId: string) => {
+    const body = await request<{ category: PromptCategory }>(
+      `/api/prompt-categories/${encodeURIComponent(categoryId)}`,
+      { method: "DELETE" },
+    );
+    return body.category;
+  },
+
+  listPrompts: async (input: { categoryId?: string; q?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (input.categoryId) params.set("categoryId", input.categoryId);
+    if (input.q) params.set("q", input.q);
+    const query = params.toString();
+    const body = await request<{ prompts: Prompt[] }>(
+      `/api/prompts${query ? `?${query}` : ""}`,
+    );
+    return body.prompts;
+  },
+
+  getPrompt: async (promptId: string) => {
+    const body = await request<{ prompt: Prompt }>(
+      `/api/prompts/${encodeURIComponent(promptId)}`,
+    );
+    return body.prompt;
+  },
+
+  createPrompt: async (input: {
+    name: string;
+    body: string;
+    categoryIds?: string[];
+  }) => {
+    const body = await request<{ prompt: Prompt }>("/api/prompts", {
+      method: "POST",
+      body: jsonBody(input),
+    });
+    return body.prompt;
+  },
+
+  updatePrompt: async (
+    promptId: string,
+    input: { name?: string; body?: string; categoryIds?: string[] },
+  ) => {
+    const body = await request<{ prompt: Prompt }>(
+      `/api/prompts/${encodeURIComponent(promptId)}`,
+      { method: "PATCH", body: jsonBody(input) },
+    );
+    return body.prompt;
+  },
+
+  deletePrompt: async (promptId: string) => {
+    const body = await request<{ prompt: Prompt }>(
+      `/api/prompts/${encodeURIComponent(promptId)}`,
+      { method: "DELETE" },
+    );
+    return body.prompt;
+  },
+
+  recordPromptUse: async (promptId: string) => {
+    const body = await request<{ prompt: Prompt }>(
+      `/api/prompts/${encodeURIComponent(promptId)}/use`,
+      { method: "POST" },
+    );
+    return body.prompt;
+  },
+
+  restorePromptDefaults: async () =>
+    request<PromptRestoreDefaultsResponse>("/api/prompts/restore-defaults", {
+      method: "POST",
+    }),
 
   uploadTaskAttachment: async (taskId: string, file: File) => {
     const formData = new FormData();

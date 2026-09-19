@@ -154,6 +154,36 @@ export const commentCreateSchema = z.object({
   metadata: jsonObjectSchema.optional(),
 });
 
+// Prompt bodies keep meaningful leading/trailing whitespace, so validate
+// without transforming the value.
+const promptBodySchema = z
+  .string()
+  .refine((value) => value.trim().length > 0, {
+    message: "Body cannot be empty",
+  });
+
+export const promptCategoryCreateSchema = z.object({
+  name: requiredString,
+  description: nullableString.optional(),
+  metadata: jsonObjectSchema.optional(),
+});
+
+export const promptCategoryUpdateSchema = promptCategoryCreateSchema.partial();
+
+export const promptCreateSchema = z.object({
+  name: requiredString,
+  body: promptBodySchema,
+  categoryIds: z.array(requiredString).optional(),
+  metadata: jsonObjectSchema.optional(),
+});
+
+export const promptUpdateSchema = promptCreateSchema.partial();
+
+export const promptListQuerySchema = z.object({
+  categoryId: requiredString.optional(),
+  q: requiredString.optional(),
+});
+
 const indexedSearchSourceTypes = ["board", "task", "comment"] as const;
 
 export const searchSchema = z.object({
@@ -178,3 +208,8 @@ export type TaskMoveInput = z.infer<typeof taskMoveSchema>;
 export type CommentCreateInput = z.infer<typeof commentCreateSchema>;
 export type ActivityQuery = z.infer<typeof activityQuerySchema>;
 export type SearchInput = z.infer<typeof searchSchema>;
+export type PromptCategoryCreateInput = z.infer<typeof promptCategoryCreateSchema>;
+export type PromptCategoryUpdateInput = z.infer<typeof promptCategoryUpdateSchema>;
+export type PromptCreateInput = z.infer<typeof promptCreateSchema>;
+export type PromptUpdateInput = z.infer<typeof promptUpdateSchema>;
+export type PromptListQuery = z.infer<typeof promptListQuerySchema>;

@@ -4,6 +4,8 @@ import type {
   BoardColumn,
   JsonArray,
   Project,
+  Prompt,
+  PromptCategory,
   Task,
   TaskActivity,
   TaskAttachment,
@@ -198,6 +200,35 @@ export function serializeAgentAttachment(attachment: TaskAttachment) {
     contentType: attachment.contentType,
     sizeBytes: attachment.sizeBytes,
     createdAt: serializeDate(attachment.createdAt),
+  };
+}
+
+export function serializePromptCategory(category: PromptCategory) {
+  return {
+    id: category.id,
+    name: category.name,
+    description: category.description,
+    position: category.position,
+    defaultKey: category.defaultKey,
+    metadata: category.metadata,
+    createdAt: serializeDate(category.createdAt),
+    updatedAt: serializeDate(category.updatedAt),
+  };
+}
+
+export function serializePrompt(prompt: Prompt, categoryIds: string[]) {
+  return {
+    id: prompt.id,
+    name: prompt.name,
+    body: prompt.body,
+    position: prompt.position,
+    usageCount: prompt.usageCount,
+    lastUsedAt: serializeDate(prompt.lastUsedAt),
+    defaultKey: prompt.defaultKey,
+    metadata: prompt.metadata,
+    categoryIds,
+    createdAt: serializeDate(prompt.createdAt),
+    updatedAt: serializeDate(prompt.updatedAt),
   };
 }
 

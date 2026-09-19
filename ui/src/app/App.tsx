@@ -13,6 +13,7 @@ import { ActivityWorkspace } from "../features/activity";
 import { BoardWorkspace } from "../features/boards";
 import type { TaskMovePlan } from "../features/boards/board-selection";
 import { ProjectsWorkspace } from "../features/projects";
+import { PromptsWorkspace } from "../features/prompts";
 import { SearchWorkspace } from "../features/search";
 import { BoardSettingsPanel, SettingsWorkspace } from "../features/settings";
 import { MaintenanceWorkspace } from "../features/maintenance";
@@ -553,6 +554,7 @@ export function App() {
             projectTree={displayedProjectTree}
           />
         )}
+        {view === "prompts" && <PromptsWorkspace />}
         {view === "maintenance" && <MaintenanceWorkspace />}
         {view === "settings" && (
           <SettingsWorkspace

@@ -6,6 +6,7 @@ import { CheckpointService } from "./checkpoint-service.js";
 import { CommentService } from "./comment-service.js";
 import { MaintenanceService } from "./maintenance-service.js";
 import { ProjectService } from "./project-service.js";
+import { PromptService } from "./prompt-service.js";
 import { SearchService, type EmbeddingModel } from "./search-service.js";
 import { TaskService } from "./task-service.js";
 import type { TaskIdSuffixGenerator } from "./task-id.js";
@@ -20,6 +21,7 @@ export interface ApiServices {
   activity: ActivityService;
   search: SearchService;
   maintenance: MaintenanceService;
+  prompts: PromptService;
 }
 
 export type CreateServicesOptions = {
@@ -53,6 +55,7 @@ export function createServices(
     search,
   );
   const maintenance = new MaintenanceService(databaseClient);
+  const prompts = new PromptService(databaseClient);
 
   return {
     projects,
@@ -64,5 +67,6 @@ export function createServices(
     activity,
     search,
     maintenance,
+    prompts,
   };
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TaskAttachment } from "../../domain/types";
-import { appendImageAttachmentMarkdown, buildTaskReferenceText, filesFromClipboardData, isImageAttachment } from "./TaskDetail";
+import { buildTaskReferenceText } from "../../lib/task-reference";
+import { appendImageAttachmentMarkdown, filesFromClipboardData, isImageAttachment } from "./TaskDetail";
 
 describe("task reference helpers", () => {
   it("formats the visible task title and ID for copying", () => {

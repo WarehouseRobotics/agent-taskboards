@@ -734,6 +734,90 @@ archived task and comment content is available through direct archived reads,
 not semantic search. Comments inherit archive visibility from their parent task,
 board, and project when indexed.
 
+## Prompt Library
+
+Prompts and prompt categories are global resources for the prompt library and
+prompt picker UI. They are not scoped to projects or boards. See
+`docs/prompts.md` for the product behavior and token contract.
+
+### `GET /api/prompt-categories`
+
+Lists all categories ordered by `position`, then `name`.
+
+### `POST /api/prompt-categories`
+
+Creates a category. Names are free-form (emoji allowed) but must be unique;
+a duplicate name returns `409 invalid_state`.
+
+```json
+{
+  "name": "☂️ Umbrella",
+  "description": "optional"
+}
+```
+
+### `PATCH /api/prompt-categories/:categoryId`
+
+Updates `name` and/or `description`.
+
+### `DELETE /api/prompt-categories/:categoryId`
+
+Hard-deletes the category and its prompt links. Prompts survive and fall back
+to the root level.
+
+### `GET /api/prompts`
+
+Lists prompts ordered by `position`, then `name`. Each prompt includes its
+`categoryIds`. Query parameters:
+
+- `categoryId`: only prompts linked to that category.
+- `q`: case-insensitive substring match on name and body.
+
+### `POST /api/prompts`
+
+Creates a prompt. `categoryIds` is optional; an empty or missing list makes a
+root-level prompt.
+
+```json
+{
+  "name": "☂️ Umbrella Task Implement",
+  "body": "...prompt text with {{TASK}} tokens...",
+  "categoryIds": ["optional-category-id"]
+}
+```
+
+### `GET /api/prompts/:promptId`
+
+Returns one prompt with its `categoryIds`.
+
+### `PATCH /api/prompts/:promptId`
+
+Updates `name`, `body`, and/or `categoryIds`. When `categoryIds` is supplied
+it replaces the entire link set; when omitted, links are unchanged.
+
+### `DELETE /api/prompts/:promptId`
+
+Hard-deletes the prompt and its category links.
+
+### `POST /api/prompts/:promptId/use`
+
+Increments `usageCount`, sets `lastUsedAt`, and returns the prompt. The UI
+calls this when a prompt is copied from the prompt picker.
+
+### `POST /api/prompts/restore-defaults`
+
+Re-creates any missing default prompts and categories, keyed on their stable
+`defaultKey`. Existing rows — including edited defaults — are left untouched,
+so the call is idempotent.
+
+```json
+{
+  "restored": ["prompt:umbrella-implement"],
+  "categories": [],
+  "prompts": []
+}
+```
+
 ## Planned API Areas
 
 The following areas are documented as product direction but are not implemented
