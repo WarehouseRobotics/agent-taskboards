@@ -1,7 +1,7 @@
 import { ChangeEvent, ClipboardEvent as ReactClipboardEvent, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ActorType, Board, BoardColumn, TaskActivity, TaskAttachment, TaskComment, TaskContext } from "../../domain/types";
+import type { ActorType, Board, BoardColumn, Task, TaskActivity, TaskAttachment, TaskComment, TaskContext } from "../../domain/types";
 import { copyTextToClipboard } from "../../lib/clipboard";
 import { buildTaskReferenceText } from "../../lib/task-reference";
 import { apiMessage } from "../../lib/errors";
@@ -24,6 +24,13 @@ import {
 } from "./task-description-view";
 import { taskAutoSaveDelayMs } from "./task-auto-save";
 import { isOutsideTaskDetailSurfaces } from "./task-detail-surfaces";
+import {
+  buildMetadataRows,
+  collectTaskIdCandidates,
+  type MetadataAtom,
+  type MetadataRow,
+} from "./task-metadata";
+import { useMetadataTaskLinks, type MetadataTaskLink } from "./task-metadata-links";
 
 interface TaskEditFields {
   description: string;
@@ -112,6 +119,7 @@ function isInteractivePreviewTarget(target: EventTarget | null) {
 export function TaskDetail({
   autoSaveTaskChanges,
   boards,
+  boardTasks,
   columns,
   companionPanelRef,
   context,
@@ -123,6 +131,7 @@ export function TaskDetail({
   onDeleteTaskAttachment,
   onMoveTask,
   onMoveTaskToBoard,
+  onNavigateToTask,
   onPostComment,
   onTaskDraftChange,
   onTogglePromptPicker,
@@ -132,6 +141,7 @@ export function TaskDetail({
 }: {
   autoSaveTaskChanges: boolean;
   boards: Board[];
+  boardTasks: Task[];
   columns: BoardColumn[];
   companionPanelRef?: RefObject<HTMLElement | null>;
   context?: TaskContext;
@@ -143,6 +153,7 @@ export function TaskDetail({
   onDeleteTaskAttachment: (taskId: string, attachmentId: string) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onMoveTaskToBoard: (taskId: string, boardId: string) => Promise<boolean>;
+  onNavigateToTask: (projectId: string, boardId: string, taskId: string) => void;
   onPostComment: (taskId: string, body: string) => Promise<void>;
   onTaskDraftChange: (taskId: string, fields: { title?: string; description?: string | null; labels?: string[] } | null) => void;
   onTogglePromptPicker?: () => void;
@@ -479,6 +490,12 @@ export function TaskDetail({
     document.addEventListener("pointerdown", handleOutsidePointerDown, true);
     return () => document.removeEventListener("pointerdown", handleOutsidePointerDown, true);
   }, [companionPanelRef, hasPendingChanges, onClose, pendingDeleteComment, showDetailToast, taskId]);
+
+  // Metadata rows render below the built-in properties; both hooks run on
+  // every render so they stay above the loading and missing-context returns.
+  const metadataRows = useMemo(() => buildMetadataRows(task?.metadata), [task?.metadata]);
+  const metadataTaskIds = useMemo(() => collectTaskIdCandidates(metadataRows), [metadataRows]);
+  const metadataTaskLinks = useMetadataTaskLinks(metadataTaskIds, boardTasks);
 
   if (loading && !context) {
     return (
@@ -1067,6 +1084,14 @@ export function TaskDetail({
           <strong className="detail-labels">
             {task.labels.length ? task.labels.map((label) => <LabelChip key={label} label={label} />) : "none"}
           </strong>
+          {metadataRows.map((row) => (
+            <MetadataProperty
+              key={row.key}
+              links={metadataTaskLinks}
+              onNavigateToTask={onNavigateToTask}
+              row={row}
+            />
+          ))}
           <span>API</span>
           <code>GET /api/tasks/{task.id}/context</code>
         </div>
@@ -1193,6 +1218,76 @@ function TimelineEntry({
         </div>
       </div>
     </div>
+  );
+}
+
+// One metadata key and its value(s). Rendered as a fragment so the pair drops
+// straight into the Properties grid alongside the built-in rows.
+function MetadataProperty({
+  links,
+  onNavigateToTask,
+  row,
+}: {
+  links: Map<string, MetadataTaskLink>;
+  onNavigateToTask: (projectId: string, boardId: string, taskId: string) => void;
+  row: MetadataRow;
+}) {
+  return (
+    <>
+      <span className="prop-grid__meta-key">{row.key}</span>
+      {row.kind === "json" ? (
+        <details className="prop-meta-json">
+          {/* Collapsed by default: a nested object can be long enough to push
+              everything below it out of the rail. */}
+          <summary>{(row.json ?? "").replace(/\s+/g, " ")}</summary>
+          <pre>{row.json}</pre>
+        </details>
+      ) : row.empty ? (
+        <strong className="prop-meta-empty">&mdash;</strong>
+      ) : (
+        <strong className="prop-meta-values">
+          {row.atoms.map((atom, index) => (
+            <MetadataValue
+              atom={atom}
+              key={`${atom.text}-${index}`}
+              link={links.get(atom.text)}
+              onNavigateToTask={onNavigateToTask}
+            />
+          ))}
+        </strong>
+      )}
+    </>
+  );
+}
+
+function MetadataValue({
+  atom,
+  link,
+  onNavigateToTask,
+}: {
+  atom: MetadataAtom;
+  link: MetadataTaskLink | undefined;
+  onNavigateToTask: (projectId: string, boardId: string, taskId: string) => void;
+}) {
+  if (atom.kind === "taskId" && link) {
+    return (
+      <button
+        className="prop-meta-link"
+        onClick={() => onNavigateToTask(link.projectId, link.boardId, link.taskId)}
+        title={link.taskId}
+        type="button"
+      >
+        {link.title || link.taskId}
+      </button>
+    );
+  }
+
+  // Either an ordinary value, or an id-shaped one whose task could not be
+  // reached. Keeping the raw text visible means it stays copy-pasteable.
+  return (
+    <span className={atom.kind === "taskId" ? "prop-meta-value prop-meta-value--id" : "prop-meta-value"}>
+      {atom.text}
+    </span>
   );
 }
 

@@ -60,6 +60,7 @@ export function BoardWorkspace({
   onMoveTask,
   onMoveTaskToBoard,
   onMoveTasks,
+  onNavigateToTask,
   onOpenCreateTask,
   onOpenProjectActivity,
   onOpenSettings,
@@ -103,6 +104,7 @@ export function BoardWorkspace({
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onMoveTaskToBoard: (taskId: string, boardId: string) => Promise<boolean>;
   onMoveTasks: (moves: TaskMovePlan[]) => Promise<boolean>;
+  onNavigateToTask: (projectId: string, boardId: string, taskId: string) => void;
   onOpenCreateTask: (columnId: string | null) => void;
   onOpenProjectActivity: () => void;
   onOpenSettings: () => void;
@@ -562,6 +564,7 @@ export function BoardWorkspace({
             <TaskDetail
               autoSaveTaskChanges={autoSaveTaskChanges}
               boards={activeProjectBoards}
+              boardTasks={tasks}
               columns={columns}
               companionPanelRef={promptPickerPanelRef}
               context={activeTaskContext}
@@ -573,6 +576,7 @@ export function BoardWorkspace({
               onDeleteTaskAttachment={deleteTaskAttachmentPreservingScroll}
               onMoveTask={moveTaskPreservingScroll}
               onMoveTaskToBoard={onMoveTaskToBoard}
+              onNavigateToTask={onNavigateToTask}
               onPostComment={postCommentPreservingScroll}
               onTaskDraftChange={onTaskDraftChange}
               onTogglePromptPicker={() => setPromptPickerOpen((current) => !current)}

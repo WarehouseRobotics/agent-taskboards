@@ -45,10 +45,18 @@ change:
 1. A parent id in the task's metadata: `parentTaskId` first, then the older
    `parentTask`, `umbrellaTaskId`, and `umbrella` keys. The value must be a
    bare task id; a title or flag falls through to the next step.
-2. The first description line that mentions "umbrella" (case-insensitive) and
+2. The first description line that starts with a parent label:
+   `Umbrella task:`, `Umbrella:`, `Parent task:`, or `Parent:`. Labels are
+   case-insensitive and may be preceded by markdown list, quote, or bold
+   decoration, but not by prose — `part of the umbrella: x` does not match.
+   An `id=...` reference on the label line wins; otherwise the rest of the
+   line must be a bare task id of at most 96 characters, after stripping
+   surrounding backticks, quotes, and brackets and trailing `.,;:`. A label
+   followed by a title or a sentence falls through to the next step.
+3. The first description line that mentions "umbrella" (case-insensitive) and
    contains an `id=...` reference.
-3. The first `id=...` reference anywhere in the description.
-4. Otherwise unresolved.
+4. The first `id=...` reference anywhere in the description.
+5. Otherwise unresolved.
 
 Self references are skipped. If the parent id resolves but the task cannot be
 fetched, the token renders as `( id=<id> )` so the pasted prompt is still

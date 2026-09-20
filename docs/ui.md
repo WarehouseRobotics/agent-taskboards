@@ -61,6 +61,7 @@ Task detail should preserve enough context for humans and agents to coordinate:
 - comments for progress notes and handoffs
 - activity entries for important state changes
 - stable task ID visible enough for API or script usage
+- open-ended task metadata, shown read-only in the Properties section
 - related search results when useful
 
 The task detail surface is an editing workspace, not just a read-only property
@@ -75,6 +76,14 @@ Attachments are listed in the task detail panel with filename, size, and a link
 to the stored upload. Attachments whose `contentType` starts with `image/`
 should render a small thumbnail from the original uploaded file URL; no separate
 thumbnail-generation flow is required for v1.
+
+Task metadata is agent-authored and open-ended, so the Properties section
+renders whatever keys a task carries, in the order they were written and under
+their exact key names. Values that name another task resolve to that task's
+title and link to it; an id that cannot be resolved stays visible as plain
+text. Lists render one value per entry and nested objects collapse behind a
+disclosure. Metadata is read-only in the UI: it is written through the API.
+A task without metadata looks exactly as it did before.
 
 Comments should be treated as durable task memory, not disposable chat.
 

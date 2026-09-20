@@ -465,6 +465,9 @@ export function App() {
               });
             }}
             onMoveTasks={moveTasks}
+            onNavigateToTask={(projectId, boardId, taskId) =>
+              navigate({ view: "board", projectId, boardId, taskId })
+            }
             onOpenCreateTask={(columnId) => setNewTaskColumnId(columnId)}
             onOpenProjectActivity={() =>
               navigate({
