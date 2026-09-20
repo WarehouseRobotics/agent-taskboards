@@ -184,6 +184,12 @@ export const promptListQuerySchema = z.object({
   q: requiredString.optional(),
 });
 
+// Shared by prompt and prompt-category reordering. `position` counts the list
+// with the moved row taken out, so it is never larger than the sibling count.
+export const promptReorderSchema = z.object({
+  position: z.number().int().min(0),
+});
+
 const indexedSearchSourceTypes = ["board", "task", "comment"] as const;
 
 export const searchSchema = z.object({
@@ -213,3 +219,4 @@ export type PromptCategoryUpdateInput = z.infer<typeof promptCategoryUpdateSchem
 export type PromptCreateInput = z.infer<typeof promptCreateSchema>;
 export type PromptUpdateInput = z.infer<typeof promptUpdateSchema>;
 export type PromptListQuery = z.infer<typeof promptListQuerySchema>;
+export type PromptReorderInput = z.infer<typeof promptReorderSchema>;

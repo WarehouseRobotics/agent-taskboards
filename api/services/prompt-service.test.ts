@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createDatabaseClient, type DatabaseClient } from "../db/client.js";
 import { runMigrations } from "../db/migrate.js";
@@ -32,6 +33,14 @@ describe("PromptService", () => {
     client.close();
     rmSync(tmpDir, { recursive: true, force: true });
   });
+
+  const promptIds = () => service.listPrompts().map(({ prompt }) => prompt.id);
+
+  const expectContiguousPromptPositions = () => {
+    expect(
+      service.listPrompts().map(({ prompt }) => prompt.position),
+    ).toEqual(service.listPrompts().map((_, index) => index));
+  };
 
   it("seeds defaults from the migration that match default-prompts.ts", () => {
     const categories = service.listCategories();
@@ -193,6 +202,90 @@ describe("PromptService", () => {
     expect(once.prompt.usageCount).toBe(1);
     expect(twice.prompt.usageCount).toBe(2);
     expect(twice.prompt.lastUsedAt).toBeInstanceOf(Date);
+  });
+
+  it("reorders a prompt within the single global order", () => {
+    const first = service.createPrompt({ name: "First", body: "body" }).prompt;
+    const second = service.createPrompt({ name: "Second", body: "body" }).prompt;
+    const seeded = promptIds().filter(
+      (id) => id !== first.id && id !== second.id,
+    );
+
+    service.reorderPrompt(second.id, 0);
+    expect(promptIds()).toEqual([second.id, ...seeded, first.id]);
+    expectContiguousPromptPositions();
+
+    // Past the end clamps instead of leaving a hole.
+    service.reorderPrompt(second.id, 99);
+    expect(promptIds()).toEqual([...seeded, first.id, second.id]);
+    expectContiguousPromptPositions();
+  });
+
+  it("gives the moved prompt the target's slot when dragging downwards", () => {
+    const ids = promptIds();
+    const [top, , third] = ids;
+
+    // `position` counts the list without the moved row, so dropping the top
+    // prompt onto the third one lands on the third slot, not the second.
+    service.reorderPrompt(top, ids.indexOf(third));
+
+    expect(promptIds()).toEqual([ids[1], third, top, ...ids.slice(3)]);
+  });
+
+  it("renormalizes gapped positions on the first reorder", () => {
+    const ids = promptIds();
+    for (const [index, gapped] of [0, 2, 7].entries()) {
+      client.db
+        .update(prompts)
+        .set({ position: gapped })
+        .where(eq(prompts.id, ids[index]))
+        .run();
+    }
+
+    service.reorderPrompt(ids[2], 0);
+
+    expect(promptIds()).toEqual([ids[2], ids[0], ids[1]]);
+    expectContiguousPromptPositions();
+  });
+
+  it("leaves usage counters untouched when reordering", () => {
+    const created = service.createPrompt({ name: "Unused", body: "body" }).prompt;
+    service.recordPromptUse(created.id);
+    const before = service.getPrompt(created.id).prompt;
+
+    const after = service.reorderPrompt(created.id, 0).prompt;
+
+    expect(after.usageCount).toBe(before.usageCount);
+    expect(after.lastUsedAt).toEqual(before.lastUsedAt);
+  });
+
+  it("reorders categories independently of prompts", () => {
+    const category = service.createCategory({ name: "🚀 Release" });
+    const seeded = service
+      .listCategories()
+      .filter((item) => item.id !== category.id)
+      .map((item) => item.id);
+    const promptOrderBefore = promptIds();
+
+    service.reorderCategory(category.id, 0);
+
+    expect(service.listCategories().map((item) => item.id)).toEqual([
+      category.id,
+      ...seeded,
+    ]);
+    expect(
+      service.listCategories().map((item) => item.position),
+    ).toEqual([0, ...seeded.map((_, index) => index + 1)]);
+    expect(promptIds()).toEqual(promptOrderBefore);
+  });
+
+  it("rejects reordering an unknown prompt or category", () => {
+    expect(() => service.reorderPrompt("missing-prompt", 0)).toThrowError(
+      ApiError,
+    );
+    expect(() => service.reorderCategory("missing-category", 0)).toThrowError(
+      ApiError,
+    );
   });
 
   it("restores deleted defaults idempotently", () => {

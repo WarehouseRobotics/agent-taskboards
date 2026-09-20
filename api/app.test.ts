@@ -201,6 +201,69 @@ describe("starter API", () => {
     expect(promptAfterCategoryDelete.status).toBe(200);
   });
 
+  it("reorders prompts and prompt categories through the REST routes", async () => {
+    const promptIds = async () =>
+      arrayProp((await api("GET", "/api/prompts")).body, "prompts").map((item) =>
+        stringProp(asObject(item), "id"),
+      );
+
+    const seeded = await promptIds();
+    expect(seeded).toHaveLength(3);
+
+    const moved = await api("POST", `/api/prompts/${seeded[2]}/reorder`, {
+      position: 0,
+    });
+    expect(moved.status).toBe(200);
+    expect(numberProp(objectProp(moved.body, "prompt"), "position")).toBe(0);
+    expect(await promptIds()).toEqual([seeded[2], seeded[0], seeded[1]]);
+
+    // `position` counts the list without the moved prompt, so this lands on
+    // the last slot rather than one before it.
+    await api("POST", `/api/prompts/${seeded[2]}/reorder`, { position: 2 });
+    expect(await promptIds()).toEqual([seeded[0], seeded[1], seeded[2]]);
+
+    const categoryIds = async () =>
+      arrayProp(
+        (await api("GET", "/api/prompt-categories")).body,
+        "categories",
+      ).map((item) => stringProp(asObject(item), "id"));
+
+    const seededCategories = await categoryIds();
+    const category = await api("POST", "/api/prompt-categories", {
+      name: "🚀 Release",
+    });
+    const categoryId = stringProp(objectProp(category.body, "category"), "id");
+    const reorderedCategory = await api(
+      "POST",
+      `/api/prompt-categories/${categoryId}/reorder`,
+      { position: 0 },
+    );
+    expect(reorderedCategory.status).toBe(200);
+    expect(await categoryIds()).toEqual([categoryId, ...seededCategories]);
+
+    const negative = await api("POST", `/api/prompts/${seeded[0]}/reorder`, {
+      position: -1,
+    });
+    expect(negative.status).toBe(400);
+
+    const fractional = await api("POST", `/api/prompts/${seeded[0]}/reorder`, {
+      position: 1.5,
+    });
+    expect(fractional.status).toBe(400);
+
+    const missingPrompt = await api("POST", "/api/prompts/not-a-prompt/reorder", {
+      position: 0,
+    });
+    expect(missingPrompt.status).toBe(404);
+
+    const missingCategory = await api(
+      "POST",
+      "/api/prompt-categories/not-a-category/reorder",
+      { position: 0 },
+    );
+    expect(missingCategory.status).toBe(404);
+  });
+
   it("creates projects, boards with default columns, tasks, comments, and context", async () => {
     const projectResponse = await api("POST", "/api/projects", {
       name: "agent-taskboards",

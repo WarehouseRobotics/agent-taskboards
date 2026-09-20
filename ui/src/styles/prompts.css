@@ -139,6 +139,56 @@
   gap: var(--s-1);
 }
 
+/* Reorder affordances. The drop indicator is an inset top border on the row
+   under the pointer, so the list never reflows while a drag is in flight. */
+.prompt-row-drag,
+.prompts-rail__drag {
+  position: relative;
+  display: flex;
+  border-radius: var(--r-md);
+}
+
+/* A button's `auto` width is fit-content even when it is a block, so the
+   wrapped row has to be stretched explicitly or it collapses to its text. */
+.prompt-row-drag > .prompt-row,
+.prompts-rail__drag > .prompts-rail__item {
+  flex: 1;
+  min-width: 0;
+}
+
+.prompt-row-drag--dragging,
+.prompts-rail__drag--dragging,
+.prompt-picker__row--dragging {
+  opacity: 0.45;
+}
+
+.prompt-row-drag--drop-before::before,
+.prompt-row-drag--drop-after::before,
+.prompts-rail__drag--drop-before::before,
+.prompts-rail__drag--drop-after::before,
+.prompt-picker__row--drop-before::before,
+.prompt-picker__row--drop-after::before {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  content: "";
+}
+
+.prompt-row-drag--drop-before::before,
+.prompts-rail__drag--drop-before::before,
+.prompt-picker__row--drop-before::before {
+  top: -2px;
+}
+
+.prompt-row-drag--drop-after::before,
+.prompts-rail__drag--drop-after::before,
+.prompt-picker__row--drop-after::before {
+  bottom: -2px;
+}
+
 .prompt-row {
   display: flex;
   align-items: baseline;
@@ -287,6 +337,7 @@
 }
 
 .prompt-picker__row {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

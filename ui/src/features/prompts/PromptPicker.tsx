@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type RefObject,
+} from "react";
 import { Icon, InlineError, Mono, SkeletonRows } from "../../components/ui";
 import type { Prompt, Task } from "../../domain/types";
 import { api } from "../../lib/api";
@@ -13,6 +20,7 @@ import {
   recentPromptGroupKey,
   recentPrompts,
 } from "./prompt-library-view";
+import { dropEdge, planReorder, promptDragType } from "./prompt-reorder";
 import { renderPromptBody, type PromptTokenValues } from "./prompt-tokens";
 import { usePromptLibrary } from "./usePromptLibrary";
 
@@ -37,6 +45,8 @@ export function PromptPicker({
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
   const [copiedRowKey, setCopiedRowKey] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
+  const [draggingPromptId, setDraggingPromptId] = useState<string | null>(null);
+  const [dropTargetRowKey, setDropTargetRowKey] = useState<string | null>(null);
   const [parentTaskValue, setParentTaskValue] = useState<string | null>(null);
   const copiedBlinkTimeout = useRef<number | null>(null);
 
@@ -143,17 +153,82 @@ export function PromptPicker({
     [filteredPrompts, library.categories],
   );
 
-  const renderRow = (prompt: Prompt, groupKey: string) => {
+  // Dragging writes the library's one global order, so it is suppressed while
+  // the filter hides rows: the resulting order would be hard to predict.
+  const reorderEnabled = !query.trim();
+
+  const dragProps = (promptId: string, rowKey: string) => ({
+    draggable: true,
+    onDragStart: (event: DragEvent<HTMLElement>) => {
+      event.dataTransfer.setData(promptDragType, promptId);
+      event.dataTransfer.effectAllowed = "move";
+      setDraggingPromptId(promptId);
+    },
+    onDragEnd: () => {
+      setDraggingPromptId(null);
+      setDropTargetRowKey(null);
+    },
+    onDragOver: (event: DragEvent<HTMLElement>) => {
+      if (!event.dataTransfer.types.includes(promptDragType)) {
+        return;
+      }
+      event.preventDefault();
+      setDropTargetRowKey(rowKey);
+    },
+    onDragLeave: () => {
+      setDropTargetRowKey((current) => (current === rowKey ? null : current));
+    },
+    onDrop: (event: DragEvent<HTMLElement>) => {
+      const draggedId = event.dataTransfer.getData(promptDragType);
+      if (!draggedId) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      setDraggingPromptId(null);
+      setDropTargetRowKey(null);
+      const plan = planReorder({
+        ids: library.prompts.map((item) => item.id),
+        draggedId,
+        targetId: promptId,
+      });
+      if (plan) {
+        void library.reorderPrompt(plan.id, plan.position);
+      }
+    },
+  });
+
+  const renderRow = (
+    prompt: Prompt,
+    groupKey: string,
+    reorderable = reorderEnabled,
+  ) => {
     const rowKey = promptRowKey(groupKey, prompt.id);
     const copied = copiedRowKey === rowKey;
     const expanded = expandedRowKey === rowKey;
+    const classNames = ["prompt-picker__row"];
+    if (copied) {
+      classNames.push("prompt-picker__row--copied");
+    }
+    if (reorderable && draggingPromptId === prompt.id) {
+      classNames.push("prompt-picker__row--dragging");
+    }
+    if (reorderable && dropTargetRowKey === rowKey) {
+      const edge = dropEdge(
+        library.prompts.map((item) => item.id),
+        draggingPromptId,
+        prompt.id,
+      );
+      if (edge) {
+        classNames.push(`prompt-picker__row--drop-${edge}`);
+      }
+    }
 
     return (
       <div
-        className={
-          copied ? "prompt-picker__row prompt-picker__row--copied" : "prompt-picker__row"
-        }
+        className={classNames.join(" ")}
         key={rowKey}
+        {...(reorderable ? dragProps(prompt.id, rowKey) : {})}
       >
         <button
           className="prompt-picker__copy"
@@ -232,7 +307,9 @@ export function PromptPicker({
         {recent.length > 0 && (
           <section className="prompt-picker__group">
             <h3>Recent</h3>
-            {recent.map((prompt) => renderRow(prompt, recentPromptGroupKey))}
+            {recent.map((prompt) =>
+              renderRow(prompt, recentPromptGroupKey, false),
+            )}
           </section>
         )}
         {groups.map((group) => (

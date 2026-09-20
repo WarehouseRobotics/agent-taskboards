@@ -89,6 +89,37 @@ export class PromptService {
     return category;
   }
 
+  reorderCategory(categoryId: string, position: number) {
+    this.getCategory(categoryId);
+
+    this.db.transaction((tx) => {
+      const rows = tx
+        .select({ id: promptCategories.id, position: promptCategories.position })
+        .from(promptCategories)
+        .orderBy(asc(promptCategories.position), asc(promptCategories.name))
+        .all();
+
+      const ordered = orderWithMovedId(
+        rows.map((row) => row.id),
+        categoryId,
+        position,
+      );
+
+      for (const [index, id] of ordered.entries()) {
+        if (rows.find((row) => row.id === id)?.position === index) {
+          continue;
+        }
+        tx
+          .update(promptCategories)
+          .set({ position: index })
+          .where(eq(promptCategories.id, id))
+          .run();
+      }
+    });
+
+    return this.getCategory(categoryId);
+  }
+
   listPrompts(query: PromptListQuery = {}): PromptWithCategories[] {
     let rows = this.db
       .select()
@@ -192,6 +223,39 @@ export class PromptService {
     const existing = this.getPrompt(promptId);
     this.db.delete(prompts).where(eq(prompts.id, promptId)).run();
     return existing;
+  }
+
+  // Prompts carry one global order. A category view is a projection of it, so
+  // reordering from inside a category still rewrites the single list.
+  reorderPrompt(promptId: string, position: number): PromptWithCategories {
+    this.getPrompt(promptId);
+
+    this.db.transaction((tx) => {
+      const rows = tx
+        .select({ id: prompts.id, position: prompts.position })
+        .from(prompts)
+        .orderBy(asc(prompts.position), asc(prompts.name))
+        .all();
+
+      const ordered = orderWithMovedId(
+        rows.map((row) => row.id),
+        promptId,
+        position,
+      );
+
+      for (const [index, id] of ordered.entries()) {
+        if (rows.find((row) => row.id === id)?.position === index) {
+          continue;
+        }
+        tx
+          .update(prompts)
+          .set({ position: index })
+          .where(eq(prompts.id, id))
+          .run();
+      }
+    });
+
+    return this.getPrompt(promptId);
   }
 
   recordPromptUse(promptId: string): PromptWithCategories {
@@ -408,4 +472,14 @@ export class PromptService {
       throw new ApiError(409, "invalid_state", "Prompt category name already exists");
     }
   }
+}
+
+// `position` is resolved against the list with the moved row already taken
+// out, so dropping onto a row takes that row's slot whether the drag went up
+// or down. Writing the whole list back as 0..n-1 also heals the gaps that
+// deletes and restore-defaults leave behind.
+function orderWithMovedId(ids: string[], movedId: string, position: number) {
+  const rest = ids.filter((id) => id !== movedId);
+  rest.splice(Math.max(0, Math.min(position, rest.length)), 0, movedId);
+  return rest;
 }

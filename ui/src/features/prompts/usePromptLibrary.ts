@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Prompt, PromptCategory } from "../../domain/types";
 import { api } from "../../lib/api";
 import { apiMessage } from "../../lib/errors";
+import { reorderItems } from "./prompt-reorder";
 
 export interface PromptLibrary {
   categories: PromptCategory[];
@@ -21,6 +22,8 @@ export interface PromptLibrary {
     input: { name?: string; body?: string; categoryIds?: string[] },
   ) => Promise<Prompt>;
   deletePrompt: (promptId: string) => Promise<void>;
+  reorderPrompt: (promptId: string, position: number) => Promise<void>;
+  reorderCategory: (categoryId: string, position: number) => Promise<void>;
   recordPromptUse: (promptId: string) => Promise<void>;
   restoreDefaults: () => Promise<string[]>;
 }
@@ -30,6 +33,13 @@ export function usePromptLibrary(): PromptLibrary {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Reordering reads the current list without re-creating its callback on
+  // every load, so the drag handlers keep a stable identity.
+  const categoriesRef = useRef<PromptCategory[]>([]);
+  const promptsRef = useRef<Prompt[]>([]);
+  categoriesRef.current = categories;
+  promptsRef.current = prompts;
 
   const reload = useCallback(async () => {
     setError(null);
@@ -109,6 +119,39 @@ export function usePromptLibrary(): PromptLibrary {
     [reload],
   );
 
+  // Both reorders paint the new order locally first so the dragged row does
+  // not snap back, then reconcile against the server's renormalized
+  // positions. A failed call restores the pre-drag order.
+  const reorderPrompt = useCallback(
+    async (promptId: string, position: number) => {
+      const previous = promptsRef.current;
+      setPrompts(reorderItems(previous, promptId, position));
+      try {
+        await api.reorderPrompt(promptId, position);
+        await reload();
+      } catch (cause) {
+        setPrompts(previous);
+        setError(apiMessage(cause));
+      }
+    },
+    [reload],
+  );
+
+  const reorderCategory = useCallback(
+    async (categoryId: string, position: number) => {
+      const previous = categoriesRef.current;
+      setCategories(reorderItems(previous, categoryId, position));
+      try {
+        await api.reorderPromptCategory(categoryId, position);
+        await reload();
+      } catch (cause) {
+        setCategories(previous);
+        setError(apiMessage(cause));
+      }
+    },
+    [reload],
+  );
+
   const recordPromptUse = useCallback(async (promptId: string) => {
     const prompt = await api.recordPromptUse(promptId);
     setPrompts((current) =>
@@ -135,6 +178,8 @@ export function usePromptLibrary(): PromptLibrary {
     createPrompt,
     updatePrompt,
     deletePrompt,
+    reorderPrompt,
+    reorderCategory,
     recordPromptUse,
     restoreDefaults,
   };

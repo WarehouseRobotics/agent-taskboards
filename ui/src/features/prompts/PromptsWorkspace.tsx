@@ -1,4 +1,9 @@
-import { useMemo, useState } from "react";
+import {
+  useMemo,
+  useState,
+  type DragEvent,
+  type KeyboardEvent,
+} from "react";
 import { ConfirmDialog, Topbar } from "../../components/layout";
 import {
   Button,
@@ -12,6 +17,13 @@ import type { Prompt } from "../../domain/types";
 import { apiMessage } from "../../lib/errors";
 import { formatDate } from "../../lib/format";
 import { promptCountByCategory } from "./prompt-library-view";
+import {
+  dropEdge,
+  planAdjacentReorder,
+  planReorder,
+  promptCategoryDragType,
+  promptDragType,
+} from "./prompt-reorder";
 import { usePromptLibrary } from "./usePromptLibrary";
 
 type PromptFilter =
@@ -39,6 +51,8 @@ export function PromptsWorkspace() {
   const [categoryNameDraft, setCategoryNameDraft] = useState<string | null>(null);
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   const counts = useMemo(
     () => promptCountByCategory(library.prompts),
@@ -241,6 +255,113 @@ export function PromptsWorkspace() {
     }
   };
 
+  // Prompts carry one global order, so a drop inside a category view is
+  // resolved against the full list, never against the filtered rows.
+  const orderedIds = (kind: "prompt" | "category") =>
+    kind === "prompt"
+      ? library.prompts.map((prompt) => prompt.id)
+      : library.categories.map((category) => category.id);
+
+  const applyPlan = (
+    kind: "prompt" | "category",
+    plan: { id: string; position: number } | null,
+  ) => {
+    if (!plan) {
+      return;
+    }
+    if (kind === "prompt") {
+      void library.reorderPrompt(plan.id, plan.position);
+    } else {
+      void library.reorderCategory(plan.id, plan.position);
+    }
+  };
+
+  const reorderTo = (
+    kind: "prompt" | "category",
+    draggedId: string,
+    targetId: string,
+  ) => {
+    const plan = planReorder({ ids: orderedIds(kind), draggedId, targetId });
+    applyPlan(kind, plan);
+  };
+
+  const dragProps = (kind: "prompt" | "category", id: string) => {
+    const dragType = kind === "prompt" ? promptDragType : promptCategoryDragType;
+    return {
+      draggable: true,
+      onDragStart: (event: DragEvent<HTMLElement>) => {
+        event.dataTransfer.setData(dragType, id);
+        event.dataTransfer.effectAllowed = "move";
+        setDraggingId(id);
+      },
+      onDragEnd: () => {
+        setDraggingId(null);
+        setDropTargetId(null);
+      },
+      onDragOver: (event: DragEvent<HTMLElement>) => {
+        if (!event.dataTransfer.types.includes(dragType)) {
+          return;
+        }
+        event.preventDefault();
+        setDropTargetId(id);
+      },
+      onDragLeave: () => {
+        setDropTargetId((current) => (current === id ? null : current));
+      },
+      onDrop: (event: DragEvent<HTMLElement>) => {
+        const draggedId = event.dataTransfer.getData(dragType);
+        if (!draggedId) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        setDraggingId(null);
+        setDropTargetId(null);
+        reorderTo(kind, draggedId, id);
+      },
+    };
+  };
+
+  const rowClassName = (
+    base: string,
+    kind: "prompt" | "category",
+    id: string,
+  ) => {
+    const classes = [base];
+    if (draggingId === id) {
+      classes.push(`${base}--dragging`);
+    }
+    if (dropTargetId === id) {
+      const edge = dropEdge(orderedIds(kind), draggingId, id);
+      if (edge) {
+        classes.push(`${base}--drop-${edge}`);
+      }
+    }
+    return classes.join(" ");
+  };
+
+  // Alt+Arrow is the pointer-free path to the same reorder, stepping one
+  // visible row at a time.
+  const reorderByKeyboard = (
+    kind: "prompt" | "category",
+    id: string,
+    event: KeyboardEvent<HTMLElement>,
+  ) => {
+    if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) {
+      return;
+    }
+    const ids = orderedIds(kind);
+    const plan = planAdjacentReorder({
+      ids,
+      visibleIds:
+        kind === "prompt" ? visiblePrompts.map((prompt) => prompt.id) : ids,
+      id,
+      delta: event.key === "ArrowUp" ? -1 : 1,
+    });
+    event.preventDefault();
+    applyPlan(kind, plan);
+  };
+
   const pendingDeleteCategory =
     pendingDeleteCategoryId !== null
       ? library.categories.find((category) => category.id === pendingDeleteCategoryId) ?? null
@@ -322,13 +443,20 @@ export function PromptsWorkspace() {
               onClick={() => setFilter({ type: "root" })}
             />
             {library.categories.map((category) => (
-              <PromptFilterItem
-                active={filter.type === "category" && filter.categoryId === category.id}
-                count={counts.get(category.id) ?? 0}
+              <div
+                className={rowClassName("prompts-rail__drag", "category", category.id)}
                 key={category.id}
-                label={category.name}
-                onClick={() => setFilter({ type: "category", categoryId: category.id })}
-              />
+                {...dragProps("category", category.id)}
+              >
+                <PromptFilterItem
+                  active={filter.type === "category" && filter.categoryId === category.id}
+                  count={counts.get(category.id) ?? 0}
+                  label={category.name}
+                  onClick={() => setFilter({ type: "category", categoryId: category.id })}
+                  onKeyDown={(event) => reorderByKeyboard("category", category.id, event)}
+                  title="Drag or press Alt+Up/Down to reorder"
+                />
+              </div>
             ))}
           </nav>
         </aside>
@@ -397,26 +525,36 @@ export function PromptsWorkspace() {
           )}
           <div className="prompts-list__items">
             {visiblePrompts.map((prompt) => (
-              <button
-                className={
-                  draft?.promptId === prompt.id
-                    ? "prompt-row prompt-row--active"
-                    : "prompt-row"
-                }
+              // The row is dragged by its wrapper: browsers handle a
+              // draggable <button> inconsistently, and the button stays the
+              // click and focus target.
+              <div
+                className={rowClassName("prompt-row-drag", "prompt", prompt.id)}
                 key={prompt.id}
-                onClick={() => openPrompt(prompt)}
-                type="button"
+                {...dragProps("prompt", prompt.id)}
               >
-                <span className="prompt-row__name">{prompt.name}</span>
-                <span className="prompt-row__meta">
-                  {prompt.usageCount > 0 && (
-                    <Mono faded>
-                      used {prompt.usageCount}× · {formatDate(prompt.lastUsedAt)}
-                    </Mono>
-                  )}
-                  {prompt.usageCount === 0 && <Mono faded>never used</Mono>}
-                </span>
-              </button>
+                <button
+                  className={
+                    draft?.promptId === prompt.id
+                      ? "prompt-row prompt-row--active"
+                      : "prompt-row"
+                  }
+                  onClick={() => openPrompt(prompt)}
+                  onKeyDown={(event) => reorderByKeyboard("prompt", prompt.id, event)}
+                  title="Drag or press Alt+Up/Down to reorder"
+                  type="button"
+                >
+                  <span className="prompt-row__name">{prompt.name}</span>
+                  <span className="prompt-row__meta">
+                    {prompt.usageCount > 0 && (
+                      <Mono faded>
+                        used {prompt.usageCount}× · {formatDate(prompt.lastUsedAt)}
+                      </Mono>
+                    )}
+                    {prompt.usageCount === 0 && <Mono faded>never used</Mono>}
+                  </span>
+                </button>
+              </div>
             ))}
           </div>
         </section>
@@ -576,16 +714,22 @@ function PromptFilterItem({
   count,
   label,
   onClick,
+  onKeyDown,
+  title,
 }: {
   active: boolean;
   count: number;
   label: string;
   onClick: () => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
+  title?: string;
 }) {
   return (
     <button
       className={active ? "prompts-rail__item prompts-rail__item--active" : "prompts-rail__item"}
       onClick={onClick}
+      onKeyDown={onKeyDown}
+      title={title}
       type="button"
     >
       <span className="prompts-rail__item-label">{label}</span>

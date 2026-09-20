@@ -376,6 +376,14 @@ export const api = {
     return body.category;
   },
 
+  reorderPromptCategory: async (categoryId: string, position: number) => {
+    const body = await request<{ category: PromptCategory }>(
+      `/api/prompt-categories/${encodeURIComponent(categoryId)}/reorder`,
+      { method: "POST", body: jsonBody({ position }) },
+    );
+    return body.category;
+  },
+
   listPrompts: async (input: { categoryId?: string; q?: string } = {}) => {
     const params = new URLSearchParams();
     if (input.categoryId) params.set("categoryId", input.categoryId);
@@ -421,6 +429,14 @@ export const api = {
     const body = await request<{ prompt: Prompt }>(
       `/api/prompts/${encodeURIComponent(promptId)}`,
       { method: "DELETE" },
+    );
+    return body.prompt;
+  },
+
+  reorderPrompt: async (promptId: string, position: number) => {
+    const body = await request<{ prompt: Prompt }>(
+      `/api/prompts/${encodeURIComponent(promptId)}/reorder`,
+      { method: "POST", body: jsonBody({ position }) },
     );
     return body.prompt;
   },

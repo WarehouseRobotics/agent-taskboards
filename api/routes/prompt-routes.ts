@@ -5,6 +5,7 @@ import {
   promptCategoryUpdateSchema,
   promptCreateSchema,
   promptListQuerySchema,
+  promptReorderSchema,
   promptUpdateSchema,
 } from "../models/request-schemas.js";
 import {
@@ -36,6 +37,15 @@ export function registerPromptRoutes(app: Express, services: ApiServices) {
 
   app.delete("/api/prompt-categories/:categoryId", (req, res) => {
     const category = services.prompts.deleteCategory(req.params.categoryId);
+    res.json({ category: serializePromptCategory(category) });
+  });
+
+  app.post("/api/prompt-categories/:categoryId/reorder", (req, res) => {
+    const body = parseBody(req, promptReorderSchema);
+    const category = services.prompts.reorderCategory(
+      req.params.categoryId,
+      body.position,
+    );
     res.json({ category: serializePromptCategory(category) });
   });
 
@@ -87,6 +97,15 @@ export function registerPromptRoutes(app: Express, services: ApiServices) {
   app.delete("/api/prompts/:promptId", (req, res) => {
     const { prompt, categoryIds } = services.prompts.deletePrompt(
       req.params.promptId,
+    );
+    res.json({ prompt: serializePrompt(prompt, categoryIds) });
+  });
+
+  app.post("/api/prompts/:promptId/reorder", (req, res) => {
+    const body = parseBody(req, promptReorderSchema);
+    const { prompt, categoryIds } = services.prompts.reorderPrompt(
+      req.params.promptId,
+      body.position,
     );
     res.json({ prompt: serializePrompt(prompt, categoryIds) });
   });

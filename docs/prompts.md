@@ -24,6 +24,22 @@ prompts survive and fall back to the root level.
 Prompts are not indexed into `search_documents`, so they do not appear in
 semantic search.
 
+## Ordering
+
+Prompts carry a single global order in `prompts.position`. A category view is
+only a projection of that order, so a prompt linked to two categories keeps
+the same relative order in both, and dragging it inside one category rewrites
+the one list. Categories have their own order in `prompt_categories.position`,
+which drives the library's left rail and the picker's groups.
+
+`prompt_category_links.position` is unrelated to either: it orders the
+categories *within* a prompt, and reordering never touches it.
+
+Both orders are edited through the reorder endpoints in `docs/api.md`, which
+rewrite the affected list as `0..n-1`. The picker's `Recent` group is sorted by
+`lastUsedAt` rather than by position, so it is never reorderable, and a
+reorder never counts as a use.
+
 ## Tokens
 
 Prompt bodies may contain case-sensitive tokens that the prompt picker

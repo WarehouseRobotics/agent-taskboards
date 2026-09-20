@@ -765,6 +765,17 @@ Updates `name` and/or `description`.
 Hard-deletes the category and its prompt links. Prompts survive and fall back
 to the root level.
 
+### `POST /api/prompt-categories/:categoryId/reorder`
+
+Moves the category to `position` in the category list and returns it. Same
+semantics as the prompt reorder below.
+
+```json
+{
+  "position": 0
+}
+```
+
 ### `GET /api/prompts`
 
 Lists prompts ordered by `position`, then `name`. Each prompt includes its
@@ -798,6 +809,26 @@ it replaces the entire link set; when omitted, links are unchanged.
 ### `DELETE /api/prompts/:promptId`
 
 Hard-deletes the prompt and its category links.
+
+### `POST /api/prompts/:promptId/reorder`
+
+Moves the prompt to `position` in the single global prompt order and returns
+it. Prompts have one order; a category view is only a projection of it, so
+reordering from inside a category rewrites the same list.
+
+```json
+{
+  "position": 3
+}
+```
+
+`position` is resolved against the list with the moved prompt already taken
+out, which mirrors `POST /api/tasks/:taskId/move`: passing the target row's
+index in the current list makes the moved prompt take that row's slot whether
+it travelled up or down. Values past the end clamp to the end, and the whole
+list is rewritten as `0..n-1` in one transaction, so the gaps left by deletes
+and `restore-defaults` heal on the first reorder. `usageCount` and
+`lastUsedAt` are untouched.
 
 ### `POST /api/prompts/:promptId/use`
 

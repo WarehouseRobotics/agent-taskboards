@@ -121,6 +121,9 @@ from the sidebar `Prompts` entry, between Search and Maintenance:
 - the middle list shows prompts for the current filter with usage metadata
 - the right editor pane edits name, body, and category membership in place
 - toolbar actions cover new prompt, new category, and restore defaults
+- prompts and rail categories reorder by dragging, with a drop indicator on the
+  side the dragged row will land on; `Alt+Up`/`Alt+Down` on a focused row is the
+  pointer-free equivalent, stepping one visible row at a time
 - deletes are hard deletes behind explicit confirmation dialogs
 
 Prompt names are user-authored data and may contain emoji; the chrome around
@@ -136,6 +139,9 @@ The prompt picker brings the library to the task detail:
 - one click copies the prompt body with `{{TASK}}` and `{{PARENT_TASK}}`
   tokens rendered from the open task; a row expands to preview the exact text
 - unresolved tokens copy as their bare names and never block the copy
+- prompts in a category group reorder by dragging, writing the same global
+  order the library view shows; `Recent` is usage-sorted and never draggable,
+  and dragging is suppressed while the filter hides rows
 
 ## Maintenance Experience
 
