@@ -199,6 +199,56 @@ describe("resolveParentTaskId", () => {
     ).toEqual({ taskId: "task_parent", source: "description-id" });
   });
 
+  it("reads a quoted id from a label line that continues into prose", () => {
+    expect(
+      resolveParentTaskId(
+        task({
+          description:
+            "Umbrella: `bridge-study-search-api-2wzig9`. Collector for the " +
+            "follow-ups deferred during study-peek planning (proposal comment " +
+            "`ZSg98xHChEulvY2E-PHYR`, pinned-decisions comment " +
+            "`Mdoq6OZ5-eJc9Fn-_qHj8`). **Do not start until BSS-7/BSS-8 are " +
+            "live** \u2014 same evidence-driven posture as BSS-6.",
+        }),
+      ),
+    ).toEqual({ taskId: "bridge-study-search-api-2wzig9", source: "label-line" });
+  });
+
+  it("reads an unquoted generated id followed by prose", () => {
+    expect(
+      resolveParentTaskId(
+        task({
+          description:
+            "Parent: bridge-study-search-api-2wzig9. Collector for follow-ups.",
+        }),
+      ),
+    ).toEqual({ taskId: "bridge-study-search-api-2wzig9", source: "label-line" });
+  });
+
+  it("does not take an ordinary word when prose follows the label", () => {
+    for (const line of [
+      "Parent: the big epic",
+      "Umbrella: some evidence-driven follow-up work",
+      "Umbrella task: TBD, ask the reviewer",
+    ]) {
+      expect(resolveParentTaskId(task({ description: line }))).toBeNull();
+    }
+  });
+
+  it("keeps the permissive id shape when the label value is the whole id", () => {
+    expect(
+      resolveParentTaskId(task({ description: "Umbrella: task_parent" })),
+    ).toEqual({ taskId: "task_parent", source: "label-line" });
+  });
+
+  it("rejects a legacy-shaped id when prose follows it", () => {
+    expect(
+      resolveParentTaskId(
+        task({ description: "Umbrella: task_parent and some notes" }),
+      ),
+    ).toBeNull();
+  });
+
   it("does not treat a mid-sentence label as a parent reference", () => {
     expect(
       resolveParentTaskId(

@@ -94,10 +94,16 @@ change:
    `Umbrella task:`, `Umbrella:`, `Parent task:`, or `Parent:`. Labels are
    case-insensitive and may be preceded by markdown list, quote, or bold
    decoration, but not by prose — `part of the umbrella: x` does not match.
-   An `id=...` reference on the label line wins; otherwise the rest of the
-   line must be a bare task id of at most 96 characters, after stripping
-   surrounding backticks, quotes, and brackets and trailing `.,;:`. A label
-   followed by a title or a sentence falls through to the next step.
+   An `id=...` reference on the label line wins; otherwise the candidate is
+   the first token after the label, stripped of surrounding backticks,
+   quotes, and brackets and of trailing `.,;:`, and capped at 96 characters.
+   How strictly that token is judged depends on what follows it: when it is
+   the whole value, any `[A-Za-z0-9_-]+` id is accepted, so hand-written and
+   legacy ids still resolve; when prose follows it on the same line, the
+   token must be quoted or match the generated id shape (slug words joined
+   by `-` plus a six-character lowercase suffix). That keeps
+   ``Umbrella: `some-task-a1b2c3`. Collector for the follow-ups...`` working
+   while `Parent: the big epic` falls through to the next step.
 3. The first description line that mentions "umbrella" (case-insensitive) and
    contains an `id=...` reference.
 4. The first `id=...` reference anywhere in the description.

@@ -33,32 +33,56 @@ const parentMetadataKeys = [
 const parentLabelPattern =
   /^[\s>*+-]*(?:umbrella task|umbrella|parent task|parent)\s*\**\s*:\s*\**\s*(.+)$/i;
 
-// Ids are short in practice; the cap keeps a run-on line such as
-// `Parent: whatever the reviewer decides next sprint` from being mistaken for
-// an id once it happens to contain no spaces.
+// Ids are short in practice; the cap rejects a single run-on token that is
+// clearly not an id, such as a pasted URL or a long hyphenated phrase.
 const maxLabelTaskIdLength = 96;
 
 const labelValueLeadingJunk = /^[`"'([]+/;
 const labelValueTrailingJunk = /[`"')\].,;:]+$/;
+const labelValueWrapped = /^[`"'([]/;
+
+// Generated task ids are slug words joined by `-` plus a six-character
+// lowercase suffix (see api/services/task-id.ts). This tighter shape is what
+// lets an id be picked out of a label line that continues into prose, where
+// the permissive shape would happily match an ordinary word.
+const generatedTaskIdShape = /^[a-z0-9]+(?:-[a-z0-9]+)*-[a-z0-9]{6}$/;
+
+function stripLabelValueJunk(value: string) {
+  return value
+    .replace(labelValueLeadingJunk, "")
+    .replace(labelValueTrailingJunk, "");
+}
 
 // The value after a `Umbrella task:` style label. An explicit `id=...` on the
-// same line wins; otherwise the whole remaining value must be a bare id, so a
-// label followed by a title or a sentence falls through to the looser steps
-// instead of producing a nonsense reference.
+// same line wins; otherwise the candidate is the value's first token, because
+// a label is regularly followed by the id and then a sentence about it.
+//
+// How strictly that token is judged depends on what follows it. When it is the
+// whole value there is nothing to confuse it with, so the permissive id shape
+// applies and hand-written or legacy ids still resolve. When prose follows,
+// the permissive shape would match any ordinary word, so the token has to be
+// quoted or to look like a generated id before it is believed.
 function labelLineTaskId(value: string): string | null {
   const explicit = taskIdPattern.exec(value);
   if (explicit) {
     return explicit[1];
   }
 
-  const bare = value
-    .trim()
-    .replace(labelValueLeadingJunk, "")
-    .replace(labelValueTrailingJunk, "");
-  if (!bare || bare.length > maxLabelTaskIdLength || !taskIdShape.test(bare)) {
+  const trimmed = value.trim();
+  const [firstToken = ""] = trimmed.split(/\s+/, 1);
+  const candidate = stripLabelValueJunk(firstToken);
+  if (!candidate || candidate.length > maxLabelTaskIdLength) {
     return null;
   }
-  return bare;
+
+  if (firstToken.length === trimmed.length) {
+    return taskIdShape.test(candidate) ? candidate : null;
+  }
+
+  const believable = labelValueWrapped.test(firstToken)
+    ? taskIdShape.test(candidate)
+    : generatedTaskIdShape.test(candidate);
+  return believable ? candidate : null;
 }
 
 // Heuristic cascade for resolving a task's parent/umbrella task without a
