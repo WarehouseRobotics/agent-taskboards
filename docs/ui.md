@@ -121,6 +121,8 @@ from the sidebar `Prompts` entry, between Search and Maintenance:
 - the middle list shows prompts for the current filter with usage metadata
 - the right editor pane edits name, note, body, and category membership in
   place; the author's note shows as static text and becomes editable on click
+- editor changes save explicitly with Save or Cmd/Ctrl+Enter from any field;
+  the shortcut also submits the new-category and rename-category forms
 - toolbar actions cover new prompt, new category, and restore defaults
 - prompts and rail categories reorder by dragging, with a drop indicator on the
   side the dragged row will land on; `Alt+Up`/`Alt+Down` on a focused row is the

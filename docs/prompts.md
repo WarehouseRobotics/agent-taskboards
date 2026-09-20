@@ -37,8 +37,8 @@ never puts the note on the clipboard, and neither the picker filter nor
 
 In the library editor the note sits between Name and Body and reads as static
 text, turning into a textarea on click and collapsing back on blur or Escape.
-It saves with the rest of the form through Save, and Cancel discards it along
-with the other edits. A prompt without a note shows a muted `Add a note`
+It saves with the rest of the form through Save or Cmd/Ctrl+Enter, and Cancel
+discards it along with the other edits. A prompt without a note shows a muted `Add a note`
 placeholder in the same spot.
 
 ## Ordering

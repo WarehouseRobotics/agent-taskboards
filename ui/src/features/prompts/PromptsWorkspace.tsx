@@ -210,6 +210,21 @@ export function PromptsWorkspace() {
     }
   };
 
+  // Cmd+Enter on Mac, Ctrl+Enter elsewhere, bound on the form so every field
+  // inside it answers the shortcut. The editor's Note and Body textareas
+  // swallow plain Enter, so without this the only keyboard save is from the
+  // single-line fields, where implicit form submission already works.
+  const submitOnShortcut = (
+    event: KeyboardEvent<HTMLFormElement>,
+    submit: () => void,
+  ) => {
+    if (event.key !== "Enter" || !(event.metaKey || event.ctrlKey)) {
+      return;
+    }
+    event.preventDefault();
+    submit();
+  };
+
   const toggleDraftCategory = (categoryId: string) => {
     setDraft((current) => {
       if (!current) {
@@ -434,6 +449,7 @@ export function PromptsWorkspace() {
           {creatingCategory && (
             <form
               className="prompts-rail__new-category"
+              onKeyDown={(event) => submitOnShortcut(event, () => void createCategory())}
               onSubmit={(event) => {
                 event.preventDefault();
                 void createCategory();
@@ -487,6 +503,7 @@ export function PromptsWorkspace() {
             {selectedCategory && categoryNameDraft !== null ? (
               <form
                 className="prompts-list__rename"
+                onKeyDown={(event) => submitOnShortcut(event, () => void renameCategory())}
                 onSubmit={(event) => {
                   event.preventDefault();
                   void renameCategory();
@@ -590,6 +607,16 @@ export function PromptsWorkspace() {
           {draft && (
             <form
               className="prompt-editor__form"
+              onKeyDown={(event) =>
+                submitOnShortcut(event, () => {
+                  // Mirrors the Save button's disabled state, so the shortcut
+                  // never fires a redundant save.
+                  if (saving || !draftDirty) {
+                    return;
+                  }
+                  void saveDraft();
+                })
+              }
               onSubmit={(event) => {
                 event.preventDefault();
                 void saveDraft();
@@ -704,7 +731,12 @@ export function PromptsWorkspace() {
                 >
                   Cancel
                 </Button>
-                <Button disabled={saving || !draftDirty} type="submit" variant="primary">
+                <Button
+                  disabled={saving || !draftDirty}
+                  title={`${draft.promptId === null ? "Create" : "Save"} (Cmd/Ctrl+Enter)`}
+                  type="submit"
+                  variant="primary"
+                >
                   {saving ? "Saving" : draft.promptId === null ? "Create" : "Save"}
                 </Button>
               </div>
