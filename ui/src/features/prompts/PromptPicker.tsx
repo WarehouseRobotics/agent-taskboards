@@ -42,8 +42,10 @@ export function PromptPicker({
   boardTasksRef.current = boardTasks;
 
   useEffect(() => {
+    // Clear any previous task's parent immediately so a copy issued while the
+    // async lookup is in flight never renders a stale parent reference.
+    setParentTaskValue(null);
     if (!parentTaskId) {
-      setParentTaskValue(null);
       return;
     }
 

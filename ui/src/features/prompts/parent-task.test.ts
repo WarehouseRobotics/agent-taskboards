@@ -31,6 +31,12 @@ describe("resolveParentTaskId", () => {
     ).toBeNull();
   });
 
+  it("ignores a whitespace-padded metadata self reference", () => {
+    expect(
+      resolveParentTaskId(task({ metadata: { parentTaskId: " task_current " } })),
+    ).toBeNull();
+  });
+
   it("finds an umbrella line with an id reference", () => {
     expect(
       resolveParentTaskId(

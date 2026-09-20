@@ -17,8 +17,9 @@ export function resolveParentTaskId(
   task: Pick<Task, "id" | "description" | "metadata">,
 ): ParentTaskReference | null {
   const metadataParent = task.metadata?.["parentTaskId"];
-  if (typeof metadataParent === "string" && metadataParent.trim() && metadataParent !== task.id) {
-    return { taskId: metadataParent.trim(), source: "metadata" };
+  const metadataParentId = typeof metadataParent === "string" ? metadataParent.trim() : "";
+  if (metadataParentId && metadataParentId !== task.id) {
+    return { taskId: metadataParentId, source: "metadata" };
   }
 
   const description = task.description ?? "";

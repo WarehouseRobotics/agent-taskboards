@@ -216,6 +216,7 @@ export class PromptService {
 
     this.db.transaction((tx) => {
       const categoryIdsByDefaultKey = new Map<string, string>();
+      const createdCategoryKeys = new Set<string>();
 
       for (const seed of defaultPromptCategories) {
         const byDefaultKey = tx
@@ -251,6 +252,7 @@ export class PromptService {
           .returning()
           .get();
         categoryIdsByDefaultKey.set(seed.defaultKey, created.id);
+        createdCategoryKeys.add(seed.defaultKey);
         restored.push(`category:${seed.defaultKey}`);
       }
 
@@ -261,6 +263,36 @@ export class PromptService {
           .where(eq(prompts.defaultKey, seed.defaultKey))
           .get();
         if (existing) {
+          // Deleting a default category cascades its links away. When this
+          // call recreates that category, relink the surviving default
+          // prompts to it; links to pre-existing categories stay untouched
+          // so intentional unlinking is preserved.
+          const relinkKeys = seed.categoryDefaultKeys.filter((key) =>
+            createdCategoryKeys.has(key),
+          );
+          if (relinkKeys.length > 0) {
+            const existingLinks = tx
+              .select()
+              .from(promptCategoryLinks)
+              .where(eq(promptCategoryLinks.promptId, existing.id))
+              .all();
+            let position =
+              existingLinks.reduce((max, link) => Math.max(max, link.position), -1) + 1;
+            for (const key of relinkKeys) {
+              const categoryId = categoryIdsByDefaultKey.get(key);
+              if (
+                !categoryId ||
+                existingLinks.some((link) => link.categoryId === categoryId)
+              ) {
+                continue;
+              }
+              tx
+                .insert(promptCategoryLinks)
+                .values({ promptId: existing.id, categoryId, position: position++ })
+                .run();
+              restored.push(`link:${seed.defaultKey}:${key}`);
+            }
+          }
           continue;
         }
 

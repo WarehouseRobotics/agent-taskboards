@@ -220,6 +220,47 @@ describe("PromptService", () => {
     expect(service.restoreDefaults().restored).toEqual([]);
   });
 
+  it("relinks surviving default prompts when restoring a deleted default category", () => {
+    const umbrella = service
+      .listCategories()
+      .find((category) => category.defaultKey === "umbrella")!;
+    service.deleteCategory(umbrella.id);
+    for (const { categoryIds } of service.listPrompts()) {
+      expect(categoryIds).toEqual([]);
+    }
+
+    const restored = service.restoreDefaults();
+    expect(restored.restored).toEqual([
+      "category:umbrella",
+      ...defaultPrompts.map((seed) => `link:${seed.defaultKey}:umbrella`),
+    ]);
+
+    const recreated = service
+      .listCategories()
+      .find((category) => category.defaultKey === "umbrella")!;
+    expect(recreated.id).not.toBe(umbrella.id);
+    for (const { prompt, categoryIds } of service.listPrompts()) {
+      expect(prompt.defaultKey).not.toBeNull();
+      expect(categoryIds).toEqual([recreated.id]);
+    }
+
+    expect(service.restoreDefaults().restored).toEqual([]);
+  });
+
+  it("does not relink defaults to a category the user still has", () => {
+    const seeded = service.listPrompts();
+    const target = seeded.find(
+      ({ prompt }) => prompt.defaultKey === "umbrella-implement",
+    )!;
+    // Unlinking a default prompt from a surviving category is user intent
+    // that a restore must not undo.
+    service.updatePrompt(target.prompt.id, { categoryIds: [] });
+
+    const restored = service.restoreDefaults();
+    expect(restored.restored).toEqual([]);
+    expect(service.getPrompt(target.prompt.id).categoryIds).toEqual([]);
+  });
+
   it("adopts a same-named user category when restoring defaults", () => {
     const umbrella = service
       .listCategories()

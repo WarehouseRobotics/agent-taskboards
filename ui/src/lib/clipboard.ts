@@ -15,9 +15,10 @@ function copyTextWithInput(text: string) {
   const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const selection = document.getSelection();
   const ranges = selection ? Array.from({ length: selection.rangeCount }, (_, index) => selection.getRangeAt(index).cloneRange()) : [];
-  const input = document.createElement("input");
+  // A textarea, not an input[type=text]: inputs normalize newlines away, which
+  // would corrupt multiline prompt bodies in the fallback path.
+  const input = document.createElement("textarea");
 
-  input.type = "text";
   input.value = text;
   input.readOnly = true;
   input.style.position = "fixed";
