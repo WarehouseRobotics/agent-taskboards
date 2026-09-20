@@ -27,6 +27,30 @@ describe("renderPromptBody", () => {
     expect(
       renderPromptBody("{{OTHER}} {{task}} {{ TASK }}", { TASK: "x" }),
     ).toBe("{{OTHER}} {{task}} {{ TASK }}");
+    expect(renderPromptBody("{{board}} {{ PROJECT }}", { BOARD: "x" })).toBe(
+      "{{board}} {{ PROJECT }}",
+    );
+  });
+
+  it("replaces the board and project tokens", () => {
+    expect(
+      renderPromptBody("On {{BOARD}} of {{PROJECT}}", {
+        BOARD: '"ui" ( id=board_1 )',
+        PROJECT: '"agent-taskboards" ( id=project_1 )',
+      }),
+    ).toBe('On "ui" ( id=board_1 ) of "agent-taskboards" ( id=project_1 )');
+  });
+
+  it("strips braces from unresolved board and project tokens", () => {
+    expect(renderPromptBody("{{BOARD}} / {{PROJECT}}", {})).toBe(
+      "BOARD / PROJECT",
+    );
+  });
+
+  it("does not let TASK shadow PARENT_TASK", () => {
+    expect(
+      renderPromptBody("{{PARENT_TASK}}", { TASK: "child", PARENT_TASK: "parent" }),
+    ).toBe("parent");
   });
 });
 
@@ -37,5 +61,11 @@ describe("promptBodyTokens", () => {
       "PARENT_TASK",
     ]);
     expect(promptBodyTokens("no tokens {{OTHER}}")).toEqual([]);
+  });
+
+  it("reports tokens in registry order, not body order", () => {
+    expect(
+      promptBodyTokens("{{PROJECT}} {{BOARD}} {{PARENT_TASK}} {{TASK}}"),
+    ).toEqual(["TASK", "PARENT_TASK", "BOARD", "PROJECT"]);
   });
 });

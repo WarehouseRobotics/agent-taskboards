@@ -30,7 +30,8 @@ comments with a GGUF embedding model.
   `review`, and `done`.
 - React UI for human task management.
 - Prompt library with categories, default prompts, and a task-detail prompt
-  picker that fills `{{TASK}}`/`{{PARENT_TASK}}` tokens on copy.
+  picker that fills `{{TASK}}`, `{{PARENT_TASK}}`, `{{BOARD}}` and
+  `{{PROJECT}}` tokens on copy.
 - Express API for scripts and AI agents.
 - SQLite persistence in `data/taskboards.sqlite`.
 - Local semantic search over boards, tasks, and comments using `node-llama-cpp`

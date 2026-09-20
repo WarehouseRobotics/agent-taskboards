@@ -64,11 +64,20 @@ replaces when copying:
 
 - `{{TASK}}`: the open task, formatted as `"...title..." ( id=... )`
 - `{{PARENT_TASK}}`: the task's parent/umbrella task in the same format
+- `{{BOARD}}`: the board the open task belongs to, as `"...name..." ( id=... )`
+- `{{PROJECT}}`: that board's project, in the same format
 
 A token that cannot be resolved never blocks the copy and produces no
 warning: the braces are stripped, so `{{PARENT_TASK}}` copies as
 `PARENT_TASK` and is easy to spot and replace by hand. Unknown `{{...}}`
 sequences are left untouched.
+
+`{{BOARD}}` and `{{PROJECT}}` need no resolution step: the picker only opens
+over an open task, so its board and project are already loaded alongside it.
+Both carry only a URL-safe `name` rather than a display title, so
+`{{PROJECT}}` renders as `"agent-taskboards" ( id=... )`.
+
+The seeded default prompts use only `{{TASK}}` and `{{PARENT_TASK}}`.
 
 ### Parent Task Resolution
 

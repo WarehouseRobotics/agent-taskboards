@@ -676,7 +676,9 @@ export function PromptsWorkspace() {
               <label className="field prompt-editor__body-field">
                 <span className="field__label">
                   Body
-                  <Mono faded> {"{{TASK}} and {{PARENT_TASK}} are replaced on copy"}</Mono>
+                  <Mono faded>
+                    {" {{TASK}}, {{PARENT_TASK}}, {{BOARD}}, {{PROJECT}} are replaced on copy"}
+                  </Mono>
                 </span>
                 <textarea
                   className="prompt-editor__body"

@@ -1,3 +1,5 @@
+import { buildNamedReferenceText } from "../../lib/entity-reference";
+
 export function buildBoardReferenceText(boardName: string, boardId: string) {
-  return `"${boardName.trim()}" ( id=${boardId} )`;
+  return buildNamedReferenceText(boardName, boardId);
 }

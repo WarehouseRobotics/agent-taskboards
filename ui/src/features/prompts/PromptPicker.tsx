@@ -7,9 +7,10 @@ import {
   type RefObject,
 } from "react";
 import { Icon, InlineError, Mono, SkeletonRows } from "../../components/ui";
-import type { Prompt, Task } from "../../domain/types";
+import type { Board, Project, Prompt, Task } from "../../domain/types";
 import { api } from "../../lib/api";
 import { copyTextToClipboard } from "../../lib/clipboard";
+import { buildNamedReferenceText } from "../../lib/entity-reference";
 import { buildTaskReferenceText } from "../../lib/task-reference";
 import { resolveParentTaskId } from "./parent-task";
 import {
@@ -27,14 +28,18 @@ import { usePromptLibrary } from "./usePromptLibrary";
 const recentPromptLimit = 3;
 
 export function PromptPicker({
+  board,
   boardTasks,
   onClose,
   panelRef,
+  project,
   task,
 }: {
+  board: Board | null;
   boardTasks: Task[];
   onClose: () => void;
   panelRef: RefObject<HTMLElement | null>;
+  project: Project | null;
   task: Task;
 }) {
   const library = usePromptLibrary();
@@ -113,8 +118,22 @@ export function PromptPicker({
     if (parentTaskValue) {
       values.PARENT_TASK = parentTaskValue;
     }
+    // The picker only opens over an open task, so its board and project are
+    // already loaded: no lookup, unlike the parent task above.
+    if (board) {
+      values.BOARD = buildNamedReferenceText(board.name, board.id);
+    }
+    if (project) {
+      values.PROJECT = buildNamedReferenceText(project.name, project.id);
+    }
     return values;
-  }, [parentTaskValue, task.id, task.title]);
+  }, [
+    board,
+    parentTaskValue,
+    project,
+    task.id,
+    task.title,
+  ]);
 
   const copyPrompt = async (prompt: Prompt, rowKey: string) => {
     setCopyError(null);

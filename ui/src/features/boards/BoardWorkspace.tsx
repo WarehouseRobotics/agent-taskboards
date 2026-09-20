@@ -554,9 +554,11 @@ export function BoardWorkspace({
           </div>
           {activeTaskId && promptPickerOpen && activePickerTask && (
             <PromptPicker
+              board={activeBoard}
               boardTasks={tasks}
               onClose={() => setPromptPickerOpen(false)}
               panelRef={promptPickerPanelRef}
+              project={activeProject}
               task={activePickerTask}
             />
           )}

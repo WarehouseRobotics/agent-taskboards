@@ -1,10 +1,20 @@
-export const promptTokenNames = ["TASK", "PARENT_TASK"] as const;
+export const promptTokenNames = [
+  "TASK",
+  "PARENT_TASK",
+  "BOARD",
+  "PROJECT",
+] as const;
 
 export type PromptTokenName = (typeof promptTokenNames)[number];
 
 export type PromptTokenValues = Partial<Record<PromptTokenName, string>>;
 
-const knownTokenPattern = /\{\{(TASK|PARENT_TASK)\}\}/g;
+// Built from the registry so adding a token means touching one list. Token
+// names are bare `[A-Z_]` words, so they need no regex escaping.
+const knownTokenPattern = new RegExp(
+  `\\{\\{(${promptTokenNames.join("|")})\\}\\}`,
+  "g",
+);
 
 // Tokens are exact and case-sensitive. A token with no value is replaced by
 // its bare name (braces stripped) so it stays easy to spot and fill in by

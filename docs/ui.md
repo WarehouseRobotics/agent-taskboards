@@ -139,8 +139,9 @@ The prompt picker brings the library to the task detail:
 - it opens from a toggle in the task detail header and extends as a nested
   sidebar on the task detail's left, attached rather than floating
 - the initial state leads with recently used prompts for one-click copying
-- one click copies the prompt body with `{{TASK}}` and `{{PARENT_TASK}}`
-  tokens rendered from the open task; a row expands to preview the exact text
+- one click copies the prompt body with `{{TASK}}`, `{{PARENT_TASK}}`,
+  `{{BOARD}}` and `{{PROJECT}}` tokens rendered from the open task and its
+  board context; a row expands to preview the exact text
 - an expanded row shows the author's note after the preview; the note is never
   copied
 - unresolved tokens copy as their bare names and never block the copy
