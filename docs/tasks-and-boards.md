@@ -125,6 +125,14 @@ Supported priorities are:
 low, normal, high, urgent
 ```
 
+Tasks have no parent-task column. A subtask records its umbrella or parent task
+by convention, as a bare task id in `metadata.parentTaskId`. Agents creating
+subtasks are instructed to set it by `skills/tasks-management/SKILL.md`, and
+the prompt picker reads it to resolve `{{PARENT_TASK}}`. Since `metadata` is
+open-ended, older tasks also carry `parentTask`, `umbrellaTaskId`, or
+`umbrella`; readers accept those as fallbacks, writers should use
+`parentTaskId`.
+
 Task movement is an explicit state transition. Clients move a task by
 destination column and optional position; they do not rewrite the whole board.
 The system reorders affected tasks in the source and destination columns. A

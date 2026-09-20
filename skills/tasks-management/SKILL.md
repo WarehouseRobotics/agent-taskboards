@@ -3,7 +3,7 @@ name: tasks-management
 description: Manage coding tasks boards - read, create, move, comment on, and search Kanban tasks/boards/projects in coding agent taskboards.
 metadata:
   author: WarehouseRobotics
-  version: "0.2.0"
+  version: "0.3.0"
 ---
 
 ## When to use
@@ -125,6 +125,38 @@ taskboards post projects/<projectNameOrId>/boards/<boardNameOrId>/tasks \
   --data /tmp/taskboards-task.json
 ```
 
+### Subtasks and umbrella tasks
+
+When a task you create belongs to a larger "umbrella" or parent task, record
+the parent's id in `metadata.parentTaskId`:
+
+```json
+{
+  "title": "Add the prompt picker to task detail",
+  "description": "...",
+  "metadata": { "parentTaskId": "prompt-library-tools-n084qh" }
+}
+```
+
+Use that exact key, and give it a bare task id as its value — not a title, URL,
+or boolean. `parentTask`, `umbrellaTaskId`, and `umbrella` are still read as
+fallbacks for older tasks, but new tasks should use `parentTaskId` so parent
+links stay consistent and queryable across sessions.
+
+The UI reads this key to fill the `{{PARENT_TASK}}` token when a human copies a
+prompt from the task detail's prompt picker. A subtask created without it
+resolves its parent only by guesswork over the description text, which silently
+picks the wrong task when the description mentions any other task id.
+
+`patch` replaces the whole `metadata` object instead of merging into it, so
+adding a parent to an existing task means reading the current metadata first
+and sending it back with the new key included:
+
+```sh
+taskboards get tasks/<taskId> include=metadata
+taskboards patch tasks/<taskId> --data /tmp/taskboards-metadata.json
+```
+
 Move a task — the shortcut sends `{"columnKey":"<key>"}`. Moving into a done
 column sets `completedAt`; moving out clears it.
 
@@ -204,6 +236,8 @@ section — read and use them instead of guessing.
   durable record, chat is not.
 - Archive instead of deleting; there is no hard-delete endpoint. Confirm with
   the user before archiving anything they did not ask to archive.
+- When creating a subtask of an umbrella or parent task, set
+  `metadata.parentTaskId` to the parent's id at create time.
 - Prefer using names for projects and boards, rather than IDs. Taskboards project and board names can sometimes be found in project instructions.
 - When mentioning tasks, mention at least the name and ID (not just the ID alone)
 - Keep object IDs or names (`project_…`, `board_…`, `task_…`) visible in your replies.

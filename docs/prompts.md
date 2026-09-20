@@ -42,8 +42,9 @@ sequences are left untouched.
 `{{PARENT_TASK}}` resolves through a heuristic cascade with no task schema
 change:
 
-1. `metadata.parentTaskId` on the task, when it is a string naming another
-   task.
+1. A parent id in the task's metadata: `parentTaskId` first, then the older
+   `parentTask`, `umbrellaTaskId`, and `umbrella` keys. The value must be a
+   bare task id; a title or flag falls through to the next step.
 2. The first description line that mentions "umbrella" (case-insensitive) and
    contains an `id=...` reference.
 3. The first `id=...` reference anywhere in the description.

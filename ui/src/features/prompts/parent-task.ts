@@ -8,6 +8,18 @@ export interface ParentTaskReference {
 }
 
 const taskIdPattern = /\bid=([A-Za-z0-9_-]+)/;
+const taskIdShape = /^[A-Za-z0-9_-]+$/;
+
+// Metadata keys that have been used for the same "this task's parent" idea.
+// `parentTaskId` is the documented key (see skills/tasks-management/SKILL.md);
+// the others are accepted so tasks created before it was documented still
+// resolve.
+const parentMetadataKeys = [
+  "parentTaskId",
+  "parentTask",
+  "umbrellaTaskId",
+  "umbrella",
+];
 
 // Heuristic cascade for resolving a task's parent/umbrella task without a
 // schema change: explicit metadata wins, then a description line that
@@ -16,10 +28,17 @@ const taskIdPattern = /\bid=([A-Za-z0-9_-]+)/;
 export function resolveParentTaskId(
   task: Pick<Task, "id" | "description" | "metadata">,
 ): ParentTaskReference | null {
-  const metadataParent = task.metadata?.["parentTaskId"];
-  const metadataParentId = typeof metadataParent === "string" ? metadataParent.trim() : "";
-  if (metadataParentId && metadataParentId !== task.id) {
-    return { taskId: metadataParentId, source: "metadata" };
+  for (const key of parentMetadataKeys) {
+    const value = task.metadata?.[key];
+    if (typeof value !== "string") {
+      continue;
+    }
+    // A value that is not shaped like a task id (a title, a flag) would only
+    // produce a nonsense reference, so fall through to the description.
+    const candidate = value.trim();
+    if (candidate && candidate !== task.id && taskIdShape.test(candidate)) {
+      return { taskId: candidate, source: "metadata" };
+    }
   }
 
   const description = task.description ?? "";

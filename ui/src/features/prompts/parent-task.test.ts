@@ -37,6 +37,35 @@ describe("resolveParentTaskId", () => {
     ).toBeNull();
   });
 
+  it("accepts legacy parent metadata keys", () => {
+    for (const key of ["parentTask", "umbrellaTaskId", "umbrella"]) {
+      expect(
+        resolveParentTaskId(task({ metadata: { [key]: "task_parent" } })),
+      ).toEqual({ taskId: "task_parent", source: "metadata" });
+    }
+  });
+
+  it("prefers parentTaskId over a legacy key", () => {
+    expect(
+      resolveParentTaskId(
+        task({
+          metadata: { umbrella: "task_legacy", parentTaskId: "task_parent" },
+        }),
+      ),
+    ).toEqual({ taskId: "task_parent", source: "metadata" });
+  });
+
+  it("ignores metadata values that are not shaped like a task id", () => {
+    expect(
+      resolveParentTaskId(
+        task({
+          metadata: { umbrella: "Zendesk Connector" },
+          description: 'Part of umbrella ( id=task_parent )',
+        }),
+      ),
+    ).toEqual({ taskId: "task_parent", source: "umbrella-line" });
+  });
+
   it("finds an umbrella line with an id reference", () => {
     expect(
       resolveParentTaskId(
