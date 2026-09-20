@@ -166,6 +166,26 @@ describe("starter API", () => {
     expect(stringProp(patchedPrompt, "name")).toBe("Fix the bug carefully");
     expect(arrayProp(patchedPrompt, "categoryIds")).toEqual([]);
 
+    const noted = await api("PATCH", `/api/prompts/${promptId}`, {
+      note: "Author's note: run the tests first.",
+    });
+    expect(noted.status).toBe(200);
+    expect(stringProp(objectProp(noted.body, "prompt"), "note")).toBe(
+      "Author's note: run the tests first.",
+    );
+
+    // A blank note is a 400; the UI clears a note by sending null.
+    const blankNote = await api("PATCH", `/api/prompts/${promptId}`, {
+      note: "",
+    });
+    expect(blankNote.status).toBe(400);
+
+    const clearedNote = await api("PATCH", `/api/prompts/${promptId}`, {
+      note: null,
+    });
+    expect(clearedNote.status).toBe(200);
+    expect(objectProp(clearedNote.body, "prompt").note).toBeNull();
+
     const used = await api("POST", `/api/prompts/${promptId}/use`);
     expect(used.status).toBe(200);
     expect(numberProp(objectProp(used.body, "prompt"), "usageCount")).toBe(1);

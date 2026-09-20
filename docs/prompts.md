@@ -12,8 +12,9 @@ hierarchy, and one library is shared across all projects.
 - `prompt_categories`: flat list of categories (no nesting). Names are unique
   and may contain emoji. Categories carry a `position` for ordering and an
   optional `default_key` marking seeded defaults.
-- `prompts`: prompt `name` (emoji allowed), `body`, `position`, usage counters
-  (`usage_count`, `last_used_at`), and an optional `default_key`.
+- `prompts`: prompt `name` (emoji allowed), `body`, an optional author `note`,
+  `position`, usage counters (`usage_count`, `last_used_at`), and an optional
+  `default_key`.
 - `prompt_category_links`: many-to-many links between prompts and categories.
   A prompt with no links is "root level" (uncategorized).
 
@@ -23,6 +24,22 @@ prompts survive and fall back to the root level.
 
 Prompts are not indexed into `search_documents`, so they do not appear in
 semantic search.
+
+## Author Notes
+
+A prompt may carry a short `note`: help text from whoever wrote the prompt,
+most useful on default prompts an end user did not author. It is plain text
+with no length cap, shown verbatim — no markdown, and no token substitution.
+
+The note is commentary about the prompt, not part of it: copying a prompt
+never puts the note on the clipboard, and neither the picker filter nor
+`GET /api/prompts?q=` matches it. The seeded defaults ship without notes.
+
+In the library editor the note sits between Name and Body and reads as static
+text, turning into a textarea on click and collapsing back on blur or Escape.
+It saves with the rest of the form through Save, and Cancel discards it along
+with the other edits. A prompt without a note shows a muted `Add a note`
+placeholder in the same spot.
 
 ## Ordering
 
@@ -105,7 +122,9 @@ as a nested sidebar on the task detail's left. It shows:
 Clicking a prompt row copies the rendered body (tokens replaced) to the
 clipboard, records usage through `POST /api/prompts/:promptId/use`, and blinks
 a confirmation. A row can be expanded to preview the exact rendered text
-before copying.
+before copying. An expanded row shows the prompt's author note, if any, after
+the preview and outside its box, so it reads as commentary rather than prompt
+text.
 
 One prompt can be rendered as several rows at once: in `Recent` and again in
 each category it is linked to. Row state is keyed per row, so expanding a

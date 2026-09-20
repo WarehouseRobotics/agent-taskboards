@@ -35,6 +35,8 @@ interface PromptDraft {
   promptId: string | null;
   name: string;
   body: string;
+  // An empty string means "no note"; it is normalized to null on save.
+  note: string;
   categoryIds: string[];
 }
 
@@ -42,6 +44,9 @@ export function PromptsWorkspace() {
   const library = usePromptLibrary();
   const [filter, setFilter] = useState<PromptFilter>({ type: "all" });
   const [draft, setDraft] = useState<PromptDraft | null>(null);
+  // Display toggle only: the note saves through the form's Save button like
+  // the name and body do, not on its own.
+  const [noteEditing, setNoteEditing] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -86,6 +91,7 @@ export function PromptsWorkspace() {
       !selectedPrompt ||
       draft.name !== selectedPrompt.name ||
       draft.body !== selectedPrompt.body ||
+      draft.note !== (selectedPrompt.note ?? "") ||
       draft.categoryIds.join(",") !== selectedPrompt.categoryIds.join(",")
     : false;
 
@@ -96,10 +102,12 @@ export function PromptsWorkspace() {
 
   const resetDraftTo = (prompt: Prompt) => {
     setMutationError(null);
+    setNoteEditing(false);
     setDraft({
       promptId: prompt.id,
       name: prompt.name,
       body: prompt.body,
+      note: prompt.note ?? "",
       categoryIds: prompt.categoryIds,
     });
   };
@@ -111,7 +119,12 @@ export function PromptsWorkspace() {
     if (!draft || !draftDirty) {
       return false;
     }
-    if (draft.promptId === null && !draft.name.trim() && !draft.body.trim()) {
+    if (
+      draft.promptId === null &&
+      !draft.name.trim() &&
+      !draft.body.trim() &&
+      !draft.note.trim()
+    ) {
       return false;
     }
     showStatus("Unsaved changes — save or cancel the open prompt first");
@@ -133,10 +146,12 @@ export function PromptsWorkspace() {
       return;
     }
     setMutationError(null);
+    setNoteEditing(false);
     setDraft({
       promptId: null,
       name: "",
       body: "",
+      note: "",
       categoryIds: filter.type === "category" ? [filter.categoryId] : [],
     });
   };
@@ -151,19 +166,24 @@ export function PromptsWorkspace() {
       return;
     }
 
+    const note = draft.note.trim() || null;
+
     setSaving(true);
     setMutationError(null);
+    setNoteEditing(false);
     try {
       if (draft.promptId === null) {
         const created = await library.createPrompt({
           name,
           body: draft.body,
+          note,
           categoryIds: draft.categoryIds,
         });
         setDraft({
           promptId: created.id,
           name: created.name,
           body: created.body,
+          note: created.note ?? "",
           categoryIds: created.categoryIds,
         });
         showStatus("Prompt created");
@@ -171,12 +191,14 @@ export function PromptsWorkspace() {
         const updated = await library.updatePrompt(draft.promptId, {
           name,
           body: draft.body,
+          note,
           categoryIds: draft.categoryIds,
         });
         setDraft({
           promptId: updated.id,
           name: updated.name,
           body: updated.body,
+          note: updated.note ?? "",
           categoryIds: updated.categoryIds,
         });
         showStatus("Prompt updated");
@@ -585,6 +607,45 @@ export function PromptsWorkspace() {
                   value={draft.name}
                 />
               </label>
+              <div className="field">
+                <span className="field__label">Note</span>
+                {noteEditing ? (
+                  <textarea
+                    autoFocus
+                    className="prompt-editor__note-input"
+                    onBlur={() => setNoteEditing(false)}
+                    onChange={(event) =>
+                      setDraft((current) =>
+                        current ? { ...current, note: event.target.value } : current,
+                      )
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        // Collapse back to static text without letting the key
+                        // reach the workspace; Cancel stays the discard path.
+                        event.stopPropagation();
+                        setNoteEditing(false);
+                      }
+                    }}
+                    placeholder="A short help text from the prompt's author..."
+                    rows={3}
+                    value={draft.note}
+                  />
+                ) : (
+                  <button
+                    className={
+                      draft.note.trim()
+                        ? "prompt-editor__note"
+                        : "prompt-editor__note prompt-editor__note--empty"
+                    }
+                    onClick={() => setNoteEditing(true)}
+                    title="Edit the note"
+                    type="button"
+                  >
+                    {draft.note.trim() ? draft.note : "Add a note"}
+                  </button>
+                )}
+              </div>
               <label className="field prompt-editor__body-field">
                 <span className="field__label">
                   Body

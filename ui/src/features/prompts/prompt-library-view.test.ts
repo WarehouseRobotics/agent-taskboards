@@ -15,6 +15,7 @@ function prompt(overrides: Partial<Prompt> = {}): Prompt {
     id: "prompt_1",
     name: "Prompt",
     body: "Body",
+    note: null,
     position: 0,
     usageCount: 0,
     lastUsedAt: null,

@@ -173,6 +173,7 @@ export const promptCategoryUpdateSchema = promptCategoryCreateSchema.partial();
 export const promptCreateSchema = z.object({
   name: requiredString,
   body: promptBodySchema,
+  note: nullableString.optional(),
   categoryIds: z.array(requiredString).optional(),
   metadata: jsonObjectSchema.optional(),
 });

@@ -68,6 +68,8 @@ describe("PromptService", () => {
       expect(match?.prompt.body).toBe(seed.body);
       expect(match?.prompt.position).toBe(seed.position);
       expect(match?.prompt.usageCount).toBe(0);
+      // Seeded defaults ship without author notes; notes are user-authored.
+      expect(match?.prompt.note).toBeNull();
       const expectedCategoryIds = seed.categoryDefaultKeys.map(
         (key) => categories.find((category) => category.defaultKey === key)!.id,
       );
@@ -124,6 +126,27 @@ describe("PromptService", () => {
         categoryIds: ["missing-category"],
       }),
     ).toThrowError(ApiError);
+  });
+
+  it("stores, updates, and clears an author note", () => {
+    const created = service.createPrompt({
+      name: "Noted",
+      body: "body",
+      note: "Use this before opening a PR.",
+    });
+    expect(created.prompt.note).toBe("Use this before opening a PR.");
+
+    const withoutNote = service.createPrompt({ name: "Plain", body: "body" });
+    expect(withoutNote.prompt.note).toBeNull();
+
+    const updated = service.updatePrompt(created.prompt.id, {
+      note: "Updated guidance.",
+    });
+    expect(updated.prompt.note).toBe("Updated guidance.");
+    expect(updated.prompt.name).toBe("Noted");
+
+    const cleared = service.updatePrompt(created.prompt.id, { note: null });
+    expect(cleared.prompt.note).toBeNull();
   });
 
   it("replaces the category link set only when categoryIds is supplied", () => {

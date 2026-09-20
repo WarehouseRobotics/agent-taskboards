@@ -244,6 +244,34 @@
   gap: var(--s-4);
 }
 
+/* The note reads as static help text and only turns into a field on click. */
+.prompt-editor__note {
+  padding: var(--s-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: text;
+  font: inherit;
+  font-size: var(--fs-12);
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.prompt-editor__note:hover {
+  border-color: var(--line-faint);
+  background: var(--bg-hover);
+}
+
+.prompt-editor__note--empty {
+  color: var(--fg-faint);
+}
+
+.prompt-editor__note-input {
+  resize: vertical;
+}
+
 .prompt-editor__body-field {
   display: flex;
   flex: 1;
@@ -402,6 +430,18 @@
   color: var(--fg-muted);
   font-size: var(--fs-11);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Author commentary, not prompt text: it sits outside the preview box and is
+   never part of the copied body. */
+.prompt-picker__note {
+  width: 100%;
+  margin: 0;
+  padding: var(--s-1) var(--s-3) var(--s-2);
+  color: var(--fg-muted);
+  font-size: var(--fs-11);
+  text-wrap: pretty;
   overflow-wrap: anywhere;
 }
 

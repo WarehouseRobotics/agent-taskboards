@@ -119,7 +119,8 @@ from the sidebar `Prompts` entry, between Search and Maintenance:
 
 - a left rail lists All prompts, Uncategorized, and each category with counts
 - the middle list shows prompts for the current filter with usage metadata
-- the right editor pane edits name, body, and category membership in place
+- the right editor pane edits name, note, body, and category membership in
+  place; the author's note shows as static text and becomes editable on click
 - toolbar actions cover new prompt, new category, and restore defaults
 - prompts and rail categories reorder by dragging, with a drop indicator on the
   side the dragged row will land on; `Alt+Up`/`Alt+Down` on a focused row is the
@@ -138,6 +139,8 @@ The prompt picker brings the library to the task detail:
 - the initial state leads with recently used prompts for one-click copying
 - one click copies the prompt body with `{{TASK}}` and `{{PARENT_TASK}}`
   tokens rendered from the open task; a row expands to preview the exact text
+- an expanded row shows the author's note after the preview; the note is never
+  copied
 - unresolved tokens copy as their bare names and never block the copy
 - prompts in a category group reorder by dragging, writing the same global
   order the library view shows; `Recent` is usage-sorted and never draggable,

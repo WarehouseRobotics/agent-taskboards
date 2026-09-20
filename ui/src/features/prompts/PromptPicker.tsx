@@ -265,6 +265,11 @@ export function PromptPicker({
             {renderPromptBody(prompt.body, tokenValues)}
           </pre>
         )}
+        {expanded && prompt.note && (
+          // The author's note is commentary, not prompt text: it is shown
+          // verbatim, outside the preview box, and never copied.
+          <p className="prompt-picker__note">{prompt.note}</p>
+        )}
       </div>
     );
   };

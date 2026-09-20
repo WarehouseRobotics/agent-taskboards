@@ -221,6 +221,7 @@ export function serializePrompt(prompt: Prompt, categoryIds: string[]) {
     id: prompt.id,
     name: prompt.name,
     body: prompt.body,
+    note: prompt.note,
     position: prompt.position,
     usageCount: prompt.usageCount,
     lastUsedAt: serializeDate(prompt.lastUsedAt),

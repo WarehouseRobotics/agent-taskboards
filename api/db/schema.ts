@@ -331,6 +331,7 @@ export const prompts = sqliteTable(
     id: id(),
     name: text("name").notNull(),
     body: text("body").notNull(),
+    note: text("note"),
     position: integer("position").notNull(),
     usageCount: integer("usage_count").notNull().default(0),
     lastUsedAt: nullableTimestamp("last_used_at"),

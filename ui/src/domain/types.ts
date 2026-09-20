@@ -255,6 +255,7 @@ export interface Prompt {
   id: string;
   name: string;
   body: string;
+  note: string | null;
   position: number;
   usageCount: number;
   lastUsedAt: string | null;

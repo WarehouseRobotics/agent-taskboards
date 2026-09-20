@@ -173,6 +173,7 @@ export class PromptService {
         .values({
           name: input.name,
           body: input.body,
+          note: input.note,
           position: this.nextPromptPosition(),
           metadata: input.metadata,
         })

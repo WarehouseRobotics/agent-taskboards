@@ -16,10 +16,20 @@ export interface PromptLibrary {
     input: { name?: string; description?: string | null },
   ) => Promise<PromptCategory>;
   deleteCategory: (categoryId: string) => Promise<void>;
-  createPrompt: (input: { name: string; body: string; categoryIds?: string[] }) => Promise<Prompt>;
+  createPrompt: (input: {
+    name: string;
+    body: string;
+    note?: string | null;
+    categoryIds?: string[];
+  }) => Promise<Prompt>;
   updatePrompt: (
     promptId: string,
-    input: { name?: string; body?: string; categoryIds?: string[] },
+    input: {
+      name?: string;
+      body?: string;
+      note?: string | null;
+      categoryIds?: string[];
+    },
   ) => Promise<Prompt>;
   deletePrompt: (promptId: string) => Promise<void>;
   reorderPrompt: (promptId: string, position: number) => Promise<void>;
@@ -91,7 +101,12 @@ export function usePromptLibrary(): PromptLibrary {
   );
 
   const createPrompt = useCallback(
-    async (input: { name: string; body: string; categoryIds?: string[] }) => {
+    async (input: {
+      name: string;
+      body: string;
+      note?: string | null;
+      categoryIds?: string[];
+    }) => {
       const prompt = await api.createPrompt(input);
       await reload();
       return prompt;
@@ -102,7 +117,12 @@ export function usePromptLibrary(): PromptLibrary {
   const updatePrompt = useCallback(
     async (
       promptId: string,
-      input: { name?: string; body?: string; categoryIds?: string[] },
+      input: {
+        name?: string;
+        body?: string;
+        note?: string | null;
+        categoryIds?: string[];
+      },
     ) => {
       const prompt = await api.updatePrompt(promptId, input);
       await reload();

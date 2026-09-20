@@ -405,6 +405,7 @@ export const api = {
   createPrompt: async (input: {
     name: string;
     body: string;
+    note?: string | null;
     categoryIds?: string[];
   }) => {
     const body = await request<{ prompt: Prompt }>("/api/prompts", {
@@ -416,7 +417,12 @@ export const api = {
 
   updatePrompt: async (
     promptId: string,
-    input: { name?: string; body?: string; categoryIds?: string[] },
+    input: {
+      name?: string;
+      body?: string;
+      note?: string | null;
+      categoryIds?: string[];
+    },
   ) => {
     const body = await request<{ prompt: Prompt }>(
       `/api/prompts/${encodeURIComponent(promptId)}`,

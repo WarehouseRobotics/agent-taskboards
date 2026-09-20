@@ -782,17 +782,20 @@ Lists prompts ordered by `position`, then `name`. Each prompt includes its
 `categoryIds`. Query parameters:
 
 - `categoryId`: only prompts linked to that category.
-- `q`: case-insensitive substring match on name and body.
+- `q`: case-insensitive substring match on name and body. The `note` is not
+  matched.
 
 ### `POST /api/prompts`
 
 Creates a prompt. `categoryIds` is optional; an empty or missing list makes a
-root-level prompt.
+root-level prompt. `note` is the optional author's note: omit it or send
+`null` for no note; an empty string is rejected with `400 invalid_request`.
 
 ```json
 {
   "name": "☂️ Umbrella Task Implement",
   "body": "...prompt text with {{TASK}} tokens...",
+  "note": "optional help text from the prompt's author",
   "categoryIds": ["optional-category-id"]
 }
 ```
@@ -803,8 +806,9 @@ Returns one prompt with its `categoryIds`.
 
 ### `PATCH /api/prompts/:promptId`
 
-Updates `name`, `body`, and/or `categoryIds`. When `categoryIds` is supplied
-it replaces the entire link set; when omitted, links are unchanged.
+Updates `name`, `body`, `note`, and/or `categoryIds`. When `categoryIds` is
+supplied it replaces the entire link set; when omitted, links are unchanged.
+`note: null` clears the note; `note: ""` is rejected.
 
 ### `DELETE /api/prompts/:promptId`
 
