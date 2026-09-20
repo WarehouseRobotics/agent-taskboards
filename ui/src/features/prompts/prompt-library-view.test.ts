@@ -4,6 +4,9 @@ import {
   filterPrompts,
   groupPromptsByCategory,
   promptCountByCategory,
+  promptGroupKey,
+  promptRowKey,
+  recentPromptGroupKey,
   recentPrompts,
 } from "./prompt-library-view";
 
@@ -110,5 +113,31 @@ describe("promptCountByCategory", () => {
     expect(counts.get("cat_a")).toBe(2);
     expect(counts.get("cat_b")).toBe(1);
     expect(counts.get(null)).toBe(1);
+  });
+});
+
+describe("promptRowKey", () => {
+  it("gives one prompt a distinct key in every group it appears in", () => {
+    const promptId = "p1";
+    const keys = [
+      promptRowKey(recentPromptGroupKey, promptId),
+      promptRowKey(promptGroupKey(category({ id: "cat_a" })), promptId),
+      promptRowKey(promptGroupKey(category({ id: "cat_b" })), promptId),
+      promptRowKey(promptGroupKey(null), promptId),
+    ];
+
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("is stable for the same group and prompt", () => {
+    const groupKey = promptGroupKey(category({ id: "cat_a" }));
+
+    expect(promptRowKey(groupKey, "p1")).toBe(promptRowKey(groupKey, "p1"));
+  });
+
+  it("keeps different prompts in one group apart", () => {
+    const groupKey = promptGroupKey(category({ id: "cat_a" }));
+
+    expect(promptRowKey(groupKey, "p1")).not.toBe(promptRowKey(groupKey, "p2"));
   });
 });

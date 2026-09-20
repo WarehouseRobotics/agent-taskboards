@@ -83,6 +83,11 @@ clipboard, records usage through `POST /api/prompts/:promptId/use`, and blinks
 a confirmation. A row can be expanded to preview the exact rendered text
 before copying.
 
+One prompt can be rendered as several rows at once: in `Recent` and again in
+each category it is linked to. Row state is keyed per row, so expanding a
+preview or blinking the copy confirmation affects only the row that was
+clicked, not its twins elsewhere in the picker.
+
 ## API
 
 See the Prompt Library section in `docs/api.md` for the REST endpoints. The

@@ -58,3 +58,17 @@ export function promptCountByCategory(prompts: Prompt[]): Map<string | null, num
   }
   return counts;
 }
+
+// The picker renders one prompt in several places at once: in the `Recent`
+// group and again in every category it is linked to. Row state such as the
+// expanded preview must therefore be keyed by group plus prompt, not by the
+// prompt id alone, or clicking one row would toggle its twins as well.
+export const recentPromptGroupKey = "recent";
+
+export function promptGroupKey(category: PromptCategory | null): string {
+  return category ? `category:${category.id}` : "root";
+}
+
+export function promptRowKey(groupKey: string, promptId: string): string {
+  return `${groupKey}/${promptId}`;
+}

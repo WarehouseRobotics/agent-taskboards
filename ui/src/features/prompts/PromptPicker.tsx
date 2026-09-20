@@ -8,6 +8,9 @@ import { resolveParentTaskId } from "./parent-task";
 import {
   filterPrompts,
   groupPromptsByCategory,
+  promptGroupKey,
+  promptRowKey,
+  recentPromptGroupKey,
   recentPrompts,
 } from "./prompt-library-view";
 import { renderPromptBody, type PromptTokenValues } from "./prompt-tokens";
@@ -28,8 +31,11 @@ export function PromptPicker({
 }) {
   const library = usePromptLibrary();
   const [query, setQuery] = useState("");
-  const [expandedPromptId, setExpandedPromptId] = useState<string | null>(null);
-  const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
+  // Row state is keyed by row, not by prompt: the same prompt is rendered in
+  // `Recent` and in each of its categories, and only the clicked row should
+  // react. See `promptRowKey`.
+  const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
+  const [copiedRowKey, setCopiedRowKey] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
   const [parentTaskValue, setParentTaskValue] = useState<string | null>(null);
   const copiedBlinkTimeout = useRef<number | null>(null);
@@ -100,7 +106,7 @@ export function PromptPicker({
     return values;
   }, [parentTaskValue, task.id, task.title]);
 
-  const copyPrompt = async (prompt: Prompt) => {
+  const copyPrompt = async (prompt: Prompt, rowKey: string) => {
     setCopyError(null);
     const rendered = renderPromptBody(prompt.body, tokenValues);
     if (!(await copyTextToClipboard(rendered))) {
@@ -111,9 +117,9 @@ export function PromptPicker({
     if (copiedBlinkTimeout.current) {
       window.clearTimeout(copiedBlinkTimeout.current);
     }
-    setCopiedPromptId(prompt.id);
+    setCopiedRowKey(rowKey);
     copiedBlinkTimeout.current = window.setTimeout(
-      () => setCopiedPromptId(null),
+      () => setCopiedRowKey(null),
       850,
     );
     void library.recordPromptUse(prompt.id).catch(() => {
@@ -137,52 +143,56 @@ export function PromptPicker({
     [filteredPrompts, library.categories],
   );
 
-  const renderRow = (prompt: Prompt) => (
-    <div
-      className={
-        copiedPromptId === prompt.id
-          ? "prompt-picker__row prompt-picker__row--copied"
-          : "prompt-picker__row"
-      }
-      key={prompt.id}
-    >
-      <button
-        className="prompt-picker__copy"
-        onClick={() => void copyPrompt(prompt)}
-        title="Copy prompt to clipboard"
-        type="button"
-      >
-        <Icon name="copy" size={12} />
-        <span className="prompt-picker__name">{prompt.name}</span>
-        {copiedPromptId === prompt.id && <Mono faded>copied</Mono>}
-      </button>
-      <button
-        aria-expanded={expandedPromptId === prompt.id}
-        aria-label={`Preview prompt ${prompt.name}`}
-        className="icon-btn prompt-picker__expand"
-        onClick={() =>
-          setExpandedPromptId((current) => (current === prompt.id ? null : prompt.id))
+  const renderRow = (prompt: Prompt, groupKey: string) => {
+    const rowKey = promptRowKey(groupKey, prompt.id);
+    const copied = copiedRowKey === rowKey;
+    const expanded = expandedRowKey === rowKey;
+
+    return (
+      <div
+        className={
+          copied ? "prompt-picker__row prompt-picker__row--copied" : "prompt-picker__row"
         }
-        title="Preview prompt"
-        type="button"
+        key={rowKey}
       >
-        <Icon
-          className={
-            expandedPromptId === prompt.id
-              ? "prompt-picker__chevron prompt-picker__chevron--open"
-              : "prompt-picker__chevron"
+        <button
+          className="prompt-picker__copy"
+          onClick={() => void copyPrompt(prompt, rowKey)}
+          title="Copy prompt to clipboard"
+          type="button"
+        >
+          <Icon name="copy" size={12} />
+          <span className="prompt-picker__name">{prompt.name}</span>
+          {copied && <Mono faded>copied</Mono>}
+        </button>
+        <button
+          aria-expanded={expanded}
+          aria-label={`Preview prompt ${prompt.name}`}
+          className="icon-btn prompt-picker__expand"
+          onClick={() =>
+            setExpandedRowKey((current) => (current === rowKey ? null : rowKey))
           }
-          name="chevron"
-          size={12}
-        />
-      </button>
-      {expandedPromptId === prompt.id && (
-        <pre className="prompt-picker__preview">
-          {renderPromptBody(prompt.body, tokenValues)}
-        </pre>
-      )}
-    </div>
-  );
+          title="Preview prompt"
+          type="button"
+        >
+          <Icon
+            className={
+              expanded
+                ? "prompt-picker__chevron prompt-picker__chevron--open"
+                : "prompt-picker__chevron"
+            }
+            name="chevron"
+            size={12}
+          />
+        </button>
+        {expanded && (
+          <pre className="prompt-picker__preview">
+            {renderPromptBody(prompt.body, tokenValues)}
+          </pre>
+        )}
+      </div>
+    );
+  };
 
   return (
     <aside
@@ -222,13 +232,15 @@ export function PromptPicker({
         {recent.length > 0 && (
           <section className="prompt-picker__group">
             <h3>Recent</h3>
-            {recent.map(renderRow)}
+            {recent.map((prompt) => renderRow(prompt, recentPromptGroupKey))}
           </section>
         )}
         {groups.map((group) => (
           <section className="prompt-picker__group" key={group.category?.id ?? "root"}>
             <h3>{group.category?.name ?? "Uncategorized"}</h3>
-            {group.prompts.map(renderRow)}
+            {group.prompts.map((prompt) =>
+              renderRow(prompt, promptGroupKey(group.category)),
+            )}
           </section>
         ))}
       </div>
