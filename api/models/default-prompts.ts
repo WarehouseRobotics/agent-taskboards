@@ -9,6 +9,7 @@ export interface DefaultPrompt {
   defaultKey: string;
   name: string;
   body: string;
+  note: string | null;
   position: number;
   categoryDefaultKeys: string[];
 }
@@ -18,61 +19,310 @@ export interface DefaultPrompt {
 // SQL literals; prompt-service.test.ts asserts the two stay in sync.
 export const defaultPromptCategories: DefaultPromptCategory[] = [
   {
-    defaultKey: "umbrella",
-    name: "☂️ Umbrella",
-    description: "Prompts for working through umbrella tasks and their subtasks.",
+    defaultKey: "planning",
+    name: "Planning",
+    description: null,
     position: 0,
   },
+  {
+    defaultKey: "implementing",
+    name: "Implementing",
+    description: null,
+    position: 1,
+  },
+  {
+    defaultKey: "misc",
+    name: "Misc",
+    description: null,
+    position: 2,
+  },
 ];
-
 export const defaultPrompts: DefaultPrompt[] = [
   {
-    defaultKey: "umbrella-implement",
-    name: "☂️ Umbrella Task Implement",
-    body: `/tasks-management
-
-We're working on an umbrella task: {{PARENT_TASK}}
-
-Now, let's handle this subtask:
-
-{{TASK}}
-
-Plan first and pin key decisions with me, then implement. When creating the plan, include an "Assumptions" section that summarizes any assumptions made (if any) in the plan.
-
-Work on the current branch, commit the changes when done.`,
+    defaultKey: "task-implementation",
+    name: "▶️ Task Implementation",
+    body: [
+      "/tasks-management ",
+      "",
+      "Let's handle this task:",
+      "",
+      "{{TASK}}",
+      "",
+      "Plan first and pin key decisions with me, then implement. When creating the plan, include an \"Assumptions\" section that summarizes any assumptions made (if any) in the plan.",
+      "",
+      "Work on the current branch, commit the changes when done.\t",
+    ].join("\n"),
+    note: "Implement a taskboard task. Add contextual markdown documentation when available.",
     position: 0,
-    categoryDefaultKeys: ["umbrella"],
+    categoryDefaultKeys: ["implementing"],
+  },
+  {
+    defaultKey: "umbrella-implement",
+    name: "☂️▶️  Umbrella Task Implement",
+    body: [
+      "/tasks-management",
+      "",
+      "We're working on an umbrella task: {{PARENT_TASK}}",
+      "",
+      "Now, let's handle this subtask:",
+      "",
+      "{{TASK}}",
+      "",
+      "Plan first and pin key decisions with me, then implement. When creating the plan, include an \"Assumptions\" section that summarizes any assumptions made (if any) in the plan.",
+      "",
+      "Work on the current branch, commit the changes when done.",
+    ].join("\n"),
+    note: "Implement a task as part of parent umbrella task. Add contextual markdown documentation when available.",
+    position: 1,
+    categoryDefaultKeys: ["implementing"],
+  },
+  {
+    defaultKey: "epic-umbrella-implement",
+    name: "☂️🦸 Epic+Umbrella Task Implement",
+    body: [
+      "/tasks-management",
+      "",
+      "We're working on an epic task: {{EPIC_TASK}}",
+      "and it's subtask, which is also an umbrella group of tasks: {{PARENT_TASK}}",
+      "",
+      "Now, let's handle this subtask:",
+      "",
+      "{{TASK}}",
+      "",
+      "Plan first and pin key decisions with me, then implement. When creating the plan, include an \"Assumptions\" section that summarizes any assumptions made (if any) in the plan.",
+      "",
+      "Work on the current branch, commit the changes when done.",
+      "",
+    ].join("\n"),
+    note: "Implement a task as part of parent umbrella-epic chain. The epic task you have to paste yourself. Add contextual markdown documentation when available.",
+    position: 2,
+    categoryDefaultKeys: ["implementing"],
+  },
+  {
+    defaultKey: "code-review",
+    name: "👮‍♂️ Code Review",
+    body: [
+      "/tasks-management",
+      "",
+      "We just completed this task:",
+      "",
+      "{{TASK}}",
+      "",
+      "Prepare a code review of the related commit, checking for bugs, security, code quality issues and redundancy. No code changes, no running tests, just a review of the code.",
+      "",
+      "Format the findings as markdown with findings by priority P1, P2, ... etc.",
+    ].join("\n"),
+    note: "Run a code review for a task implementation.",
+    position: 3,
+    categoryDefaultKeys: ["implementing"],
   },
   {
     defaultKey: "umbrella-code-review",
-    name: "☂️ Umbrella Task Code Review",
-    body: `/tasks-management
-We're working on an umbrella task: {{PARENT_TASK}}
-
-We just made progress on this subtask:
-
-{{TASK}}
-
-<note_from_developer>
-</note_from_developer>
-
-Prepare a code review of the last commit, checking for bugs, security, code quality issues and redundancy. No code changes, no running tests, just a review of the code.
-
-Format the findings as markdown with findings by priority P1, P2, ... etc.`,
-    position: 1,
-    categoryDefaultKeys: ["umbrella"],
+    name: "☂️👮‍♂️ Umbrella Task Code Review",
+    body: [
+      "/tasks-management",
+      "",
+      "We're working on an umbrella task: {{PARENT_TASK}}",
+      "",
+      "We just made progress on this subtask:",
+      "",
+      "{{TASK}}",
+      "",
+      "<note_from_developer>",
+      "</note_from_developer>",
+      "",
+      "Prepare a code review of the last commit, checking for bugs, security, code quality issues and redundancy. No code changes, no running tests, just a review of the code.",
+      "",
+      "Format the findings as markdown with findings by priority P1, P2, ... etc.",
+    ].join("\n"),
+    note: "Run a code review for a task implementation with umbrella task in the context.",
+    position: 4,
+    categoryDefaultKeys: ["implementing"],
+  },
+  {
+    defaultKey: "epic-umbrella-code-review",
+    name: "☂️🦸👮‍♂️ Epic+Umbrella Task Code Review",
+    body: [
+      "/tasks-management\u2028",
+      "",
+      "We're working on an epic task: {{EPIC_TASK}}",
+      "and it's subtask, which is also an umbrella group of tasks: {{PARENT_TASK}}",
+      "",
+      "We just made progress on this subtask:",
+      "",
+      "{{TASK}}",
+      "",
+      "Prepare a code review of the last commit, checking for bugs, security, code quality issues and redundancy. No code changes, no running tests, just a review of the code.",
+    ].join("\n"),
+    note: "Run a code review for a task implementation with umbrella and epic in the context. The epic info you have to paste yourself.",
+    position: 5,
+    categoryDefaultKeys: ["implementing"],
+  },
+  {
+    defaultKey: "post-review-compaction",
+    name: "💼 Post-review compaction",
+    body: [
+      "/compact We need to address external code review findings, but we're running out of context window.",
+    ].join("\n"),
+    note: "Sometimes it makes sense to compact your session before you apply code-review fixes.",
+    position: 6,
+    categoryDefaultKeys: ["implementing"],
   },
   {
     defaultKey: "address-review-findings",
-    name: "Address Code Review Findings",
-    body: `A code review identified potential issues. Review them, reject false positives (or things intentionally deferred to other tasks) and address the ones that you think are worth fixing:
-
-<code_review_findings>
-
-</code_review_findings>
-
-In case of doubt or ambiguity, pin assumptions or decisions with me.`,
-    position: 2,
-    categoryDefaultKeys: ["umbrella"],
+    name: "🚑 Fix Review Findings",
+    body: [
+      "We're working on this task: {{TASK}}",
+      "",
+      "A code review identified potential issues. Review them, reject false positives (or things intentionally deferred to other tasks) and address the ones that you think are worth fixing:",
+      "",
+      "<code_review_findings>",
+      "",
+      "</code_review_findings>",
+      "",
+      "In case of doubt or ambiguity, pin assumptions or decisions with me.",
+    ].join("\n"),
+    note: "Fix code-review findings that you have to manually paste inside of the tag.",
+    position: 7,
+    categoryDefaultKeys: ["implementing"],
+  },
+  {
+    defaultKey: "task-follow-up",
+    name: "⏯️ Task Follow-up",
+    body: [
+      "/tasks-management ",
+      "",
+      "We need to do a follow-up for this task: {{TASK}}",
+      "",
+      "...",
+      "",
+      "Plan first and pin key decisions with me, then implement. When creating the plan, include an \"Assumptions\" section that summarizes any assumptions made (if any) in the plan.",
+      "",
+      "Work on the current branch, commit the changes when done.",
+    ].join("\n"),
+    note: "Does a follow-up for an existing task (normally without creating a new task card).",
+    position: 8,
+    categoryDefaultKeys: ["implementing"],
+  },
+  {
+    defaultKey: "expand-task",
+    name: "↔️ Expand Task",
+    body: [
+      "/tasks-management ",
+      "",
+      "Please help me work out the details and the implementation plan for this task: {{TASK}}",
+      "",
+      "Plan first and pin key decisions with me, then update the description of the task. When creating the plan, include an \"Assumptions\" section that summarizes any assumptions made (if any) in the plan.",
+    ].join("\n"),
+    note: "Plans and expands a task sketch into a full task spec. Give it a task with something loosely defined to get a refined version.",
+    position: 9,
+    categoryDefaultKeys: ["planning"],
+  },
+  {
+    defaultKey: "create-scoped-tasks",
+    name: "📝 Create scoped tasks",
+    body: [
+      "Now scope the plan into taskboard tasks for implementation by an AI agent. Tasks must be scoped and in reasonable order. Tasks must be scoped in chunks of work that can be done by a coding agent in a roughly 200K token session. Also – reference relevant doc files in the description for better task context.",
+      "",
+      "Create an umbrella task for the whole chain. For each task, populate the metadata.parentTaskId with the id of the umbrella task.",
+      "",
+      "Use board {{BOARD}}.",
+      "",
+      "Pin down key assumptions and decisions with me first.",
+    ].join("\n"),
+    note: "Based on your current session (you would usually already have some planning results in it), generate a chain of tasks (plus umbrella) to implement the plan.",
+    position: 10,
+    categoryDefaultKeys: ["planning"],
+  },
+  {
+    defaultKey: "merge-conflicts-resolve",
+    name: "🔀🛠️ Merge Conflicts Resolve",
+    body: [
+      "/tasks-management",
+      "",
+      "We're working on a task: {{TASK}}",
+      "",
+      "I'm merging git branches: `SOURCE_BRANCH` into `TARGET_BRANCH`.",
+      "",
+      "The unfinished merge is my current working copy state. I want to have a clean TARGET_BRANCH with all merge conflicts resolved.",
+      "",
+      "Help me resolve the merge conflicts. Fix the code first, then the docs. Pin down key decisions with me first, then implement. ",
+      "",
+    ].join("\n"),
+    note: null,
+    position: 11,
+    categoryDefaultKeys: ["misc"],
+  },
+  {
+    defaultKey: "virtual-rebase-merge-conflicts-assistance",
+    name: "🔀🛠️ Virtual Rebase Merge Conflicts Assistance",
+    body: [
+      "/tasks-management",
+      "",
+      "We're working on this task: {{TASK}}",
+      "",
+      "I'm preparing my branch to be merged into branch MERGE_TARGET. To prepare for a clean final merge, I renamed my original branch FEATURE_BRANCH to FEATURE_BRANCH_VERSIONED, then I branched again from MERGE_TARGET and called the new branch FEATURE_BRANCH and then I merged FEATURE_BRANCH_VERSIONED into the new FEATURE_BRANCH. The unfinished merge is my current working copy state. I want to have a clean FEATURE_BRANCH with all merge conflicts resolved.",
+      "",
+      "Help me resolve the merge conflicts. Fix the code first, then the docs. Pin down key decisions with me first, then implement. ",
+    ].join("\n"),
+    note: "Helps resolve a virtual rebase (when a source branch is merged into a clone of a target branch, e.g. feature-branch -> master-clone).",
+    position: 12,
+    categoryDefaultKeys: ["misc"],
+  },
+  {
+    defaultKey: "taskboard-loop",
+    name: "♻️ Taskboard Loop Prompt",
+    body: [
+      "/loop",
+      "/tasks-management",
+      "",
+      "On board {{BOARD}}, go through tasks in \"Ready\" one by one in order, for each do the following:",
+      "",
+      "<step index=\"1\" model=\"Opus\" thinking=\"high\">",
+      "first, spawn an **Opus agent** (High thinking effort) that will take the first task that is not in progress, load its context, find the right spec context in the docs folder for it, will plan the implementation and implement the task on the current branch (leaving a comment in the task and moving it to In Review afterwards).",
+      "",
+      "This agent should then wait for a handoff from the review agent of step 2. Apply the fix suggestions (reject the ones that do not make sense).\u2028</step>",
+      "",
+      "<step index=\"2\" model=\"Opus\" thinking=\"high\">",
+      "second, spawn a new **Opus agent** (High thinking effort) to review the pending changes with the following prompt:",
+      "",
+      "```",
+      "We've just completed the task <name and ID of the completed task>.",
+      "",
+      "Load relevant context from `docs/` and perform code review for bugs, code quality and redundancy.",
+      "",
+      "Hand off priority fixes to the next agent in step 3.",
+      "```\u2028",
+      "</step>",
+      "",
+      "<step index=\"3\" model=\"Opus\" thinking=\"high\">",
+      "third, spawn a new **Opus agent** (High thinking effort) to fix the issues identified in the previous code review step, use the following prompt:",
+      "",
+      "```",
+      "We're working on this task: <name and ID of the completed task>.",
+      "",
+      "A code review identified potential issues. Review them, reject false positives and address the ones that you think are worth fixing:",
+      "",
+      "<list of issues from code review results>",
+      "",
+      "```\u2028</step>",
+      "",
+      "<step index=\"4\" model=\"Opus\" thinking=\"high\">",
+      "fourth, spawn a new **Opus agent** (High thinking effort) to update the documentation and finalize the commit.",
+      "",
+      "```",
+      "We've just completed the task <name and ID of the completed task>.",
+      "",
+      "Look at the task comments and pending changes and update the spec documentation in <docs>.",
+      "",
+      "Afterwards do the git commit to whatever the current branch is. Move task to Done, mention commit hash in the comments.",
+      "```\u2028",
+      "</step>",
+      "",
+      "If you get an \"API Error: 529 Overloaded\" error when spawning new sub agents, stop the loop and inform the user.",
+    ].join("\n"),
+    note: "Autonomously loops over tasks on a board that you specify using subagents for plan-implement-review-fix-finalize sequence.",
+    position: 13,
+    categoryDefaultKeys: ["implementing"],
   },
 ];

@@ -19,6 +19,10 @@ import {
   taskComments,
   tasks,
 } from "./db/schema.js";
+import {
+  defaultPromptCategories,
+  defaultPrompts,
+} from "./models/default-prompts.js";
 import { createFakeEmbeddingModel } from "./testing/fake-embedding-model.js";
 
 describe("starter API", () => {
@@ -106,18 +110,15 @@ describe("starter API", () => {
       arrayProp(seededPrompts.body, "prompts").map((item) =>
         stringProp(asObject(item), "defaultKey"),
       ),
-    ).toEqual([
-      "umbrella-implement",
-      "umbrella-code-review",
-      "address-review-findings",
-    ]);
+    ).toEqual(defaultPrompts.map((prompt) => prompt.defaultKey));
 
     const seededCategories = await api("GET", "/api/prompt-categories");
     expect(seededCategories.status).toBe(200);
-    const seededCategory = asObject(
-      arrayProp(seededCategories.body, "categories")[0],
-    );
-    expect(stringProp(seededCategory, "name")).toBe("☂️ Umbrella");
+    expect(
+      arrayProp(seededCategories.body, "categories").map((item) =>
+        stringProp(asObject(item), "name"),
+      ),
+    ).toEqual(defaultPromptCategories.map((category) => category.name));
 
     const categoryResponse = await api("POST", "/api/prompt-categories", {
       name: "🔧 Fixes",
@@ -203,7 +204,7 @@ describe("starter API", () => {
     const restoreResponse = await api("POST", "/api/prompts/restore-defaults");
     expect(restoreResponse.status).toBe(200);
     expect(arrayProp(restoreResponse.body, "restored")).toEqual([
-      "prompt:umbrella-implement",
+      `prompt:${defaultPrompts[0].defaultKey}`,
     ]);
 
     const restoreAgain = await api("POST", "/api/prompts/restore-defaults");
@@ -228,19 +229,24 @@ describe("starter API", () => {
       );
 
     const seeded = await promptIds();
-    expect(seeded).toHaveLength(3);
+    expect(seeded).toHaveLength(defaultPrompts.length);
 
     const moved = await api("POST", `/api/prompts/${seeded[2]}/reorder`, {
       position: 0,
     });
     expect(moved.status).toBe(200);
     expect(numberProp(objectProp(moved.body, "prompt"), "position")).toBe(0);
-    expect(await promptIds()).toEqual([seeded[2], seeded[0], seeded[1]]);
+    expect(await promptIds()).toEqual([
+      seeded[2],
+      seeded[0],
+      seeded[1],
+      ...seeded.slice(3),
+    ]);
 
     // `position` counts the list without the moved prompt, so this lands on
     // the last slot rather than one before it.
     await api("POST", `/api/prompts/${seeded[2]}/reorder`, { position: 2 });
-    expect(await promptIds()).toEqual([seeded[0], seeded[1], seeded[2]]);
+    expect(await promptIds()).toEqual(seeded);
 
     const categoryIds = async () =>
       arrayProp(

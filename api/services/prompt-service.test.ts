@@ -5,7 +5,11 @@ import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createDatabaseClient, type DatabaseClient } from "../db/client.js";
 import { runMigrations } from "../db/migrate.js";
-import { promptCategoryLinks, prompts } from "../db/schema.js";
+import {
+  promptCategories,
+  promptCategoryLinks,
+  prompts,
+} from "../db/schema.js";
 import { ApiError } from "../http/errors.js";
 import {
   defaultPromptCategories,
@@ -68,8 +72,7 @@ describe("PromptService", () => {
       expect(match?.prompt.body).toBe(seed.body);
       expect(match?.prompt.position).toBe(seed.position);
       expect(match?.prompt.usageCount).toBe(0);
-      // Seeded defaults ship without author notes; notes are user-authored.
-      expect(match?.prompt.note).toBeNull();
+      expect(match?.prompt.note).toBe(seed.note);
       const expectedCategoryIds = seed.categoryDefaultKeys.map(
         (key) => categories.find((category) => category.defaultKey === key)!.id,
       );
@@ -90,7 +93,7 @@ describe("PromptService", () => {
     });
     expect(updated.description).toBe("Release prompts");
     expect(() =>
-      service.updateCategory(category.id, { name: "☂️ Umbrella" }),
+      service.updateCategory(category.id, { name: "Planning" }),
     ).toThrowError(ApiError);
   });
 
@@ -257,17 +260,17 @@ describe("PromptService", () => {
 
   it("renormalizes gapped positions on the first reorder", () => {
     const ids = promptIds();
-    for (const [index, gapped] of [0, 2, 7].entries()) {
+    for (const [index, id] of ids.entries()) {
       client.db
         .update(prompts)
-        .set({ position: gapped })
-        .where(eq(prompts.id, ids[index]))
+        .set({ position: index * 3 })
+        .where(eq(prompts.id, id))
         .run();
     }
 
     service.reorderPrompt(ids[2], 0);
 
-    expect(promptIds()).toEqual([ids[2], ids[0], ids[1]]);
+    expect(promptIds()).toEqual([ids[2], ids[0], ids[1], ...ids.slice(3)]);
     expectContiguousPromptPositions();
   });
 
@@ -336,82 +339,161 @@ describe("PromptService", () => {
     expect(service.restoreDefaults().restored).toEqual([]);
   });
 
-  it("relinks surviving default prompts when restoring a deleted default category", () => {
-    const umbrella = service
-      .listCategories()
-      .find((category) => category.defaultKey === "umbrella")!;
-    service.deleteCategory(umbrella.id);
-    for (const { categoryIds } of service.listPrompts()) {
-      expect(categoryIds).toEqual([]);
-    }
+  it("reconciles edited defaults while preserving custom rows", () => {
+    const customCategory = service.createCategory({ name: "Custom category" });
+    const customPrompt = service.createPrompt({
+      name: "Custom prompt",
+      body: "Keep me",
+      note: "Keep this note",
+      categoryIds: [customCategory.id],
+    });
+    const targetSeed = defaultPrompts.find(
+      (seed) => seed.defaultKey === "umbrella-implement",
+    )!;
+    const target = service
+      .listPrompts()
+      .find(({ prompt }) => prompt.defaultKey === targetSeed.defaultKey)!;
+    const used = service.recordPromptUse(target.prompt.id).prompt;
+    service.updatePrompt(target.prompt.id, {
+      name: "Edited default",
+      body: "Edited body",
+      note: "Edited note",
+      categoryIds: [customCategory.id],
+    });
+    service.reorderPrompt(target.prompt.id, defaultPrompts.length - 1);
 
     const restored = service.restoreDefaults();
-    expect(restored.restored).toEqual([
-      "category:umbrella",
-      ...defaultPrompts.map((seed) => `link:${seed.defaultKey}:umbrella`),
+
+    expect(restored.restored).toEqual(
+      defaultPrompts.slice(1).map((seed) => `prompt:${seed.defaultKey}`),
+    );
+    const reconciled = service.getPrompt(target.prompt.id);
+    expect(reconciled.prompt.name).toBe(targetSeed.name);
+    expect(reconciled.prompt.body).toBe(targetSeed.body);
+    expect(reconciled.prompt.note).toBe(targetSeed.note);
+    expect(reconciled.prompt.position).toBe(targetSeed.position);
+    expect(reconciled.prompt.usageCount).toBe(1);
+    expect(reconciled.prompt.lastUsedAt).toEqual(used.lastUsedAt);
+    expect(
+      reconciled.categoryIds.map(
+        (categoryId) => service.getCategory(categoryId).defaultKey,
+      ),
+    ).toEqual(targetSeed.categoryDefaultKeys);
+    expect(service.getPrompt(customPrompt.prompt.id).prompt).toMatchObject({
+      name: "Custom prompt",
+      body: "Keep me",
+      note: "Keep this note",
+      position: defaultPrompts.length,
+      defaultKey: null,
+    });
+    expect(service.getPrompt(customPrompt.prompt.id).categoryIds).toEqual([
+      customCategory.id,
     ]);
+    expect(service.restoreDefaults().restored).toEqual([]);
+  });
+
+  it("recreates deleted default categories and exact prompt links", () => {
+    const implementing = service
+      .listCategories()
+      .find((category) => category.defaultKey === "implementing")!;
+    service.deleteCategory(implementing.id);
+
+    const restored = service.restoreDefaults();
+    expect(restored.restored[0]).toBe("category:implementing");
 
     const recreated = service
       .listCategories()
-      .find((category) => category.defaultKey === "umbrella")!;
-    expect(recreated.id).not.toBe(umbrella.id);
-    for (const { prompt, categoryIds } of service.listPrompts()) {
-      expect(prompt.defaultKey).not.toBeNull();
-      expect(categoryIds).toEqual([recreated.id]);
+      .find((category) => category.defaultKey === "implementing")!;
+    expect(recreated.id).not.toBe(implementing.id);
+    for (const seed of defaultPrompts) {
+      const prompt = service
+        .listPrompts()
+        .find((item) => item.prompt.defaultKey === seed.defaultKey)!;
+      expect(
+        prompt.categoryIds.map(
+          (categoryId) => service.getCategory(categoryId).defaultKey,
+        ),
+      ).toEqual(seed.categoryDefaultKeys);
     }
 
     expect(service.restoreDefaults().restored).toEqual([]);
   });
 
-  it("does not relink defaults to a category the user still has", () => {
-    const seeded = service.listPrompts();
-    const target = seeded.find(
-      ({ prompt }) => prompt.defaultKey === "umbrella-implement",
-    )!;
-    // Unlinking a default prompt from a surviving category is user intent
-    // that a restore must not undo.
-    service.updatePrompt(target.prompt.id, { categoryIds: [] });
-
-    const restored = service.restoreDefaults();
-    expect(restored.restored).toEqual([]);
-    expect(service.getPrompt(target.prompt.id).categoryIds).toEqual([]);
-  });
-
-  it("adopts a same-named user category when restoring defaults", () => {
-    const umbrella = service
+  it("adopts same-named rows created before their default keys existed", () => {
+    const planning = service
       .listCategories()
-      .find((category) => category.defaultKey === "umbrella")!;
-    for (const { prompt } of service.listPrompts()) {
-      service.deletePrompt(prompt.id);
-    }
-    service.deleteCategory(umbrella.id);
-    const userOwned = service.createCategory({ name: "☂️ Umbrella" });
+      .find((category) => category.defaultKey === "planning")!;
+    const seed = defaultPrompts.find(
+      (candidate) => candidate.defaultKey === "expand-task",
+    )!;
+    const seededPrompt = service
+      .listPrompts()
+      .find(({ prompt }) => prompt.defaultKey === seed.defaultKey)!;
+    service.deletePrompt(seededPrompt.prompt.id);
+    service.deleteCategory(planning.id);
+    const category = service.createCategory({ name: "Planning" });
+    const prompt = service.createPrompt({
+      name: seed.name,
+      body: seed.body,
+      note: seed.note,
+      categoryIds: [category.id],
+    });
 
     const restored = service.restoreDefaults();
-    expect(restored.restored).toEqual(
-      defaultPrompts.map((seed) => `prompt:${seed.defaultKey}`),
+    expect(restored.restored).toEqual([
+      "category:planning",
+      "prompt:expand-task",
+      "prompt:create-scoped-tasks",
+    ]);
+    expect(service.getCategory(category.id).defaultKey).toBe("planning");
+    expect(service.getPrompt(prompt.prompt.id).prompt.defaultKey).toBe(
+      "expand-task",
     );
-
-    for (const { prompt, categoryIds } of service.listPrompts()) {
-      expect(prompt.defaultKey).not.toBeNull();
-      expect(categoryIds).toEqual([userOwned.id]);
-    }
+    expect(
+      service
+        .listPrompts()
+        .filter(({ prompt: item }) => item.name === seed.name),
+    ).toHaveLength(1);
   });
 
-  it("appends restored prompts after existing user prompt positions", () => {
-    const userPrompt = service.createPrompt({ name: "Mine", body: "body" });
-    const target = service
-      .listPrompts()
-      .find(({ prompt }) => prompt.defaultKey === "umbrella-code-review")!;
-    service.deletePrompt(target.prompt.id);
+  it("removes obsolete system defaults but preserves custom rows", () => {
+    const custom = service.createPrompt({ name: "Mine", body: "body" });
+    client.db
+      .insert(prompts)
+      .values({
+        name: "Obsolete default",
+        body: "old",
+        position: 99,
+        defaultKey: "obsolete-default",
+      })
+      .run();
+    client.db
+      .insert(promptCategories)
+      .values({
+        name: "Obsolete category",
+        position: 99,
+        defaultKey: "obsolete-category",
+      })
+      .run();
 
-    service.restoreDefaults();
+    const restored = service.restoreDefaults();
 
-    const restoredRow = client.db
-      .select()
-      .from(prompts)
-      .all()
-      .find((prompt) => prompt.defaultKey === "umbrella-code-review");
-    expect(restoredRow!.position).toBeGreaterThan(userPrompt.prompt.position);
+    expect(restored.restored).toEqual([
+      "removed:prompt:obsolete-default",
+      "removed:category:obsolete-category",
+    ]);
+    expect(
+      service.listPrompts().some(
+        ({ prompt }) => prompt.defaultKey === "obsolete-default",
+      ),
+    ).toBe(false);
+    expect(
+      service
+        .listCategories()
+        .some((category) => category.defaultKey === "obsolete-category"),
+    ).toBe(false);
+    expect(service.getPrompt(custom.prompt.id).prompt.position).toBe(
+      defaultPrompts.length,
+    );
   });
 });

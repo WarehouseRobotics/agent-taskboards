@@ -841,13 +841,16 @@ calls this when a prompt is copied from the prompt picker.
 
 ### `POST /api/prompts/restore-defaults`
 
-Re-creates any missing default prompts and categories, keyed on their stable
-`defaultKey`. Existing rows — including edited defaults — are left untouched,
-so the call is idempotent.
+Reconciles default prompts and categories to the shipped catalog, keyed on
+their stable `defaultKey`. It restores exact names, bodies, notes, order, and
+category links; removes obsolete system defaults; and preserves user-created
+rows. Same-named rows without a default key are adopted to avoid duplicates
+when an existing database gains a new system default. Repeated calls are
+idempotent.
 
 ```json
 {
-  "restored": ["prompt:umbrella-implement"],
+  "restored": ["prompt:task-implementation"],
   "categories": [],
   "prompts": []
 }

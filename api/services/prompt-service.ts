@@ -274,113 +274,250 @@ export class PromptService {
     return { prompt, categoryIds: this.categoryIdsForPrompt(promptId) };
   }
 
-  // Re-creates any missing default rows, keyed on defaultKey. Existing rows
-  // (including edited defaults) are left untouched, so the call is idempotent.
+  // Reconciles system-owned rows to the shipped defaults while preserving
+  // user-created prompts and categories. Same-named user rows are adopted so
+  // databases created before a default key was introduced do not get duplicates.
   restoreDefaults() {
-    const restored: string[] = [];
+    const restored = new Set<string>();
 
     this.db.transaction((tx) => {
+      const categoryKeys = new Set(
+        defaultPromptCategories.map((seed) => seed.defaultKey),
+      );
+      const promptKeys = new Set(defaultPrompts.map((seed) => seed.defaultKey));
+
+      for (const prompt of tx.select().from(prompts).all()) {
+        if (prompt.defaultKey && !promptKeys.has(prompt.defaultKey)) {
+          tx.delete(prompts).where(eq(prompts.id, prompt.id)).run();
+          restored.add(`removed:prompt:${prompt.defaultKey}`);
+        }
+      }
+
+      for (const category of tx.select().from(promptCategories).all()) {
+        if (category.defaultKey && !categoryKeys.has(category.defaultKey)) {
+          tx
+            .delete(promptCategories)
+            .where(eq(promptCategories.id, category.id))
+            .run();
+          restored.add(`removed:category:${category.defaultKey}`);
+        }
+      }
+
       const categoryIdsByDefaultKey = new Map<string, string>();
-      const createdCategoryKeys = new Set<string>();
 
       for (const seed of defaultPromptCategories) {
-        const byDefaultKey = tx
+        let category = tx
           .select()
           .from(promptCategories)
           .where(eq(promptCategories.defaultKey, seed.defaultKey))
           .get();
-        if (byDefaultKey) {
-          categoryIdsByDefaultKey.set(seed.defaultKey, byDefaultKey.id);
-          continue;
-        }
-
-        // A user-created category may already own the default name; adopt it
-        // for linking instead of violating the unique name constraint.
         const byName = tx
           .select()
           .from(promptCategories)
           .where(eq(promptCategories.name, seed.name))
           .get();
-        if (byName) {
-          categoryIdsByDefaultKey.set(seed.defaultKey, byName.id);
-          continue;
+
+        if (category && byName && category.id !== byName.id) {
+          // Preserve links from custom prompts before replacing an edited
+          // system category with the user row that owns the canonical name.
+          const oldLinks = tx
+            .select()
+            .from(promptCategoryLinks)
+            .where(eq(promptCategoryLinks.categoryId, category.id))
+            .all();
+          const replacementLinks = tx
+            .select()
+            .from(promptCategoryLinks)
+            .where(eq(promptCategoryLinks.categoryId, byName.id))
+            .all();
+          for (const link of oldLinks) {
+            if (
+              replacementLinks.some(
+                (candidate) => candidate.promptId === link.promptId,
+              )
+            ) {
+              continue;
+            }
+            tx.insert(promptCategoryLinks)
+              .values({
+                promptId: link.promptId,
+                categoryId: byName.id,
+                position: link.position,
+              })
+              .run();
+          }
+          tx
+            .delete(promptCategories)
+            .where(eq(promptCategories.id, category.id))
+            .run();
+          category = byName;
         }
 
-        const created = tx
-          .insert(promptCategories)
-          .values({
-            name: seed.name,
-            description: seed.description,
-            position: seed.position,
-            defaultKey: seed.defaultKey,
-          })
-          .returning()
-          .get();
-        categoryIdsByDefaultKey.set(seed.defaultKey, created.id);
-        createdCategoryKeys.add(seed.defaultKey);
-        restored.push(`category:${seed.defaultKey}`);
+        category ??= byName;
+        if (!category) {
+          category = tx
+            .insert(promptCategories)
+            .values({
+              name: seed.name,
+              description: seed.description,
+              position: seed.position,
+              defaultKey: seed.defaultKey,
+            })
+            .returning()
+            .get();
+          restored.add(`category:${seed.defaultKey}`);
+        } else if (
+          category.name !== seed.name ||
+          category.description !== seed.description ||
+          category.position !== seed.position ||
+          category.defaultKey !== seed.defaultKey
+        ) {
+          category = tx
+            .update(promptCategories)
+            .set({
+              name: seed.name,
+              description: seed.description,
+              position: seed.position,
+              defaultKey: seed.defaultKey,
+            })
+            .where(eq(promptCategories.id, category.id))
+            .returning()
+            .get();
+          restored.add(`category:${seed.defaultKey}`);
+        }
+
+        categoryIdsByDefaultKey.set(seed.defaultKey, category.id);
       }
 
       for (const seed of defaultPrompts) {
-        const existing = tx
+        let prompt = tx
           .select()
           .from(prompts)
           .where(eq(prompts.defaultKey, seed.defaultKey))
           .get();
-        if (existing) {
-          // Deleting a default category cascades its links away. When this
-          // call recreates that category, relink the surviving default
-          // prompts to it; links to pre-existing categories stay untouched
-          // so intentional unlinking is preserved.
-          const relinkKeys = seed.categoryDefaultKeys.filter((key) =>
-            createdCategoryKeys.has(key),
-          );
-          if (relinkKeys.length > 0) {
-            const existingLinks = tx
-              .select()
-              .from(promptCategoryLinks)
-              .where(eq(promptCategoryLinks.promptId, existing.id))
-              .all();
-            let position =
-              existingLinks.reduce((max, link) => Math.max(max, link.position), -1) + 1;
-            for (const key of relinkKeys) {
-              const categoryId = categoryIdsByDefaultKey.get(key);
-              if (
-                !categoryId ||
-                existingLinks.some((link) => link.categoryId === categoryId)
-              ) {
-                continue;
-              }
-              tx
-                .insert(promptCategoryLinks)
-                .values({ promptId: existing.id, categoryId, position: position++ })
-                .run();
-              restored.push(`link:${seed.defaultKey}:${key}`);
-            }
-          }
-          continue;
+        prompt ??= tx
+          .select()
+          .from(prompts)
+          .where(eq(prompts.name, seed.name))
+          .orderBy(asc(prompts.position), asc(prompts.id))
+          .get();
+
+        if (!prompt) {
+          prompt = tx
+            .insert(prompts)
+            .values({
+              name: seed.name,
+              body: seed.body,
+              note: seed.note,
+              position: seed.position,
+              defaultKey: seed.defaultKey,
+            })
+            .returning()
+            .get();
+          restored.add(`prompt:${seed.defaultKey}`);
+        } else if (
+          prompt.name !== seed.name ||
+          prompt.body !== seed.body ||
+          prompt.note !== seed.note ||
+          prompt.position !== seed.position ||
+          prompt.defaultKey !== seed.defaultKey
+        ) {
+          prompt = tx
+            .update(prompts)
+            .set({
+              name: seed.name,
+              body: seed.body,
+              note: seed.note,
+              position: seed.position,
+              defaultKey: seed.defaultKey,
+            })
+            .where(eq(prompts.id, prompt.id))
+            .returning()
+            .get();
+          restored.add(`prompt:${seed.defaultKey}`);
         }
 
-        const created = tx
-          .insert(prompts)
-          .values({
-            name: seed.name,
-            body: seed.body,
-            position: this.nextPromptPosition(tx),
-            defaultKey: seed.defaultKey,
-          })
-          .returning()
-          .get();
         const categoryIds = seed.categoryDefaultKeys
           .map((key) => categoryIdsByDefaultKey.get(key))
           .filter((value): value is string => Boolean(value));
-        this.insertLinks(tx, created.id, categoryIds);
-        restored.push(`prompt:${seed.defaultKey}`);
+        const existingCategoryIds = tx
+          .select({ categoryId: promptCategoryLinks.categoryId })
+          .from(promptCategoryLinks)
+          .where(eq(promptCategoryLinks.promptId, prompt.id))
+          .orderBy(asc(promptCategoryLinks.position))
+          .all()
+          .map((link) => link.categoryId);
+        if (
+          existingCategoryIds.length !== categoryIds.length ||
+          existingCategoryIds.some((id, index) => id !== categoryIds[index])
+        ) {
+          tx
+            .delete(promptCategoryLinks)
+            .where(eq(promptCategoryLinks.promptId, prompt.id))
+            .run();
+          this.insertLinks(tx, prompt.id, categoryIds);
+          restored.add(`prompt:${seed.defaultKey}`);
+        }
       }
+
+      const orderedCategoryRows = tx
+        .select()
+        .from(promptCategories)
+        .orderBy(asc(promptCategories.position), asc(promptCategories.name))
+        .all();
+      const categoryPositions = new Map(
+        orderedCategoryRows.map((category) => [category.id, category.position]),
+      );
+      const orderedCategoryIds = [
+        ...defaultPromptCategories.map(
+          (seed) => categoryIdsByDefaultKey.get(seed.defaultKey)!,
+        ),
+        ...orderedCategoryRows
+          .filter((category) => category.defaultKey === null)
+          .map((category) => category.id),
+      ];
+      orderedCategoryIds.forEach((id, position) => {
+        if (categoryPositions.get(id) === position) {
+          return;
+        }
+        tx
+          .update(promptCategories)
+          .set({ position })
+          .where(eq(promptCategories.id, id))
+          .run();
+      });
+
+      const orderedPromptRows = tx
+        .select()
+        .from(prompts)
+        .orderBy(asc(prompts.position), asc(prompts.name))
+        .all();
+      const promptIdsByDefaultKey = new Map(
+        orderedPromptRows
+          .filter((prompt) => prompt.defaultKey !== null)
+          .map((prompt) => [prompt.defaultKey!, prompt.id]),
+      );
+      const orderedPromptIds = [
+        ...defaultPrompts.map(
+          (seed) => promptIdsByDefaultKey.get(seed.defaultKey)!,
+        ),
+        ...orderedPromptRows
+          .filter((prompt) => prompt.defaultKey === null)
+          .map((prompt) => prompt.id),
+      ];
+      orderedPromptIds.forEach((id, position) => {
+        if (
+          orderedPromptRows.find((prompt) => prompt.id === id)?.position ===
+          position
+        ) {
+          return;
+        }
+        tx.update(prompts).set({ position }).where(eq(prompts.id, id)).run();
+      });
     });
 
     return {
-      restored,
+      restored: [...restored],
       categories: this.listCategories(),
       prompts: this.listPrompts(),
     };

@@ -33,7 +33,8 @@ with no length cap, shown verbatim — no markdown, and no token substitution.
 
 The note is commentary about the prompt, not part of it: copying a prompt
 never puts the note on the clipboard, and neither the picker filter nor
-`GET /api/prompts?q=` matches it. The seeded defaults ship without notes.
+`GET /api/prompts?q=` matches it. System defaults may include notes that
+explain when and how to use them.
 
 In the library editor the note sits between Name and Body and reads as static
 text, turning into a textarea on click and collapsing back on blur or Escape.
@@ -77,7 +78,9 @@ over an open task, so its board and project are already loaded alongside it.
 Both carry only a URL-safe `name` rather than a display title, so
 `{{PROJECT}}` renders as `"agent-taskboards" ( id=... )`.
 
-The seeded default prompts use only `{{TASK}}` and `{{PARENT_TASK}}`.
+The seeded default prompts use `{{TASK}}`, `{{PARENT_TASK}}`, and `{{BOARD}}`.
+Some also carry an `{{EPIC_TASK}}` placeholder, which is intentionally not a
+picker token and remains in the copied text for the user to fill in.
 
 ### Parent Task Resolution
 
@@ -106,18 +109,36 @@ actionable.
 
 ## Default Prompts
 
-The `0006_prompt_library.sql` migration seeds a default category
-`☂️ Umbrella` with three prompts, keyed by stable `default_key` values:
+The `0006_prompt_library.sql` migration seeds three default categories and 14
+prompts, all keyed by stable `default_key` values:
 
-- `umbrella-implement` — ☂️ Umbrella Task Implement
-- `umbrella-code-review` — ☂️ Umbrella Task Code Review
-- `address-review-findings` — Address Code Review Findings
+- `Planning`
+  - `expand-task` — ↔️ Expand Task
+  - `create-scoped-tasks` — 📝 Create scoped tasks
+- `Implementing`
+  - `task-implementation` — ▶️ Task Implementation
+  - `umbrella-implement` — ☂️▶️ Umbrella Task Implement
+  - `epic-umbrella-implement` — ☂️🦸 Epic+Umbrella Task Implement
+  - `code-review` — 👮‍♂️ Code Review
+  - `umbrella-code-review` — ☂️👮‍♂️ Umbrella Task Code Review
+  - `epic-umbrella-code-review` — ☂️🦸👮‍♂️ Epic+Umbrella Task Code Review
+  - `post-review-compaction` — 💼 Post-review compaction
+  - `address-review-findings` — 🚑 Fix Review Findings
+  - `task-follow-up` — ⏯️ Task Follow-up
+  - `taskboard-loop` — ♻️ Taskboard Loop Prompt
+- `Misc`
+  - `merge-conflicts-resolve` — 🔀🛠️ Merge Conflicts Resolve
+  - `virtual-rebase-merge-conflicts-assistance` — 🔀🛠️ Virtual Rebase Merge
+    Conflicts Assistance
 
 The seed values mirror `api/models/default-prompts.ts`, which also backs the
 `Restore defaults` action (`POST /api/prompts/restore-defaults`). Restore
-re-creates only rows whose `default_key` is missing, so it is idempotent and
-never overwrites edited defaults. If a user-created category already owns the
-default category name, restored prompts are linked to it instead.
+reconciles system-owned names, bodies, notes, order, categories, and links to
+this exact catalog, removes obsolete system defaults, and remains idempotent.
+User-created prompts and categories are preserved and ordered after system
+defaults. A same-named user row is adopted when its default key is missing,
+which upgrades databases created before that key was introduced without
+creating a duplicate.
 
 ## Prompt Picker
 

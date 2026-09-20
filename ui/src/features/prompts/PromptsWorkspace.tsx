@@ -282,8 +282,8 @@ export function PromptsWorkspace() {
       const restored = await library.restoreDefaults();
       showStatus(
         restored.length === 0
-          ? "Defaults already present"
-          : `Restored ${restored.length} default ${restored.length === 1 ? "entry" : "entries"}`,
+          ? "Defaults already up to date"
+          : `Updated ${restored.length} default ${restored.length === 1 ? "entry" : "entries"}`,
       );
     } catch (cause) {
       setMutationError(apiMessage(cause));
