@@ -442,6 +442,8 @@
   color: var(--fg-muted);
   font-size: var(--fs-11);
   text-wrap: pretty;
+  /* Notes are shown verbatim, and the editor preserves their line breaks. */
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
