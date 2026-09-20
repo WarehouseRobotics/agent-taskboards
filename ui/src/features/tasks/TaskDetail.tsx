@@ -1084,18 +1084,25 @@ export function TaskDetail({
           <strong className="detail-labels">
             {task.labels.length ? task.labels.map((label) => <LabelChip key={label} label={label} />) : "none"}
           </strong>
-          {metadataRows.map((row) => (
-            <MetadataProperty
-              key={row.key}
-              links={metadataTaskLinks}
-              onNavigateToTask={onNavigateToTask}
-              row={row}
-            />
-          ))}
           <span>API</span>
           <code>GET /api/tasks/{task.id}/context</code>
         </div>
       </section>
+      {metadataRows.length > 0 && (
+        <section className="detail-section">
+          <h2>Metadata</h2>
+          <div className="meta-grid">
+            {metadataRows.map((row) => (
+              <MetadataProperty
+                key={row.key}
+                links={metadataTaskLinks}
+                onNavigateToTask={onNavigateToTask}
+                row={row}
+              />
+            ))}
+          </div>
+        </section>
+      )}
       <section className="detail-section">
         <div className="detail-section__heading">
           <h2>Activity & Comments</h2>
@@ -1222,7 +1229,7 @@ function TimelineEntry({
 }
 
 // One metadata key and its value(s). Rendered as a fragment so the pair drops
-// straight into the Properties grid alongside the built-in rows.
+// straight into the two columns of the metadata grid.
 function MetadataProperty({
   links,
   onNavigateToTask,
@@ -1234,18 +1241,18 @@ function MetadataProperty({
 }) {
   return (
     <>
-      <span className="prop-grid__meta-key">{row.key}</span>
+      <span className="meta-grid__key">{row.key}</span>
       {row.kind === "json" ? (
-        <details className="prop-meta-json">
+        <details className="meta-json">
           {/* Collapsed by default: a nested object can be long enough to push
               everything below it out of the rail. */}
           <summary>{(row.json ?? "").replace(/\s+/g, " ")}</summary>
           <pre>{row.json}</pre>
         </details>
       ) : row.empty ? (
-        <strong className="prop-meta-empty">&mdash;</strong>
+        <strong className="meta-empty">&mdash;</strong>
       ) : (
-        <strong className="prop-meta-values">
+        <strong className="meta-values">
           {row.atoms.map((atom, index) => (
             <MetadataValue
               atom={atom}
@@ -1272,7 +1279,7 @@ function MetadataValue({
   if (atom.kind === "taskId" && link) {
     return (
       <button
-        className="prop-meta-link"
+        className="meta-link"
         onClick={() => onNavigateToTask(link.projectId, link.boardId, link.taskId)}
         title={link.taskId}
         type="button"
@@ -1285,7 +1292,7 @@ function MetadataValue({
   // Either an ordinary value, or an id-shaped one whose task could not be
   // reached. Keeping the raw text visible means it stays copy-pasteable.
   return (
-    <span className={atom.kind === "taskId" ? "prop-meta-value prop-meta-value--id" : "prop-meta-value"}>
+    <span className={atom.kind === "taskId" ? "meta-value meta-value--id" : "meta-value"}>
       {atom.text}
     </span>
   );

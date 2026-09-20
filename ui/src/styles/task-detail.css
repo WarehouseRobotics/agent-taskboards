@@ -531,22 +531,13 @@
 
 .prop-grid {
   display: grid;
-  /* The key track sizes to its content so agent-authored metadata keys such as
-     `relatedTasks` are not forced to wrap mid-word. The 72px floor comes from
-     the key cells' min-width and the ceiling from their max-width, which keeps
-     a task without metadata looking exactly as it did before. A fixed or
-     `minmax()` max cannot do this: the `1fr` value track swallows the free
-     space those tracks would have grown into. */
-  /* `minmax(0, …)` on the value track: its automatic minimum is min-content,
-     which a long metadata value would push past the panel's width. */
-  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-columns: 72px 1fr;
   gap: var(--s-2) 10px;
   align-items: start;
   font-size: var(--fs-12);
 }
 
 .prop-grid > span {
-  min-width: 72px;
   color: var(--fg-faint);
   font-size: var(--fs-10);
   font-weight: 600;
@@ -559,44 +550,56 @@
   font-weight: 500;
 }
 
-/* Metadata keys are identifiers an agent writes and PATCHes by, so they keep
-   their exact casing and render in mono, unlike the prose micro-labels on the
-   built-in rows above. */
-.prop-grid > .prop-grid__meta-key {
+/* The metadata grid sits below Properties in its own section because its keys
+   are agent-authored identifiers, not the prose micro-labels the built-in rows
+   use. The key track sizes to its content so a key such as `relatedTasks` is
+   not forced to wrap mid-word; the 72px floor and 128px ceiling live on the
+   key cells because a fixed or `minmax()` max never grows into the free space
+   a `1fr` sibling swallows. `minmax(0, …)` on the value track: its automatic
+   minimum is min-content, which a long metadata value would push past the
+   panel's width. */
+.meta-grid {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--s-2) 10px;
+  align-items: start;
+  font-size: var(--fs-12);
+}
+
+.meta-grid__key {
   overflow-wrap: anywhere;
+  min-width: 72px;
   max-width: 128px;
   color: var(--fg-muted);
   font-family: var(--font-mono);
   font-size: var(--fs-11);
   font-weight: 500;
-  letter-spacing: normal;
-  text-transform: none;
 }
 
-.prop-meta-values {
+.meta-values {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   align-items: center;
 }
 
-.prop-meta-value {
+.meta-value {
   overflow-wrap: anywhere;
   color: var(--fg);
   font-weight: 450;
 }
 
-.prop-meta-value--id {
+.meta-value--id {
   color: var(--fg-muted);
   font-family: var(--font-mono);
   font-size: var(--fs-11);
 }
 
-.prop-meta-empty {
+.meta-empty {
   color: var(--fg-faint);
 }
 
-.prop-meta-link {
+.meta-link {
   overflow-wrap: anywhere;
   border: 1px solid var(--line-faint);
   border-radius: var(--r-sm);
@@ -610,13 +613,13 @@
   cursor: pointer;
 }
 
-.prop-meta-link:hover {
+.meta-link:hover {
   border-color: var(--line);
   background: var(--bg-hover);
   color: var(--accent);
 }
 
-.prop-meta-json > summary {
+.meta-json > summary {
   overflow: hidden;
   color: var(--fg-muted);
   font-family: var(--font-mono);
@@ -626,11 +629,11 @@
   cursor: pointer;
 }
 
-.prop-meta-json > summary:hover {
+.meta-json > summary:hover {
   color: var(--fg);
 }
 
-.prop-meta-json > pre {
+.meta-json > pre {
   overflow-x: auto;
   margin: var(--s-1) 0 0;
   border: 1px solid var(--line-faint);
