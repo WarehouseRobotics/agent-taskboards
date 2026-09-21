@@ -1,11 +1,41 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BoardColumn, Task } from "../../domain/types";
 import {
   boardLoadingState,
   normalizeBoardScrollLeft,
   normalizeColumnScrollTop,
+  persistBoardSortKey,
   sortBoardTasks,
+  storedBoardSortKey,
 } from "./board-view-state";
+
+const boardSortKeyStorageKey = "taskboards.board.sortKey";
+
+describe("board sorting preference", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("defaults to position for missing or invalid stored values", () => {
+    stubWindowStorage(makeStorage());
+    expect(storedBoardSortKey()).toBe("position");
+
+    stubWindowStorage(makeStorage({ [boardSortKeyStorageKey]: "unknown" }));
+    expect(storedBoardSortKey()).toBe("position");
+  });
+
+  it("persists every supported sort key in localStorage", () => {
+    const storage = makeStorage();
+    stubWindowStorage(storage);
+
+    for (const sortKey of ["position", "priority", "title", "createdAt", "updatedAt"] as const) {
+      persistBoardSortKey(sortKey);
+
+      expect(storage.value(boardSortKeyStorageKey)).toBe(sortKey);
+      expect(storedBoardSortKey()).toBe(sortKey);
+    }
+  });
+});
 
 describe("board loading state", () => {
   it("shows an initial skeleton while loading without board content", () => {
@@ -163,5 +193,25 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     title: id,
     updatedAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
+  };
+}
+
+function stubWindowStorage(storage: ReturnType<typeof makeStorage>) {
+  vi.stubGlobal("window", { localStorage: storage });
+}
+
+function makeStorage(initial: Record<string, string> = {}) {
+  const entries = new Map(Object.entries(initial));
+
+  return {
+    getItem(key: string) {
+      return entries.get(key) ?? null;
+    },
+    setItem(key: string, value: string) {
+      entries.set(key, value);
+    },
+    value(key: string) {
+      return entries.get(key);
+    },
   };
 }

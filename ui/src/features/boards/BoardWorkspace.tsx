@@ -22,8 +22,10 @@ import {
   normalizeBoardScrollLeft,
   normalizeColumnScrollTop,
   persistBoardDisplayMode,
+  persistBoardSortKey,
   sortBoardTasks,
   storedBoardDisplayMode,
+  storedBoardSortKey,
   type BoardDisplayMode,
   type BoardSortKey,
 } from "./board-view-state";
@@ -118,7 +120,7 @@ export function BoardWorkspace({
   tasks: Task[];
 }) {
   const [displayMode, setDisplayMode] = useState<BoardDisplayMode>(storedBoardDisplayMode);
-  const [sortKey, setSortKey] = useState<BoardSortKey>("position");
+  const [sortKey, setSortKey] = useState<BoardSortKey>(storedBoardSortKey);
   const [archivingSelection, setArchivingSelection] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(() => new Set());
   const [rangeSelectionAnchors, setRangeSelectionAnchors] = useState<Map<string, string>>(() => new Map());
@@ -152,6 +154,10 @@ export function BoardWorkspace({
   const setDisplayPreference = (mode: BoardDisplayMode) => {
     setDisplayMode(mode);
     persistBoardDisplayMode(mode);
+  };
+  const setSortPreference = (nextSortKey: BoardSortKey) => {
+    setSortKey(nextSortKey);
+    persistBoardSortKey(nextSortKey);
   };
   const clearTaskSelection = useCallback(() => {
     setSelectedTaskIds(new Set());
@@ -508,7 +514,7 @@ export function BoardWorkspace({
               <select
                 aria-label="Sort tasks"
                 className="small-select"
-                onChange={(event) => setSortKey(event.target.value as BoardSortKey)}
+                onChange={(event) => setSortPreference(event.target.value as BoardSortKey)}
                 value={sortKey}
               >
                 {boardSortOptions.map((option) => (

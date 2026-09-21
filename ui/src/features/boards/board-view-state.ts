@@ -13,6 +13,7 @@ export const boardSortOptions = [
 ] as const satisfies ReadonlyArray<{ key: BoardSortKey; label: string }>;
 
 const boardDisplayModeStorageKey = "taskboards.board.displayMode";
+const boardSortKeyStorageKey = "taskboards.board.sortKey";
 const priorityRank = {
   urgent: 0,
   high: 1,
@@ -40,6 +41,27 @@ export function storedBoardDisplayMode(): BoardDisplayMode {
 export function persistBoardDisplayMode(mode: BoardDisplayMode) {
   try {
     window.localStorage.setItem(boardDisplayModeStorageKey, mode);
+  } catch {
+    // Preference persistence should never block the board UI.
+  }
+}
+
+export function storedBoardSortKey(): BoardSortKey {
+  if (typeof window === "undefined") {
+    return "position";
+  }
+
+  try {
+    const stored = window.localStorage.getItem(boardSortKeyStorageKey);
+    return boardSortOptions.some((option) => option.key === stored) ? stored as BoardSortKey : "position";
+  } catch {
+    return "position";
+  }
+}
+
+export function persistBoardSortKey(sortKey: BoardSortKey) {
+  try {
+    window.localStorage.setItem(boardSortKeyStorageKey, sortKey);
   } catch {
     // Preference persistence should never block the board UI.
   }
