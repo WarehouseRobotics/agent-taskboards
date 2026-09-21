@@ -1,7 +1,7 @@
 import { ChangeEvent, ClipboardEvent as ReactClipboardEvent, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ActorType, Board, BoardColumn, Task, TaskActivity, TaskAttachment, TaskComment, TaskContext } from "../../domain/types";
+import type { Board, BoardColumn, Task, TaskAttachment, TaskContext } from "../../domain/types";
 import { copyTextToClipboard } from "../../lib/clipboard";
 import { buildTaskReferenceText } from "../../lib/task-reference";
 import { apiMessage } from "../../lib/errors";
@@ -24,6 +24,12 @@ import {
 } from "./task-description-view";
 import { taskAutoSaveDelayMs } from "./task-auto-save";
 import { isOutsideTaskDetailSurfaces } from "./task-detail-surfaces";
+import {
+  mergeTaskTimeline,
+  persistTaskTimelineSortOrder,
+  storedTaskTimelineSortOrder,
+  type TaskTimelineItem,
+} from "./task-timeline-sort";
 import {
   buildMetadataRows,
   collectTaskIdCandidates,
@@ -172,6 +178,7 @@ export function TaskDetail({
   const [movingBoard, setMovingBoard] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
+  const [timelineSortOrder, setTimelineSortOrder] = useState(storedTaskTimelineSortOrder);
   const [taskIdCopyBlink, setTaskIdCopyBlink] = useState(false);
   const [descriptionView, setDescriptionView] = useState<TaskDescriptionView>(() => storedDescriptionView());
   const [descriptionHeight, setDescriptionHeight] = useState<number | null>(() => storedDescriptionHeight());
@@ -220,8 +227,12 @@ export function TaskDetail({
   const column = boardColumns.find((item) => item.id === task?.columnId);
   const doneColumn = boardColumns.find((item) => item.isDone);
   const entries = useMemo(
-    () => mergeTimeline(context?.comments ?? [], showActivity ? context?.activity ?? [] : []),
-    [context?.activity, context?.comments, showActivity],
+    () => mergeTaskTimeline(
+      context?.comments ?? [],
+      showActivity ? context?.activity ?? [] : [],
+      timelineSortOrder,
+    ),
+    [context?.activity, context?.comments, showActivity, timelineSortOrder],
   );
   const activeDraft = task && draft.taskId === task.id
     ? draft
@@ -1104,8 +1115,29 @@ export function TaskDetail({
         </section>
       )}
       <section className="detail-section">
-        <div className="detail-section__heading">
+        <div className="detail-section__heading detail-section__heading--timeline">
           <h2>Activity & Comments</h2>
+          <button
+            aria-label={timelineSortOrder === "asc"
+              ? "Timeline sorted oldest first; sort newest first"
+              : "Timeline sorted newest first; sort oldest first"}
+            aria-pressed={timelineSortOrder === "desc"}
+            className="detail-section__sort"
+            onClick={() => {
+              const nextOrder = timelineSortOrder === "asc" ? "desc" : "asc";
+              setTimelineSortOrder(nextOrder);
+              persistTaskTimelineSortOrder(nextOrder);
+            }}
+            title={timelineSortOrder === "asc" ? "Sort newest first" : "Sort oldest first"}
+            type="button"
+          >
+            <span>Sort</span>
+            <Icon
+              className={timelineSortOrder === "desc" ? "detail-section__sort-icon detail-section__sort-icon--up" : "detail-section__sort-icon"}
+              name="down"
+              size={12}
+            />
+          </button>
           <label className="detail-section__toggle">
             <input
               checked={showActivity}
@@ -1157,39 +1189,13 @@ export function TaskDetail({
   );
 }
 
-type TimelineItem =
-  | { kind: "comment"; id: string; at: string | null; authorType: ActorType; authorName: string | null; body: string }
-  | { kind: "activity"; id: string; at: string | null; actorType: ActorType; actorName: string | null; summary: string; eventType: string };
-
-type CommentTimelineItem = Extract<TimelineItem, { kind: "comment" }>;
-
-function mergeTimeline(comments: TaskComment[], activity: TaskActivity[]): TimelineItem[] {
-  return [
-    ...comments.map((comment) => ({
-      kind: "comment" as const,
-      id: comment.id,
-      at: comment.createdAt,
-      authorType: comment.authorType,
-      authorName: comment.authorName,
-      body: comment.body,
-    })),
-    ...activity.map((item) => ({
-      kind: "activity" as const,
-      id: item.id,
-      at: item.createdAt,
-      actorType: item.actorType,
-      actorName: item.actorName,
-      summary: item.summary,
-      eventType: item.eventType,
-    })),
-  ].sort((a, b) => new Date(a.at ?? 0).getTime() - new Date(b.at ?? 0).getTime());
-}
+type CommentTimelineItem = Extract<TaskTimelineItem, { kind: "comment" }>;
 
 function TimelineEntry({
   entry,
   onRequestDeleteComment,
 }: {
-  entry: TimelineItem;
+  entry: TaskTimelineItem;
   onRequestDeleteComment: (entry: CommentTimelineItem) => void;
 }) {
   const kind = entry.kind === "comment" ? entry.authorType : entry.actorType;

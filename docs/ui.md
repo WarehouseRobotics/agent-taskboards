@@ -87,6 +87,8 @@ link to it; an id that cannot be resolved stays visible as plain text. Lists ren
 disclosure. Metadata is read-only in the UI: it is written through the API.
 
 Comments should be treated as durable task memory, not disposable chat.
+The shared comments and activity timeline defaults to oldest first and offers a
+locally persisted toggle for switching the entire timeline to newest first.
 
 ## Activity Experience
 
