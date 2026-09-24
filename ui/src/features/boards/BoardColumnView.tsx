@@ -25,7 +25,7 @@ export function BoardColumnView({
   isCreating: boolean;
   onArchiveTask: (taskId: string) => Promise<void>;
   onCreateTask: (input: { title: string; description?: string | null; columnId?: string; priority?: TaskPriority; labels?: string[] }) => Promise<void>;
-  onDropTask: (taskId: string, columnId: string, position?: number) => Promise<void>;
+  onDropTask: (taskId: string, columnId: string, targetTaskId?: string) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onOpenCreateTask: (columnId: string | null) => void;
   onOpenTask: (taskId: string) => void;
@@ -58,12 +58,11 @@ export function BoardColumnView({
         </button>
       </header>
       <div className="board-column__tasks" ref={(element) => onTaskScrollerMount?.(column.id, element)}>
-        {tasks.map((task, index) => (
+        {tasks.map((task) => (
           <TaskCard
             active={task.id === activeTaskId}
             column={column}
             columns={totalColumns}
-            index={index}
             key={task.id}
             onArchiveTask={onArchiveTask}
             onDropTask={onDropTask}

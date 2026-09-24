@@ -291,12 +291,13 @@ export function BoardWorkspace({
     [rangeSelectionAnchors, tasksByColumn],
   );
   const handleTaskDrop = useCallback(
-    async (draggedTaskId: string, targetColumnId: string, targetPosition?: number) => {
+    async (draggedTaskId: string, targetColumnId: string, targetTaskId?: string) => {
       const moves = planTaskDrop({
         draggedTaskId,
+        manualOrder: sortKey === "position",
         selectedTaskIds,
         targetColumnId,
-        targetPosition,
+        targetTaskId,
         visibleTasks: sortedTasks,
       });
       if (moves.length === 0) {
@@ -306,7 +307,7 @@ export function BoardWorkspace({
       await moveTaskBatchPreservingScroll(moves);
       clearTaskSelection();
     },
-    [clearTaskSelection, moveTaskBatchPreservingScroll, selectedTaskIds, sortedTasks],
+    [clearTaskSelection, moveTaskBatchPreservingScroll, selectedTaskIds, sortKey, sortedTasks],
   );
   const archiveSelectedTasks = useCallback(async () => {
     const taskIds = selectedTasksInVisibleOrder(sortedTasks, selectedTaskIds).map((task) => task.id);

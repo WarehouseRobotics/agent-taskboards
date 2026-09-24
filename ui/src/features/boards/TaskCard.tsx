@@ -24,7 +24,6 @@ export function TaskCard({
   active,
   column,
   columns,
-  index,
   onArchiveTask,
   onDropTask,
   onMoveTask,
@@ -36,9 +35,8 @@ export function TaskCard({
   active: boolean;
   column: BoardColumn;
   columns: BoardColumn[];
-  index: number;
   onArchiveTask: (taskId: string) => Promise<void>;
-  onDropTask: (taskId: string, columnId: string, position?: number) => Promise<void>;
+  onDropTask: (taskId: string, columnId: string, targetTaskId?: string) => Promise<void>;
   onMoveTask: (taskId: string, input: { columnId?: string; position?: number }) => Promise<void>;
   onOpenTask: (taskId: string) => void;
   onSelectTask: (taskId: string, columnId: string, range: boolean) => void;
@@ -170,7 +168,7 @@ export function TaskCard({
         event.stopPropagation();
         const taskId = event.dataTransfer.getData("text/task-id");
         if (taskId && taskId !== task.id) {
-          void onDropTask(taskId, column.id, index);
+          void onDropTask(taskId, column.id, task.id);
         }
       }}
       onKeyDown={onKeyDown}

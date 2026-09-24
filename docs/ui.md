@@ -39,6 +39,12 @@ The board view should make task state easy to scan and change:
 - columns represent workflow states
 - tasks can be created, edited, moved, archived, and completed
 - task checkboxes support range selection, group dragging, and immediate bulk archival from the board toolbar
+- dragging a card, or a selection within one column, onto another card in the
+  same column reorders it into that card's slot: after it when dragging down,
+  before it when dragging up; dropping on the column background moves it to the
+  end. A non-contiguous selection gathers into one block in its current order.
+  Same-column reordering applies only under the `Position` sort, because other
+  sorts do not show the stored order
 - task cards show compact, high-signal information
 - blocked or review states should be visually obvious
 - archived content should stay out of active board views by default

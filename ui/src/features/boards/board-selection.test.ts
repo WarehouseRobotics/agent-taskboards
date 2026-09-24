@@ -74,9 +74,10 @@ describe("task drop planning", () => {
 
     expect(planTaskDrop({
       draggedTaskId: "task-a",
+      manualOrder: true,
       selectedTaskIds: ["task-b"],
       targetColumnId: "ready",
-      targetPosition: 0,
+      targetTaskId: "task-b",
       visibleTasks: tasks,
     })).toEqual([
       { taskId: "task-a", input: { columnId: "ready", position: 0 } },
@@ -92,6 +93,7 @@ describe("task drop planning", () => {
 
     expect(planTaskDrop({
       draggedTaskId: "backlog-b",
+      manualOrder: true,
       selectedTaskIds: ["backlog-b", "backlog-a"],
       targetColumnId: "ready",
       visibleTasks: tasks,
@@ -106,13 +108,15 @@ describe("task drop planning", () => {
       makeTask("backlog-a", { columnId: "backlog" }),
       makeTask("backlog-b", { columnId: "backlog" }),
       makeTask("ready-a", { columnId: "ready" }),
+      makeTask("ready-b", { columnId: "ready" }),
     ];
 
     expect(planTaskDrop({
       draggedTaskId: "backlog-a",
+      manualOrder: true,
       selectedTaskIds: ["backlog-a", "backlog-b"],
       targetColumnId: "ready",
-      targetPosition: 1,
+      targetTaskId: "ready-b",
       visibleTasks: tasks,
     })).toEqual([
       { taskId: "backlog-a", input: { columnId: "ready", position: 1 } },
@@ -126,13 +130,15 @@ describe("task drop planning", () => {
       makeTask("ready-a", { columnId: "ready" }),
       makeTask("blocked-a", { columnId: "blocked" }),
       makeTask("review-a", { columnId: "review" }),
+      makeTask("review-b", { columnId: "review" }),
     ];
 
     expect(planTaskDrop({
       draggedTaskId: "ready-a",
+      manualOrder: true,
       selectedTaskIds: ["blocked-a", "backlog-a", "ready-a"],
       targetColumnId: "review",
-      targetPosition: 1,
+      targetTaskId: "review-b",
       visibleTasks: tasks,
     })).toEqual([
       { taskId: "backlog-a", input: { columnId: "review", position: 1 } },
@@ -150,30 +156,115 @@ describe("task drop planning", () => {
 
     expect(planTaskDrop({
       draggedTaskId: "ready-a",
+      manualOrder: true,
       selectedTaskIds: ["ready-a", "backlog-a", "ready-b"],
       targetColumnId: "ready",
-      targetPosition: 1,
+      targetTaskId: "ready-b",
       visibleTasks: tasks,
     })).toEqual([
       { taskId: "backlog-a", input: { columnId: "ready", position: 1 } },
     ]);
   });
 
-  it("returns no moves for selected group drops where every selected task is already in the destination column", () => {
+  it("keeps cross-column drops under non-position sorts", () => {
     const tasks = [
-      makeTask("ready-a", { columnId: "ready" }),
-      makeTask("ready-b", { columnId: "ready" }),
+      makeTask("task-a", { columnId: "backlog" }),
+      makeTask("task-b", { columnId: "ready" }),
     ];
 
     expect(planTaskDrop({
-      draggedTaskId: "ready-a",
-      selectedTaskIds: ["ready-a", "ready-b"],
+      draggedTaskId: "task-a",
+      manualOrder: false,
+      selectedTaskIds: [],
       targetColumnId: "ready",
-      targetPosition: 1,
+      targetTaskId: "task-b",
       visibleTasks: tasks,
-    })).toEqual([]);
+    })).toEqual([
+      { taskId: "task-a", input: { columnId: "ready", position: 0 } },
+    ]);
   });
 });
+
+describe("same-column drop planning", () => {
+  const ids = ["a", "b", "c", "d", "e"];
+
+  it("reorders a single unselected card into the target's slot", () => {
+    expect(dropOrder(ids, { dragged: "b", selected: [], target: "d" })).toEqual(["a", "c", "d", "b", "e"]);
+    expect(dropOrder(ids, { dragged: "d", selected: [], target: "b" })).toEqual(["a", "d", "b", "c", "e"]);
+  });
+
+  it("lands a contiguous block dragged down right after the target", () => {
+    expect(dropOrder(ids, { dragged: "a", selected: ["a", "b"], target: "d" })).toEqual(["c", "d", "a", "b", "e"]);
+  });
+
+  it("lands a contiguous block dragged up right before the target", () => {
+    expect(dropOrder(ids, { dragged: "e", selected: ["d", "e"], target: "b" })).toEqual(["a", "d", "e", "b", "c"]);
+  });
+
+  it("gathers a non-contiguous selection into one block in column order", () => {
+    expect(dropOrder(ids, { dragged: "a", selected: ["c", "a"], target: "d" })).toEqual(["b", "d", "a", "c", "e"]);
+    expect(dropOrder(ids, { dragged: "c", selected: ["e", "c"], target: "b" })).toEqual(["a", "c", "e", "b", "d"]);
+  });
+
+  it("takes direction from the grabbed card when the selection straddles the target", () => {
+    expect(dropOrder(ids, { dragged: "a", selected: ["a", "e"], target: "c" })).toEqual(["b", "c", "a", "e", "d"]);
+    expect(dropOrder(ids, { dragged: "e", selected: ["a", "e"], target: "c" })).toEqual(["b", "a", "e", "c", "d"]);
+  });
+
+  it("appends the block to the end on a column background drop", () => {
+    expect(dropOrder(ids, { dragged: "b", selected: ["b", "d"] })).toEqual(["a", "c", "e", "b", "d"]);
+  });
+
+  it("returns no moves when the drop lands on a selected card", () => {
+    expect(planSameColumnDrop(ids, { dragged: "a", selected: ["a", "c"], target: "c" })).toEqual([]);
+  });
+
+  it("returns no moves when the block is already in its final place", () => {
+    expect(planSameColumnDrop(ids, { dragged: "d", selected: ["d", "e"] })).toEqual([]);
+  });
+
+  it("skips moves that leave a task where it already is", () => {
+    expect(planSameColumnDrop(ids, { dragged: "c", selected: ["a", "c"], target: "b" })).toEqual([
+      { taskId: "c", input: { columnId: "ready", position: 1 } },
+    ]);
+    expect(dropOrder(ids, { dragged: "c", selected: ["a", "c"], target: "b" })).toEqual(["a", "c", "b", "d", "e"]);
+  });
+
+  it("returns no moves for same-column drops under non-position sorts", () => {
+    expect(planSameColumnDrop(ids, { dragged: "b", selected: [], target: "d", manualOrder: false })).toEqual([]);
+    expect(planSameColumnDrop(ids, { dragged: "b", selected: [], manualOrder: false })).toEqual([]);
+    expect(planSameColumnDrop(ids, { dragged: "a", selected: ["a", "b"], target: "d", manualOrder: false })).toEqual([]);
+  });
+});
+
+type SameColumnDrop = {
+  dragged: string;
+  manualOrder?: boolean;
+  selected: string[];
+  target?: string;
+};
+
+function planSameColumnDrop(ids: string[], drop: SameColumnDrop) {
+  return planTaskDrop({
+    draggedTaskId: drop.dragged,
+    manualOrder: drop.manualOrder ?? true,
+    selectedTaskIds: drop.selected,
+    targetColumnId: "ready",
+    targetTaskId: drop.target,
+    visibleTasks: ids.map((id) => makeTask(id, { columnId: "ready" })),
+  });
+}
+
+// Applies planned moves one at a time the way the server does: take the task
+// out of the column, then splice it back in at the clamped position.
+function dropOrder(ids: string[], drop: SameColumnDrop) {
+  return planSameColumnDrop(ids, drop).reduce((order, move) => {
+    const rest = order.filter((id) => id !== move.taskId);
+    const position = move.input.position ?? rest.length;
+    rest.splice(Math.max(0, Math.min(position, rest.length)), 0, move.taskId);
+    return rest;
+  }, ids);
+}
 
 function makeTask(id: string, overrides: Partial<Task> = {}): Task {
   return {
