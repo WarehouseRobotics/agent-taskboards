@@ -193,6 +193,13 @@ describe("same-column drop planning", () => {
     expect(dropOrder(ids, { dragged: "d", selected: [], target: "b" })).toEqual(["a", "d", "b", "c", "e"]);
   });
 
+  it("returns no moves when a single unselected card is dropped where it already is", () => {
+    expect(planSameColumnDrop(ids, { dragged: "e", selected: [] })).toEqual([]);
+    expect(planSameColumnDrop(ids, { dragged: "b", selected: ["d"] })).toEqual([
+      { taskId: "b", input: { columnId: "ready", position: 4 } },
+    ]);
+  });
+
   it("lands a contiguous block dragged down right after the target", () => {
     expect(dropOrder(ids, { dragged: "a", selected: ["a", "b"], target: "d" })).toEqual(["c", "d", "a", "b", "e"]);
   });

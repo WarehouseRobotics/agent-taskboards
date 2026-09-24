@@ -304,8 +304,11 @@ export function BoardWorkspace({
         return;
       }
 
-      await moveTaskBatchPreservingScroll(moves);
-      clearTaskSelection();
+      // A failed batch may have reordered only part of the block; keep the
+      // selection so the refreshed state is easy to inspect and retry.
+      if (await moveTaskBatchPreservingScroll(moves)) {
+        clearTaskSelection();
+      }
     },
     [clearTaskSelection, moveTaskBatchPreservingScroll, selectedTaskIds, sortKey, sortedTasks],
   );

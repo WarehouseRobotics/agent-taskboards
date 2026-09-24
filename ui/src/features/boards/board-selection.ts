@@ -89,10 +89,12 @@ export function planTaskDrop({
   const targetPosition = targetIndex === -1 ? undefined : targetIndex;
 
   if (!selected.has(draggedTaskId)) {
-    if (draggedTask.columnId === targetColumnId && !manualOrder) {
-      return [];
+    if (draggedTask.columnId !== targetColumnId) {
+      return [movePlanForTask(draggedTaskId, targetColumnId, targetPosition)];
     }
-    return [movePlanForTask(draggedTaskId, targetColumnId, targetPosition)];
+    return manualOrder
+      ? planBlockReorder(columnTaskIds, new Set([draggedTaskId]), draggedTaskId, targetColumnId, targetTaskId)
+      : [];
   }
 
   const selectedTasks = selectedTasksInVisibleOrder(visibleTasks, selected);
