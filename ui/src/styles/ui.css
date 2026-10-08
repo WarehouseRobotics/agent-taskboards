@@ -305,6 +305,52 @@ button.label-chip:hover {
   color: var(--fg);
 }
 
+/* The filter icon stays collapsed until the chip is hovered or holds focus,
+   so a plain click on the chip body falls through to the card or row. */
+.label-chip__filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 0;
+  margin-left: -4px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  opacity: 0;
+  padding: 0;
+  transition: max-width 120ms ease, margin-left 120ms ease, opacity 120ms ease;
+}
+
+.label-chip--filterable:hover .label-chip__filter,
+.label-chip--filterable:focus-within .label-chip__filter {
+  max-width: 14px;
+  margin-left: 0;
+  opacity: 1;
+  padding: 1px;
+}
+
+@media (hover: none) {
+  .label-chip--filterable .label-chip__filter {
+    max-width: 14px;
+    margin-left: 0;
+    opacity: 1;
+    padding: 1px;
+  }
+}
+
+.label-chip__filter:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.label-chip__filter:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 button.label-chip:focus-visible,
 .label-chip__remove:focus-visible {
   outline: 2px solid var(--accent);
