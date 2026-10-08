@@ -85,6 +85,18 @@ export const agentReadQuerySchema = z.object({
   repositoryPath: queryString,
 });
 
+const querySort = z
+  .preprocess(firstQueryValue, z.enum(["asc", "desc"]).optional())
+  .transform((value) => value ?? "asc");
+
+export const agentCommentListQuerySchema = agentReadQuerySchema.extend({
+  sort: querySort,
+});
+
+export const agentTaskContextQuerySchema = agentReadQuerySchema.extend({
+  commentSort: querySort,
+});
+
 export const agentTaskListQuerySchema = agentReadQuerySchema.extend({
   projectId: queryString,
   boardId: queryString,
@@ -112,5 +124,6 @@ export const agentSearchQuerySchema = agentReadQuerySchema.extend({
 export type AgentFormat = z.infer<typeof agentReadQuerySchema>["format"];
 export type AgentView = z.infer<typeof agentReadQuerySchema>["view"];
 export type AgentReadQuery = z.infer<typeof agentReadQuerySchema>;
+export type AgentCommentListQuery = z.infer<typeof agentCommentListQuerySchema>;
 export type AgentTaskListQuery = z.infer<typeof agentTaskListQuerySchema>;
 export type AgentSearchQuery = z.infer<typeof agentSearchQuerySchema>;

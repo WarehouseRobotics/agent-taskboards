@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import type { DatabaseClient } from "../db/client.js";
 import { searchDocuments, taskActivity, taskComments } from "../db/schema.js";
 import { ApiError } from "../http/errors.js";
@@ -22,13 +22,14 @@ export class CommentService {
     this.db = databaseClient.db;
   }
 
-  listTaskComments(taskId: string) {
+  listTaskComments(taskId: string, sort: "asc" | "desc" = "asc") {
     this.taskService.getTask(taskId, true);
+    const direction = sort === "asc" ? asc : desc;
     return this.db
       .select()
       .from(taskComments)
       .where(eq(taskComments.taskId, taskId))
-      .orderBy(asc(taskComments.createdAt))
+      .orderBy(direction(taskComments.createdAt), direction(taskComments.id))
       .all();
   }
 

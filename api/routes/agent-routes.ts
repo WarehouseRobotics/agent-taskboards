@@ -45,9 +45,12 @@ import type { SearchInput } from "../models/request-schemas.js";
 import type { SearchResult } from "../services/search-service.js";
 import { uploadAttachmentFile } from "./attachment-upload.js";
 import {
+  agentCommentListQuerySchema,
   agentReadQuerySchema,
   agentSearchQuerySchema,
+  agentTaskContextQuerySchema,
   agentTaskListQuerySchema,
+  type AgentCommentListQuery,
   type AgentFormat,
   type AgentReadQuery,
   type AgentTaskListQuery,
@@ -833,11 +836,12 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
   });
 
   app.get("/api/agents/tasks/:taskId/context", (req, res) => {
-    const query = parseQuery(req, agentReadQuerySchema);
+    const query = parseQuery(req, agentTaskContextQuerySchema);
     const context = loadTaskWithParents(
       services,
       req.params.taskId,
       query.includeArchived,
+      query.commentSort,
     );
     const commentPage = limitCollection(context.comments, query.commentLimit);
     const activityPage = limitCollection(context.activity, query.activityLimit);
@@ -861,7 +865,7 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
               ...truncationLines(
                 includeComments && commentPage.truncated,
                 "comments",
-                `GET /api/agents/tasks/${context.task.id}/comments?offset=${query.commentLimit}&limit=${query.commentLimit}`,
+                `GET /api/agents/tasks/${context.task.id}/comments?offset=${query.commentLimit}&limit=${query.commentLimit}${query.commentSort === "desc" ? "&sort=desc" : ""}`,
               ),
               ...truncationLines(
                 includeActivity && activityPage.truncated,
@@ -902,11 +906,12 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
   });
 
   app.get("/api/agents/tasks/:taskId/comments", (req, res) => {
-    const query = parseQuery(req, agentReadQuerySchema);
+    const query = parseQuery(req, agentCommentListQuerySchema);
     const context = loadTaskWithParents(
       services,
       req.params.taskId,
       query.includeArchived,
+      query.sort,
     );
     const page = paginate(context.comments, query.offset, query.limit);
 
@@ -937,6 +942,7 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
             truncated: page.truncated,
             offset: query.offset,
             limit: query.limit,
+            sort: query.sort,
             total: context.comments.length,
           },
         },
@@ -1481,13 +1487,14 @@ function loadTaskWithParents(
   services: ApiServices,
   taskId: string,
   includeArchived: boolean,
+  commentSort: "asc" | "desc" = "asc",
 ): TaskWithParents {
   const task = services.tasks.getTask(taskId, includeArchived);
   const project = services.projects.getProject(task.projectId, includeArchived);
   const board = services.boards.getBoard(project.id, task.boardId, includeArchived);
   const columns = services.boards.listBoardColumns(board.id);
   const column = columnForTask(columns, task);
-  const comments = services.comments.listTaskComments(task.id);
+  const comments = services.comments.listTaskComments(task.id, commentSort);
   const activity = services.comments.listTaskActivity(task.id);
   const attachments = services.attachments.listTaskAttachments(task.id, true);
   return { project, board, columns, column, task, comments, activity, attachments };
@@ -1829,8 +1836,9 @@ function tasksNextCall(query: AgentTaskListQuery) {
   return `GET /api/agents/tasks?${params.toString()}`;
 }
 
-function commentsNextCall(taskId: string, query: AgentReadQuery) {
-  return `GET /api/agents/tasks/${taskId}/comments?offset=${query.offset + query.limit}&limit=${query.limit}`;
+function commentsNextCall(taskId: string, query: AgentCommentListQuery) {
+  const sort = query.sort === "desc" ? "&sort=desc" : "";
+  return `GET /api/agents/tasks/${taskId}/comments?offset=${query.offset + query.limit}&limit=${query.limit}${sort}`;
 }
 
 function activityNextCall(taskId: string, query: AgentReadQuery) {

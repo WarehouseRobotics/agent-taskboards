@@ -8,6 +8,7 @@ import {
 } from "../http/validation.js";
 import {
   commentCreateSchema,
+  commentListQuerySchema,
   includeArchivedQuerySchema,
   taskCreateSchema,
   taskMoveSchema,
@@ -101,7 +102,11 @@ export function registerTaskRoutes(app: Express, services: ApiServices) {
   });
 
   app.get("/api/tasks/:taskId/comments", (req, res) => {
-    const comments = services.comments.listTaskComments(req.params.taskId);
+    const query = parseQuery(req, commentListQuerySchema);
+    const comments = services.comments.listTaskComments(
+      req.params.taskId,
+      query.sort,
+    );
     res.json({ comments: comments.map(serializeComment) });
   });
 

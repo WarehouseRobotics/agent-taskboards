@@ -52,6 +52,10 @@ export const activityQuerySchema = z.object({
     .transform((value) => value === "true"),
 });
 
+export const commentListQuerySchema = z.object({
+  sort: z.enum(["asc", "desc"]).optional().default("asc"),
+});
+
 export const projectCreateSchema = z.object({
   name: urlSafeNameSchema,
   description: nullableString.optional(),

@@ -11,7 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { eq } from "drizzle-orm";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "./app.js";
 import { createDatabaseClient, type DatabaseClient } from "./db/client.js";
 import { runMigrations } from "./db/migrate.js";
@@ -954,6 +954,50 @@ describe("starter API", () => {
         (document) => document.embeddingStatus === "indexed",
       ),
     ).toBe(true);
+  });
+
+  it("lists task comments in the requested sort order", async () => {
+    const { projectId, boardId } = await createProjectAndBoard();
+    const taskResponse = await api(
+      "POST",
+      `/api/projects/${projectId}/boards/${boardId}/tasks`,
+      { title: "Sorted comments" },
+    );
+    const taskId = stringProp(objectProp(taskResponse.body, "task"), "id");
+
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      for (const [index, body] of ["First", "Second", "Third"].entries()) {
+        vi.setSystemTime(new Date(Date.UTC(2026, 0, 1, 0, 0, index)));
+        await api("POST", `/api/tasks/${taskId}/comments`, {
+          authorType: "human",
+          body,
+        });
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const bodies = (response: Awaited<ReturnType<typeof api>>) =>
+      arrayProp(response.body, "comments").map((item) =>
+        stringProp(asObject(item), "body"),
+      );
+
+    const defaultOrder = await api("GET", `/api/tasks/${taskId}/comments`);
+    expect(defaultOrder.status).toBe(200);
+    expect(bodies(defaultOrder)).toEqual(["First", "Second", "Third"]);
+
+    const ascending = await api("GET", `/api/tasks/${taskId}/comments?sort=asc`);
+    expect(bodies(ascending)).toEqual(["First", "Second", "Third"]);
+
+    const descending = await api("GET", `/api/tasks/${taskId}/comments?sort=desc`);
+    expect(bodies(descending)).toEqual(["Third", "Second", "First"]);
+
+    const invalid = await api("GET", `/api/tasks/${taskId}/comments?sort=newest`);
+    expect(invalid.status).toBe(400);
+    expect(stringProp(objectProp(invalid.body, "error"), "code")).toBe(
+      "invalid_request",
+    );
   });
 
   it("deletes individual task comments with audit activity and search cleanup", async () => {
