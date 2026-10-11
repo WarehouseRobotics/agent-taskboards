@@ -305,15 +305,33 @@ button.label-chip:hover {
   color: var(--fg);
 }
 
-/* The filter icon stays collapsed until the chip is hovered or holds focus,
-   so a plain click on the chip body falls through to the card or row. */
+/* Filterable chips swap the color dot for a filter icon on hover or focus.
+   The slot keeps the dot's width and the icon is laid over it, so the chip
+   never grows and a plain click on the chip body falls through to the card
+   or row. */
+.label-chip__slot {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 6px;
+  height: 6px;
+}
+
+.label-chip__slot .label-chip__dot {
+  transition: opacity 120ms ease;
+}
+
 .label-chip__filter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  max-width: 0;
-  margin-left: -4px;
-  overflow: hidden;
+  width: 14px;
+  height: 14px;
   border: 0;
   border-radius: 2px;
   background: transparent;
@@ -321,23 +339,30 @@ button.label-chip:hover {
   cursor: pointer;
   opacity: 0;
   padding: 0;
-  transition: max-width 120ms ease, margin-left 120ms ease, opacity 120ms ease;
+  transform: translate(-50%, -50%);
+  transition: opacity 120ms ease;
+}
+
+.label-chip--filterable:hover .label-chip__dot,
+.label-chip--filterable:focus-within .label-chip__dot {
+  opacity: 0;
 }
 
 .label-chip--filterable:hover .label-chip__filter,
 .label-chip--filterable:focus-within .label-chip__filter {
-  max-width: 14px;
-  margin-left: 0;
   opacity: 1;
-  padding: 1px;
 }
 
+/* Touch devices cannot hover, so the icon stands in for the dot permanently
+   and carries the tag's color in its place. */
 @media (hover: none) {
+  .label-chip--filterable .label-chip__dot {
+    opacity: 0;
+  }
+
   .label-chip--filterable .label-chip__filter {
-    max-width: 14px;
-    margin-left: 0;
+    color: var(--label-color);
     opacity: 1;
-    padding: 1px;
   }
 }
 

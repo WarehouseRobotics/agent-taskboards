@@ -235,26 +235,31 @@ export function LabelChip({
 
   // Filterable chips sit inside clickable cards and rows. A click on the chip
   // body opens the task like the rest of the card; only the small icon filters,
-  // so a slightly-off click no longer narrows the board by accident.
+  // so a slightly-off click no longer narrows the board by accident. The icon
+  // overlays the dot's slot, so revealing it never changes the chip's width.
   if (onFilter) {
+    const color = labelColor(label);
     return (
-      <span className="label-chip label-chip--filterable">
-        {content}
-        <button
-          aria-label={title ?? `Filter by tag ${label}`}
-          className="label-chip__filter"
-          draggable={false}
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onFilter(label);
-          }}
-          onKeyDown={(event) => event.stopPropagation()}
-          title={title ?? `Filter by tag ${label}`}
-          type="button"
-        >
-          <Icon name="filter" size={10} strokeWidth={1.8} />
-        </button>
+      <span className="label-chip label-chip--filterable" style={{ "--label-color": color } as CSSProperties}>
+        <span className="label-chip__slot">
+          <span className="label-chip__dot" style={{ background: color }} />
+          <button
+            aria-label={title ?? `Filter by tag ${label}`}
+            className="label-chip__filter"
+            draggable={false}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onFilter(label);
+            }}
+            onKeyDown={(event) => event.stopPropagation()}
+            title={title ?? `Filter by tag ${label}`}
+            type="button"
+          >
+            <Icon name="filter" size={10} strokeWidth={1.8} />
+          </button>
+        </span>
+        {label}
       </span>
     );
   }
