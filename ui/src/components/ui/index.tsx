@@ -217,10 +217,13 @@ export function Avatar({
 export function LabelChip({
   label,
   onClick,
+  onFilter,
   title,
 }: {
   label: string;
   onClick?: (label: string) => void;
+  /** Reveals a filter icon on hover or focus; the chip body stays inert. */
+  onFilter?: (label: string) => void;
   title?: string;
 }) {
   const content = (
@@ -229,12 +232,39 @@ export function LabelChip({
       {label}
     </>
   );
+
+  // Filterable chips sit inside clickable cards and rows. A click on the chip
+  // body opens the task like the rest of the card; only the small icon filters,
+  // so a slightly-off click no longer narrows the board by accident.
+  if (onFilter) {
+    return (
+      <span className="label-chip label-chip--filterable">
+        {content}
+        <button
+          aria-label={title ?? `Filter by tag ${label}`}
+          className="label-chip__filter"
+          draggable={false}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onFilter(label);
+          }}
+          onKeyDown={(event) => event.stopPropagation()}
+          title={title ?? `Filter by tag ${label}`}
+          type="button"
+        >
+          <Icon name="filter" size={10} strokeWidth={1.8} />
+        </button>
+      </span>
+    );
+  }
+
   if (!onClick) {
     return <span className="label-chip">{content}</span>;
   }
 
-  // Chips sit inside clickable cards and rows, so keep their clicks and
-  // activation keys from also opening the task underneath.
+  // Keep chip clicks and activation keys from also reaching any clickable
+  // container underneath.
   return (
     <button
       className="label-chip"

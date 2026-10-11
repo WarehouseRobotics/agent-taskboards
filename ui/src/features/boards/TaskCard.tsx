@@ -220,8 +220,7 @@ export function TaskCard({
             <LabelChip
               key={label}
               label={label}
-              onClick={onLabelClick}
-              title={onLabelClick ? `Filter by tag ${label}` : undefined}
+              onFilter={onLabelClick}
             />
           ))}
           <span className="task-card__spacer" />

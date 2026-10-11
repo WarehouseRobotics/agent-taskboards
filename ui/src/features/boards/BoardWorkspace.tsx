@@ -732,7 +732,7 @@ function BoardTaskList({
                 <td>
                   <span className="board-list__labels">
                     {task.labels.slice(0, 3).map((label) => (
-                      <LabelChip key={label} label={label} onClick={onLabelClick} title={`Filter by tag ${label}`} />
+                      <LabelChip key={label} label={label} onFilter={onLabelClick} />
                     ))}
                   </span>
                 </td>

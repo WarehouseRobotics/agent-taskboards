@@ -52,8 +52,11 @@ The board view should make task state easy to scan and change:
   in search, narrows both the board and list modes to cards carrying the
   picked tags, matching all of them or any of
   them (the All/Any toggle appears once two tags are picked). The summary then
-  reads `N of M tasks`. Clicking a tag chip on a card or list row adds that tag
-  to the filter instead of opening the task. The filter lives in memory for the
+  reads `N of M tasks`. Hovering or focusing a tag chip on a card or list row
+  reveals a small filter icon; clicking it adds that tag to the filter. A click
+  on the chip itself opens the task like the rest of the card, so a slightly
+  off-target click never narrows the board. Touch devices show the icon
+  permanently. The filter lives in memory for the
   current board and resets when switching boards. Hidden cards keep their
   stored positions: drops are still planned against the full column
 - while a task detail is open and the window is narrower than 1910px, the
