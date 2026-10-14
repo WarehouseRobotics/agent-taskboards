@@ -114,7 +114,12 @@ implementation work):
 
 ```sh
 taskboards context <taskId>
+taskboards context <taskId> commentLimit=30 commentSort=desc   # the 30 newest comments
 ```
+
+Comments come back oldest first unless you ask otherwise. For "what happened
+last" reads pass `commentSort=desc` to `context`, or `sort=desc` to
+`tasks/<taskId>/comments`; the `Next calls` follow-ups keep the sort.
 
 Create a task (`columnKey` defaults to the board's first column on the server
 side). For descriptions longer than a short sentence, write the complete JSON
@@ -191,6 +196,19 @@ taskboards patch tasks/<taskId> --json '{"priority":"high"}'
 taskboards patch tasks/<taskId> --field-file description=/tmp/taskboards-description.md
 ```
 
+Like `metadata`, `labels` and `externalReferences` are replaced whole, not
+merged. To add a PR or other link, read the current list first — the default
+view omits it, so ask for it with `include=externalReferences` — then send the
+full array back with the new entry appended:
+
+```sh
+taskboards get tasks/<taskId> include=externalReferences
+taskboards patch tasks/<taskId> --data /tmp/taskboards-refs.json
+```
+
+Never patch these fields without that read: a missing field in the output means
+you did not ask for it, not that the list is empty.
+
 Complete (sets `completedAt` without moving columns) and archive:
 
 ```sh
@@ -214,13 +232,26 @@ For projects and boards you can use their URL-compliant names instead of IDs. Ta
 
 Pass these as bare `key=value` args:
 
-- `format=toon|yaml|json|none` — default `toon`.
+- `format=toon|yaml|json|none` — default `toon`. This picks the format of the
+  fenced data block only; the response is always markdown around it, so
+  `format=json` output is not parseable JSON as is. Extract the block first:
+
+  ```sh
+  taskboards get tasks/<taskId> include=externalReferences format=json \
+    | awk '/^```json$/{f=1;next} /^```$/{f=0} f' \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["externalReferences"])'
+  ```
+
+  `--json` sets a request body; it does not change the response format.
 - `view=brief|normal|full` — default `normal`. Use `brief` for scans, `full`
   only when you actually need descriptions/metadata.
 - `include=description,comments,activity,metadata,externalReferences` —
   opt-in; explicit `include` overrides `view`.
 - `limit` (default 25, search 10), `offset`, `perColumnLimit` (20),
   `commentLimit` (5), `activityLimit` (10).
+- `commentSort=asc|desc` on `context`, `sort=asc|desc` on
+  `tasks/<taskId>/comments` — default `asc` (oldest first). Use `desc` to read
+  the newest comments without paging through the whole log.
 - `includeArchived=true` — required to see archived projects/boards/tasks.
 
 Truncated responses always carry exact follow-up calls in their `Next calls`

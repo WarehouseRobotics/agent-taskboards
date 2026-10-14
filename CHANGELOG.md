@@ -4,6 +4,16 @@ Important changes to Agent Taskboards are documented in this file.
 
 ## Released
 
+### 2026-10-07
+
+- **Comment sort order** (`add-a-sort-parameter-68tm1s`):
+  `GET /api/tasks/:taskId/comments` and `GET /api/agents/tasks/:taskId/comments`
+  accept `sort=asc|desc`. `asc` (oldest first) stays the default; `desc` lists
+  newest first, and agent paging next calls keep the chosen order. The agent
+  task context (`GET /api/agents/tasks/:taskId/context`) accepts
+  `commentSort=asc|desc`, so `commentSort=desc` returns the newest
+  `commentLimit` comments.
+
 ### 2026-10-04
 
 - **Project-scoped sidebar search** (`scope-sidebar-search-to-90rvs4`): The

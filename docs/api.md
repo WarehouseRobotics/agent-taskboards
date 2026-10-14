@@ -560,6 +560,12 @@ Activity fields:
 
 Lists comments for a task in creation order.
 
+Query parameters:
+
+- `sort`: `asc` by default (oldest first); accepts `asc` or `desc` (newest
+  first). Comments created in the same millisecond are ordered by id. Any other
+  value returns `400 invalid_request`.
+
 ### `POST /api/tasks/:taskId/comments`
 
 Creates a comment and appends a `comment.created` activity entry.
