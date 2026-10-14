@@ -153,6 +153,10 @@ Limits should be conservative by default:
 Every truncated response must say what was omitted and include an exact next
 call. Truncation metadata should also appear in the structured block.
 
+Task comments and activity are returned newest first everywhere in the agentic
+API, so `commentLimit` and `activityLimit` keep the most recent entries and
+`offset` pages back to older ones. The canonical JSON API keeps creation order.
+
 ### Archived Content
 
 Read endpoints exclude archived projects, boards, and tasks by default. They
@@ -355,6 +359,10 @@ Default `normal` view should include:
 - exact calls for full context, comments, activity, move, complete, archive, and
   comment creation
 
+Comments and activity are listed only with `include=comments`,
+`include=activity`, or `view=full`, newest first and capped by `commentLimit`
+and `activityLimit`.
+
 ### `PATCH /api/agents/tasks/:taskId`
 
 Updates mutable task fields using the same JSON body as `PATCH /api/tasks/:id`.
@@ -422,13 +430,15 @@ Returns task context for handoff or implementation. Supports:
 ?activityLimit=20
 ```
 
-Default behavior should include the task, parent project and board, ordered
-workflow columns, recent comments, recent activity, and truncation notices. Full
-comments and activity require explicit `include` or `view=full`.
+Default behavior includes the task, parent project and board, attachments, and
+comment and activity counts. Comments and activity are listed only with
+explicit `include` or `view=full`; they come newest first, capped by
+`commentLimit` and `activityLimit`, with a truncation notice that points to the
+next page of older entries.
 
 ### `GET /api/agents/tasks/:taskId/comments`
 
-Lists comments in creation order. Supports `limit`, `offset`, and `format`.
+Lists comments newest first. Supports `limit`, `offset`, and `format`.
 Comments should preserve author type, optional author name/ref, creation time,
 and body.
 
@@ -451,7 +461,7 @@ ID.
 
 ### `GET /api/agents/tasks/:taskId/activity`
 
-Lists task activity in creation order. Supports `limit`, `offset`, and
+Lists task activity newest first. Supports `limit`, `offset`, and
 `format`. Activity entries should stay compact unless `view=full` is requested.
 
 ## Search

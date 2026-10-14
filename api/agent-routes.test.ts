@@ -377,6 +377,76 @@ describe("agent markdown API", () => {
     expect(archive.text).toContain("Comments and activity remain attached.");
   });
 
+  it("returns the newest comments and activity first and honors view=full in context", async () => {
+    const { projectId, boardId } = await createProjectAndBoard();
+    const taskId = await createTask(projectId, boardId, { title: "Chatty task" });
+    for (const body of ["Comment alpha", "Comment bravo", "Comment charlie"]) {
+      await api("POST", `/api/agents/tasks/${taskId}/comments`, {
+        authorType: "agent",
+        body,
+      });
+    }
+    const commentBodies = (text: string) =>
+      arrayProp(jsonBlock(text), "comments")
+        .map(asObject)
+        .map((comment) => stringProp(comment, "body"));
+
+    const included = await api(
+      "GET",
+      `/api/agents/tasks/${taskId}?include=comments&commentLimit=2&format=json`,
+    );
+    expect(commentBodies(included.text)).toEqual(["Comment charlie", "Comment bravo"]);
+
+    const full = await api(
+      "GET",
+      `/api/agents/tasks/${taskId}?view=full&commentLimit=2&activityLimit=1&format=json`,
+    );
+    expect(commentBodies(full.text)).toEqual(["Comment charlie", "Comment bravo"]);
+    expect(
+      arrayProp(jsonBlock(full.text), "activity")
+        .map(asObject)
+        .map((entry) => stringProp(entry, "summary")),
+    ).toEqual(["Comment was added"]);
+
+    const context = await api(
+      "GET",
+      `/api/agents/tasks/${taskId}/context?view=full&commentLimit=2&activityLimit=2`,
+    );
+    expect(context.text).toContain("## Comments");
+    expect(context.text).toContain("## Activity");
+    expect(context.text).toContain("- Comments returned (newest first): 2 of 3.");
+    expect(context.text).toContain("- Activity returned (newest first): 2 of 4.");
+    expect(context.text.indexOf("Comment charlie")).toBeLessThan(
+      context.text.indexOf("Comment bravo"),
+    );
+    expect(context.text).not.toContain("Comment alpha");
+    expect(context.text).not.toContain("task.created");
+    expect(context.text).toContain(
+      `Continue with \`GET /api/agents/tasks/${taskId}/comments?offset=2&limit=2\``,
+    );
+
+    const normalContext = await api("GET", `/api/agents/tasks/${taskId}/context`);
+    expect(normalContext.text).toContain("- Comments returned (newest first): 0 of 3.");
+    expect(normalContext.text).not.toContain("## Comments");
+    expect(normalContext.text).not.toContain("## Activity");
+
+    const olderComments = await api(
+      "GET",
+      `/api/agents/tasks/${taskId}/comments?offset=2&limit=2&format=json`,
+    );
+    expect(commentBodies(olderComments.text)).toEqual(["Comment alpha"]);
+
+    const activity = await api(
+      "GET",
+      `/api/agents/tasks/${taskId}/activity?format=json`,
+    );
+    const eventTypes = arrayProp(jsonBlock(activity.text), "activity")
+      .map(asObject)
+      .map((entry) => stringProp(entry, "eventType"));
+    expect(eventTypes[0]).toBe("comment.created");
+    expect(eventTypes.at(-1)).toBe("task.created");
+  });
+
   it("moves a task to a sibling board and reports the resulting context", async () => {
     const { projectId, boardId } = await createProjectAndBoard();
     const targetBoard = objectProp(

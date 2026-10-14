@@ -220,7 +220,8 @@ Pass these as bare `key=value` args:
 - `include=description,comments,activity,metadata,externalReferences` —
   opt-in; explicit `include` overrides `view`.
 - `limit` (default 25, search 10), `offset`, `perColumnLimit` (20),
-  `commentLimit` (5), `activityLimit` (10).
+  `commentLimit` (5), `activityLimit` (10). Comments and activity come back
+  newest first, so the limits keep the most recent entries.
 - `includeArchived=true` — required to see archived projects/boards/tasks.
 
 Truncated responses always carry exact follow-up calls in their `Next calls`

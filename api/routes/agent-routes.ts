@@ -90,7 +90,7 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
             lines: [
               "- Read endpoints support `format=toon|yaml|json|none` and `view=brief|normal|full`.",
               "- Writes accept canonical JSON bodies, except attachment uploads which use multipart `file`.",
-              "- Use task context endpoints when you need comments and activity for handoff.",
+              "- Use task context endpoints when you need comments and activity for handoff; both are returned newest first.",
             ],
           },
         ],
@@ -841,8 +841,8 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
     );
     const commentPage = limitCollection(context.comments, query.commentLimit);
     const activityPage = limitCollection(context.activity, query.activityLimit);
-    const includeComments = query.include.includes("comments");
-    const includeActivity = query.include.includes("activity");
+    const includeComments = includesCollection(query, "comments");
+    const includeActivity = includesCollection(query, "activity");
 
     sendAgentMarkdown(
       res,
@@ -856,8 +856,8 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
               `- Parent project: \`${context.project.id}\` ${context.project.name}.`,
               `- Parent board: \`${context.board.id}\` ${context.board.name}.`,
               `- Attachments: ${context.attachments.length}.`,
-              `- Comments returned: ${includeComments ? commentPage.items.length : 0} of ${context.comments.length}.`,
-              `- Activity returned: ${includeActivity ? activityPage.items.length : 0} of ${context.activity.length}.`,
+              `- Comments returned (newest first): ${includeComments ? commentPage.items.length : 0} of ${context.comments.length}.`,
+              `- Activity returned (newest first): ${includeActivity ? activityPage.items.length : 0} of ${context.activity.length}.`,
               ...truncationLines(
                 includeComments && commentPage.truncated,
                 "comments",
@@ -913,7 +913,7 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
     sendAgentMarkdown(
       res,
       {
-        outcome: `Found ${page.items.length} comment${plural(page.items.length)} for task \`${context.task.id}\`.`,
+        outcome: `Found ${page.items.length} comment${plural(page.items.length)} for task \`${context.task.id}\`, newest first.`,
         sections: [
           {
             title: "What I found",
@@ -1070,7 +1070,7 @@ export function registerAgentRoutes(app: Express, options: AgentRouteOptions) {
     sendAgentMarkdown(
       res,
       {
-        outcome: `Found ${page.items.length} activity entr${page.items.length === 1 ? "y" : "ies"} for task \`${context.task.id}\`.`,
+        outcome: `Found ${page.items.length} activity entr${page.items.length === 1 ? "y" : "ies"} for task \`${context.task.id}\`, newest first.`,
         sections: [
           {
             title: "What I found",
@@ -1487,8 +1487,9 @@ function loadTaskWithParents(
   const board = services.boards.getBoard(project.id, task.boardId, includeArchived);
   const columns = services.boards.listBoardColumns(board.id);
   const column = columnForTask(columns, task);
-  const comments = services.comments.listTaskComments(task.id);
-  const activity = services.comments.listTaskActivity(task.id);
+  // Agents read newest first, so limits and offsets keep the most recent context.
+  const comments = services.comments.listTaskComments(task.id).reverse();
+  const activity = services.comments.listTaskActivity(task.id).reverse();
   const attachments = services.attachments.listTaskAttachments(task.id, true);
   return { project, board, columns, column, task, comments, activity, attachments };
 }
@@ -1733,12 +1734,19 @@ function includedCollection<T>(
   query: AgentReadQuery,
   collection: "comments" | "activity",
 ) {
-  if (query.view === "full" || query.include.includes(collection)) {
+  if (includesCollection(query, collection)) {
     const limit = collection === "comments" ? query.commentLimit : query.activityLimit;
     return limitCollection(items, limit).items;
   }
 
   return [];
+}
+
+function includesCollection(
+  query: AgentReadQuery,
+  collection: "comments" | "activity",
+) {
+  return query.view === "full" || query.include.includes(collection);
 }
 
 function limitCollection<T>(items: T[], limit: number) {
